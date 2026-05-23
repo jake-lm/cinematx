@@ -8,7 +8,7 @@ require '../database.php';
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <meta property="og:title" content="" />
   <meta property="og:description" content="" />
-  <link rel="stylesheet" href="../css/sass.scss" />
+  <link rel="stylesheet" href="../css/sass.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
   <link rel="icon" href="/img/iconimg.png" type="image/x-icon"/>
   <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon"/>

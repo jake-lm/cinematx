@@ -18,7 +18,7 @@ require '../database.php';
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
   <link rel="icon" href="/images/icons/icon.png" type="image/x-icon"/>
   <link rel="shortcut icon" href="/images/icons/icon.png" type="image/x-icon"/>
-  <link rel="stylesheet" href="../css/sass.scss" />
+  <link rel="stylesheet" href="../css/sass.css?v=2" />
   <link href="https://vjs.zencdn.net/7.8.3/video-js.css" rel="stylesheet" />
   <script src="https://use.fontawesome.com/80ad235f22.js"></script>
   <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>

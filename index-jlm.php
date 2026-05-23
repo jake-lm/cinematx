@@ -116,7 +116,7 @@ $tomorrow = $today + 86400;
   <meta name="viewport" content="width=device-width" />
   <meta property="og:title" content="The Cinema" />
   <meta property="og:description" content="First ever real-time virtual cinema, probably." />
-  <link rel="stylesheet" href="css/sass.scss" />
+  <link rel="stylesheet" href="css/sass.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
   <link rel="icon" href="/images/icons/icon.png" type="image/x-icon"/>
   <link rel="shortcut icon" href="/images/icons/icon.png" type="image/x-icon"/>
