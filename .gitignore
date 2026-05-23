@@ -1,0 +1,13 @@
+# Local config with real credentials — copy config.example.php to config.php and fill in
+config.php
+
+# Database backups may contain real data
+*.sql
+
+# Media uploads
+motw/
+
+# OS and editor
+.DS_Store
+*.swp
+*.swo
