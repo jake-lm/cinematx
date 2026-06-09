@@ -1,0 +1,8 @@
+Options -Indexes
+RewriteEngine On
+RewriteBase /
+
+# Pretty post URLs: /posts/my-post-title-42 → /posts/index.php?id=42
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^posts/([a-z0-9-]+)-([0-9]+)/?$ /posts/index.php?id=$2 [L,QSA]

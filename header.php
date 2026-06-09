@@ -22,21 +22,27 @@
     ?>
     <div class="text">
     <form action="/dashboard/signup.php?action=login" method="post" enctype="multipart/form-data">
-      <input class="input-u" type="text" name="email" placeholder="Email" disabled />
-      <input class="input-u" type="password" name="pw" placeholder="Password" disabled /> <br>
+      <input class="input-u" type="text" name="email" placeholder="Email" />
+      <input class="input-u" type="password" name="pw" placeholder="Password" /> <br>
 
-      <input type="submit" class="submit-u" value="Sign in" disabled />
+      <input type="submit" class="submit-u" value="Sign in" />
     </form>
     </div>
     <?php
     }
     ?>
+  <div class="social">
+    <a href="#"><i class="fa-brands fa-discord fa"></i></a>
+    &nbsp;
+    <a href="#"><i class="fa-brands fa-instagram fa"></i></a>
+  </div>
 </div>
 <div class="top-bar">
   <div class="underlay"></div>
   <div class="right-hold"></div>
   <div class="top-hold">
   <div class="head-txt"><span class="bgcolor">Cinema, TX</span></div>
+  <span class="welcome">Welcome to the Cinema</span>
   <div class="menu-hold"><span class="menu-btn">
     <i class="fa-solid fa-bars"></i>
   </span></div>

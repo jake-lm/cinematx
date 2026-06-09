@@ -1,90 +1,128 @@
 /* theatre support */
 
-function theatre_1(showtime, dur, filename) {
-var motw = videojs('motw'); // define player
-console.log(showtime);
+function theatre_1(showtime, dur, filename, playerId) {
+  playerId = playerId || 'motw';
 
-/*$.ajax({
-    type: "POST",
-    url: '/motw/motw.php',
-    dataType: 'json',
-    data: {"data":"check"},
-    success: function(data){
-        alert(data.value1);
-        alert(data.value2);
+  // guard: nothing scheduled
+  if (!showtime || !filename) return;
+
+  console.log('[th1] showtime:', showtime, '(' + new Date(showtime * 1000).toLocaleTimeString() + ')');
+  console.log('[th1] dur:', dur, 'seconds (' + Math.floor(dur/60) + 'm)');
+  console.log('[th1] filename:', filename);
+  console.log('[th1] playerId:', playerId);
+
+  // get or init the Video.js player for this element
+  var player = videojs(playerId);
+
+  player.ready(function() {
+    var now = Date.now() / 1000;
+    var diff = Math.floor(now - showtime);
+
+    if (diff < 0) {
+      // pre-show: don't expose the file — poster stays, reload interval handles the start
+      console.log('[th1] pre-show (' + Math.abs(diff) + 's until showtime), not loading file');
+      return;
     }
- });*/
 
-console.log(filename);
+    if (diff >= dur) {
+      // film already over
+      console.log('[th1] film ended (diff >= dur)');
+      return;
+    }
 
-// set file
-motw.ready(function(){
-  this.src({type: 'video/mp4', src: '/motw/'+filename+'.mp4'});
-});
+    // set source via streaming endpoint (supports HTTP range requests for seeking)
+    player.src({ type: 'video/mp4', src: '/motw/stream.php?f=' + encodeURIComponent(filename) });
+    console.log('[th1] source set at diff=' + diff + 's, waiting for loadedmetadata...');
 
-motw.load();
+    player.one('loadedmetadata', function() {
+      var now2 = Date.now() / 1000;
+      var diff2 = Math.floor(now2 - showtime);
+      console.log('[th1] loadedmetadata fired. seeking to', diff2 + 's');
 
-//showtime = Math.floor(showtime / 1000); // define start time in seconds
-var now = new Date().getTime(); now = now / 1000; // define now in seconds
-var diff = Math.floor(now - showtime); // define current duration
-console.log(dur);
-console.log(new Date(showtime * 1000));
+      player.muted(true);
+      player.currentTime(diff2);
 
-// reset on mouseup
-$('#motw').mouseup(function(){
-  now = new Date().getTime(); now = now / 1000;
-  diff = Math.floor(now - showtime);
-  motw.currentTime(diff);
-});
+      player.one('seeked', function() {
+        console.log('[th1] seeked, now playing from', Math.floor(player.currentTime()) + 's');
+        player.play().then(function() {
+          console.log('[th1] muted autoplay succeeded');
+          // show unmute nudge
+          setTimeout(function() {
+            if (player.muted()) {
+              var btn = document.createElement('div');
+              btn.id = 'unmute-nudge';
+              btn.innerHTML = '&#128266; click to unmute';
+              btn.style.cssText = 'position:absolute;bottom:55px;right:12px;background:rgba(0,0,0,0.65);color:#e2e2e2;font-size:44px;letter-spacing:4px;padding:20px 40px;cursor:pointer;z-index:9999;font-family:Montserrat,sans-serif;';
+              var holdEl = document.getElementById(playerId + '-hold') || document.querySelector('.video-hold');
+              if (holdEl) holdEl.appendChild(btn);
+              btn.addEventListener('click', function() {
+                player.muted(false);
+                btn.remove();
+              });
+            }
+          }, 500);
+        }).catch(function(e) {
+          player.muted(false);
+          console.warn('[th1] autoplay blocked entirely:', e.message);
+        });
+      });
+    });
+  });
 
-// reload on showtime
-function checkTime() {
-  now = new Date().getTime(); now = now / 1000;
-  if(now == showtime || now > showtime) {
-    location.reload();
+  // reload when showtime arrives (pre-show state)
+  var nowCheck = Date.now() / 1000;
+  if (nowCheck < showtime) {
+    var c = setInterval(function() {
+      if (Date.now() / 1000 >= showtime) {
+        clearInterval(c);
+        location.reload();
+      }
+    }, 5000);
   }
-  console.log('test');
-}
-if(now < showtime) {
-  c = setInterval(checkTime,5000);
-}
 
-// change text on duration
-function checkDur() {
-  now = new Date().getTime(); now = now / 1000;
-  if(now < showtime) {
-    $('.np').html('<span style="color:orange;"></span>');
-  }
-  else if(now < showtime && now > (showtime - 900)) { // 15m or less before showtime
-    $('.np').html('<span style="color:orange;">starting soon</span>');
-  }
-  else if(now > (showtime + ((dur/3)*2)) && now < (showtime + dur)) { // within 2/6 of showtime + dur (end)
-    $('.np').html('<span style="color:orange;">almost over</span>');
-  }
-  else if(now > showtime && now < (showtime + dur)) { // if between showtime and end
-    $('.np').html('<span style="color:green;">playing now</span>');
-  }
-  else if(now > (showtime + dur)) { // if past end
-    $('.np').html('<span style="color:#b22222;">ended</span>');
-  }
-}
+  // sync interval — every 3s, correct any drift beyond 2s
+  var t = setInterval(function() {
+    var now = Date.now() / 1000;
+    var diff = Math.floor(now - showtime);
 
-i = setInterval(checkDur(),60000);
+    if (diff < 0 || diff >= dur) return; // outside film bounds, do nothing
 
-// reflect consistent time
-function resetTime() {
-  now = new Date().getTime(); now = now / 1000;
-  mct = Math.floor(motw.currentTime());
-  diff = Math.floor(now - showtime);
-  diffOver = diff + 1; diffUnder = diff - 1;
+    var mct = Math.floor(player.currentTime());
+    if (Math.abs(mct - diff) > 2) {
+      player.currentTime(diff);
+    }
+  }, 3000);
 
-  if(mct > diffOver || mct < diffUnder) {
-    diff = Math.floor(now - showtime);
-    motw.currentTime(diff);
+  // snap back on any scrub attempt
+  $('#' + playerId).on('mouseup touchend', function() {
+    var now = Date.now() / 1000;
+    var diff = Math.floor(now - showtime);
+    if (diff >= 0 && diff < dur) {
+      player.currentTime(diff);
+    }
+  });
+
+  // status text
+  function checkDur() {
+    var now = Date.now() / 1000;
+    if (now < showtime - 900) {
+      $('.np').html('');
+    } else if (now < showtime) {
+      $('.np').html('<span style="color:orange;">starting soon</span>');
+    } else if (now >= showtime && now < showtime + dur) {
+      if (now > showtime + (dur / 3) * 2) {
+        $('.np').html('<span style="color:orange;">almost over</span>');
+      } else {
+        $('.np').html('<span style="color:green;">playing now</span>');
+      }
+    } else {
+      $('.np').html('<span style="color:#b22222;">ended</span>');
+    }
   }
-}
 
-t = setInterval(resetTime, 10000);
+  checkDur();
+  setInterval(checkDur, 60000);
+
 }
 
   /*for(i=0;i<welcomeCount;i++) {
@@ -122,6 +160,8 @@ $('.welcome').delay(10000).fadeOut(500, function() {
 //menu show/hide & video
 $(document).ready(function(){
 
+  cycle();
+
   $('.menu-button').on("click", function(){
       if($('.menu-button').hasClass('clicked')) {
           $(this).removeClass("clicked");
@@ -137,6 +177,122 @@ $(document).ready(function(){
             });
           }
       }
+  });
+
+// ── Custom player controls ──────────────────────────────────────────────
+
+  function getPlayer($el) {
+    var id = $el.closest('.player-controls').data('player');
+    return videojs.players[id] || null;
+  }
+
+  function syncVolumeIcon($controls, player) {
+    var $icon = $controls.find('.ctrl-mute i');
+    if (player.muted() || player.volume() === 0) {
+      $icon.attr('class', 'fa-solid fa-volume-xmark');
+    } else if (player.volume() < 0.5) {
+      $icon.attr('class', 'fa-solid fa-volume-low');
+    } else {
+      $icon.attr('class', 'fa-solid fa-volume-high');
+    }
+  }
+
+  $(document).on('click', '.ctrl-mute', function() {
+    var player = getPlayer($(this));
+    if (!player) return;
+    player.muted(!player.muted());
+    syncVolumeIcon($(this).closest('.player-controls'), player);
+  });
+
+  $(document).on('input', '.ctrl-volume-slider', function() {
+    var player = getPlayer($(this));
+    if (!player) return;
+    var vol = parseFloat($(this).val());
+    player.volume(vol);
+    player.muted(vol === 0);
+    syncVolumeIcon($(this).closest('.player-controls'), player);
+  });
+
+  $(document).on('click', '.ctrl-fullscreen', function() {
+    var player = getPlayer($(this));
+    if (!player) return;
+    var $icon = $(this).find('i');
+    if (player.isFullscreen()) {
+      player.exitFullscreen();
+      $icon.attr('class', 'fa-solid fa-expand');
+    } else {
+      player.requestFullscreen();
+      $icon.attr('class', 'fa-solid fa-compress');
+    }
+  });
+
+  // ── motw theatre expansion
+  var motwPlayerInited = false;
+
+  $('#motw-banner').on('click', function(e) {
+    if ($(e.target).closest('#motw-close').length) return;
+    if ($(this).hasClass('expanded')) return;
+    $(this).addClass('expanded');
+    if (!motwPlayerInited && typeof motwShowtime !== 'undefined') {
+      motwPlayerInited = true;
+      theatre_1(motwShowtime, motwDur, motwFilename, 'motw-home');
+    } else if (motwPlayerInited) {
+      var p = videojs.players['motw-home'];
+      if (p) p.play();
+    }
+  });
+
+  $('#motw-close').on('click', function(e) {
+    e.stopPropagation();
+    $('#motw-banner').removeClass('expanded');
+    var p = videojs.players['motw-home'];
+    if (p) p.pause();
+  });
+
+// signup panel — open on click, close on outside click
+  $('#signup-panel').on('click', function() {
+    if (!$(this).hasClass('active')) {
+      $(this).addClass('active');
+    }
+  });
+  $(document).on('click', function(e) {
+    if (!$(e.target).closest('#signup-panel').length) {
+      $('#signup-panel').removeClass('active');
+    }
+  });
+
+  // step 1 AJAX submit
+  $('#signup-form-1').on('submit', function(e) {
+    e.preventDefault();
+    var $btn = $(this).find('[type=submit]');
+    $btn.val('...').prop('disabled', true);
+
+    $.ajax({
+      type: 'POST',
+      url: '/dashboard/signup.php?action=signup',
+      data: $(this).serialize(),
+      dataType: 'json',
+      success: function(res) {
+        if (res.success) {
+          $('#signup-uid').val(res.uid);
+          $('#signup-step-1').fadeOut(200, function() {
+            $('#signup-step-2').fadeIn(200);
+          });
+        } else {
+          var msgs = {
+            '102': 'Please fill all fields and ensure passwords match.',
+            '104': 'That email is already registered.',
+            '108': 'Invalid access code.'
+          };
+          $('#signup-error').text(msgs[res.error] || 'An error occurred.').show();
+          $btn.val('Sign up').prop('disabled', false);
+        }
+      },
+      error: function() {
+        $('#signup-error').text('Server error. Please try again.').show();
+        $btn.val('Sign up').prop('disabled', false);
+      }
+    });
   });
 
 //film info show/hide

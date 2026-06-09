@@ -1,4 +1,5 @@
-<?php error_reporting(1);
+<?php
+error_reporting(1);
 session_start();
 require '../database.php';
 ?>
@@ -6,18 +7,18 @@ require '../database.php';
 <head>
   <meta name="author" content="Dr. Zoidberg" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <meta property="og:title" content="" />
-  <meta property="og:description" content="" />
   <link rel="stylesheet" href="../css/sass.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
   <link rel="icon" href="/img/iconimg.png" type="image/x-icon"/>
   <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon"/>
   <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-  <script src="../script.js"></script>
-  <title>dashboard</title>
+  <script src="../js/script.js"></script>
+  <script src="../js/script-jlm.js"></script>
+  <script src="../js/dashboard.js"></script>
+  <title>Cinema, TX — Dashboard</title>
 </head>
-<body id="signup" onload="cycle()">
+<body id="dashboard">
 
 <div class="main-content">
 
@@ -25,126 +26,155 @@ require '../database.php';
 
 <div class="home-base">
   <div class="content-block-w">
+
+  <?php if(isset($_SESSION['username'])): ?>
   <?php
-  if(isset($_SESSION['username'])) { // if logged in
     $user = $_SESSION['username'];
-    $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = '$user'");
-    $sql1->execute();
-    $qUser=$sql1->fetch();
+    $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = :email");
+    $sql1->execute([':email' => $user]);
+    $qUser = $sql1->fetch();
+    require '../roles.php';
+
+    function slugify($text) {
+      $text = mb_strtolower(trim($text));
+      $text = preg_replace('/[^a-z0-9\s-]/', '', $text);
+      $text = preg_replace('/[\s-]+/', '-', $text);
+      return trim($text, '-');
+    }
+
+    $posts_q = $conn->prepare("SELECT id, title, subtitle, type, stamp, edited, active
+                               FROM `posts` WHERE uid=:uid
+                               ORDER BY COALESCE(edited, stamp) DESC");
+    $posts_q->execute([':uid' => $qUser['id']]);
+    $all_posts = $posts_q->fetchAll(PDO::FETCH_ASSOC);
+    $post_count = count($all_posts);
   ?>
-  <span class="title">Account Details</span>
-  <br>
-  <div class="text">
-  <form action="signup.php?action=updateprof" method="post">
-    <input class="input" type="text" value="<?php echo $qUser['email']; ?>" placeholder="Email" disabled />
-    <input type="hidden" value="<?php echo $qUser['email']; ?>" name="email" placeholder="Email" />
-    <sup><i class="fa-solid fa-circle-info hover-info">
-      <div class="info-box">
-        Visibile to everyone.
-      </div>
-    </i></sup><br>
-    <input class="input" type="text" value="<?php echo $qUser['name']; ?>" name="uname" placeholder="Name" />
-    <input class="input" type="tel" value="<?php echo $qUser['phone']; ?>" name="phone" placeholder="Phone" /><br>
-    <select class="input" value="Department" name="dept">
-      <?php
-      switch($qUser['dept']){
-        case '0':
-        echo "<option value='0'>Select your department</option>";break;
-        case 'Production':
-        echo "<option value='Production'>Production</option>";break;
-        case 'Camera':
-        echo "<option value='Camera'>Camera</option>";break;
-        case 'Sound':
-        echo "<option value='Sound'>Sound</option>";break;
-        case 'Locations':
-        echo "<option value='Locations'>Locations</option>";break;
-        case 'G&E':
-        echo "<option value='G&E'>G&E</option>";break;
-        case 'Art':
-        echo "<option value='Art'>Art</option>";break;
-        case 'Hair & Make-up':
-        echo "<option value='Hair & Make-up'>Hair & Make-up</option>";break;
-        case 'Casting':
-        echo "<option value='Casting'>Casting</option>";break;
-        case 'Editing':
-        echo "<option value='Editing'>Editing</option>";break;
-        case 'VFX':
-        echo "<option value='VFX'>VFX</option>";break;
-        case 'Other':
-        echo "<option value='Other'>Other</option>";break;
-      }
-       ?>
-      <option value="Production">Production</option>
-      <option value="Camera">Camera</option>
-      <option value="Sound">Sound</option>
-      <option value="Locations">Locations</option>
-      <option value="G&E">G&E</option>
-      <option value="Art">Art</option>
-      <option value="Hair & Make-up">Hair & Make-up</option>
-      <option value="Casting">Casting</option>
-      <option value="Editing">Editing</option>
-      <option value="VFX">VFX</option>
-      <option value="Other">Other</option>
-    </select>
-    <input class="input" value="<?php echo $qUser['position']; ?>" type="text" name="position" placeholder="Specify position" /><br>
-    <input class="input" type="text" value="<?php echo $qUser['website']; ?>" name="website" placeholder="Website" />
-    <input class="input" type="text" value="<?php echo $qUser['lb']; ?>" name="lb" placeholder="Letterboxd" /><br>
-    <input type="hidden" value="<?php echo $qUser['id']; ?>" name="uid" />
-    <input type="submit" class="submit" value="Update" />
-  </form>
 
+  <nav class="dash-nav">
+    <span class="dash-tab" data-panel="write">Write</span>
+    <span class="dash-tab" data-panel="posts">Posts<?php if($post_count > 0): ?> <span class="dash-count"><?php echo $post_count; ?></span><?php endif; ?></span>
+    <span class="dash-tab" data-panel="account">Account</span>
+  </nav>
 
-  <!--i class="fa-solid fa-toggle-on"></i-->
-
+  <div class="dash-panel" id="panel-posts">
+    <?php if(!empty($all_posts)): ?>
+    <ul class="drafts-list">
+      <?php foreach($all_posts as $post): ?>
+      <?php $is_live = (int)$post['active'] === 1; ?>
+      <li class="draft-row <?php echo $is_live ? 'post-live' : ''; ?>"
+          data-id="<?php echo $post['id']; ?>"
+          data-active="<?php echo (int)$post['active']; ?>"
+          data-title="<?php echo htmlspecialchars($post['title'] ?? ''); ?>"
+          data-subtitle="<?php echo htmlspecialchars($post['subtitle'] ?? ''); ?>"
+          data-type="<?php echo htmlspecialchars($post['type'] ?? ''); ?>">
+        <div class="draft-info">
+          <span class="draft-title"><?php echo $post['title'] ? htmlspecialchars($post['title']) : '<em>Untitled</em>'; ?></span>
+          <?php if($post['type']): ?><span class="draft-type"><?php echo htmlspecialchars($post['type']); ?></span><?php endif; ?>
+          <span class="post-status <?php echo $is_live ? 'status-live' : 'status-draft'; ?>"><?php echo $is_live ? 'live' : 'draft'; ?></span>
+          <span class="draft-date"><?php echo date('M j, Y', $post['edited'] ?: $post['stamp']); ?></span>
+        </div>
+        <div class="post-row-actions">
+          <?php if($is_live): ?>
+            <a class="post-view" href="/posts/?id=<?php echo $post['id']; ?>" target="_blank">view</a>
+            <button class="post-edit" data-id="<?php echo $post['id']; ?>">edit</button>
+            <button class="post-unpublish" data-id="<?php echo $post['id']; ?>">unpublish</button>
+          <?php else: ?>
+            <button class="draft-delete" data-id="<?php echo $post['id']; ?>">&#x2715;</button>
+          <?php endif; ?>
+        </div>
+      </li>
+      <?php endforeach; ?>
+    </ul>
+    <?php else: ?>
+    <p class="drafts-empty">Nothing here yet.</p>
+    <?php endif; ?>
   </div>
+
+  <div class="dash-panel" id="panel-account">
+    <form action="/dashboard/signup.php?action=updateprof" method="post">
+      <label>Email</label>
+      <input class="input" type="text" value="<?php echo htmlspecialchars($qUser['email']); ?>" placeholder="Email" disabled />
+      <input type="hidden" value="<?php echo htmlspecialchars($qUser['email']); ?>" name="email" />
+      <label>Name</label>
+      <input class="input" type="text" value="<?php echo htmlspecialchars($qUser['name']); ?>" name="uname" placeholder="Name" />
+      <label>Phone</label>
+      <input class="input" type="tel" value="<?php echo htmlspecialchars($qUser['phone']); ?>" name="phone" placeholder="Phone" />
+      <label>Role</label>
+      <select class="input" name="dept">
+        <option value="0">Select your role</option>
+        <?php foreach($roles as $role): ?>
+        <option value="<?php echo $role; ?>" <?php echo $qUser['dept'] === $role ? 'selected' : ''; ?>><?php echo $role; ?></option>
+        <?php endforeach; ?>
+      </select>
+      <label>Website</label>
+      <input class="input" type="text" value="<?php echo htmlspecialchars($qUser['website']); ?>" name="website" placeholder="Website" />
+      <label>Letterboxd</label>
+      <input class="input" type="text" value="<?php echo htmlspecialchars($qUser['lb']); ?>" name="lb" placeholder="Letterboxd" />
+      <input type="hidden" value="<?php echo $qUser['id']; ?>" name="uid" />
+      <input type="submit" class="submit" value="Update" />
+    </form>
+  </div>
+
+  <div class="dash-panel" id="panel-write">
+    <div class="write-wrap">
+      <input  type="text" id="post-title"    class="write-title"   placeholder="Title"            autocomplete="off" />
+      <input  type="text" id="post-subtitle" class="write-subtitle" placeholder="Subtitle"         autocomplete="off" />
+      <select id="post-type" class="write-type">
+        <option value="">Type — optional</option>
+        <option value="review">Review</option>
+        <option value="essay">Essay</option>
+        <option value="note">Note</option>
+      </select>
+      <textarea id="post-content" class="write-content" placeholder="Write something..."></textarea>
+      <div class="write-image-wrap">
+        <div class="write-image-row">
+          <label class="write-image-btn" id="post-image-label">
+            <i class="fa-solid fa-image"></i> Main image
+            <input type="file" id="post-image" accept="image/jpeg,image/png,image/webp,image/gif" disabled />
+          </label>
+          <span class="write-image-hint" id="post-image-hint">Save a draft first</span>
+        </div>
+        <div class="write-image-preview" id="post-image-preview" style="display:none;">
+          <img id="post-image-thumb" src="" alt="preview" />
+          <button class="write-image-remove" id="post-image-remove" title="Remove image">&#x2715;</button>
+        </div>
+        <input type="text" id="post-photo-cred" class="write-photo-cred" placeholder="Photo credit — optional" autocomplete="off" />
+      </div>
+      <div class="write-footer">
+        <span id="autosave-status" class="autosave-status"></span>
+        <div class="write-actions">
+          <button id="post-save"    class="submit write-save">Save Draft</button>
+          <button id="post-publish" class="submit write-publish" disabled>Publish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <?php else: ?>
   <?php
-} else { // if not
-    $error = $_GET['error'];
-    if($error === "100") { // login issue
-      echo "<div class='error'>Retry email or password.</div><br>";
-    }
-    else if($error === "102") { // sign up issue
-      echo "<div class='error'>Registration error.</div><br>";
-    }
-    else if($error === "104") { // sign up issue
-      echo "<div class='error'>Email already registered.</div><br>";
-    }
+    $error = $_GET['error'] ?? null;
+    if ($error === "100") echo "<div class='error'>Retry email or password.</div><br>";
+    else if ($error === "102") echo "<div class='error'>Registration error.</div><br>";
+    else if ($error === "104") echo "<div class='error'>Email already registered.</div><br>";
+    else if ($error === "108") echo "<div class='error'>Invalid access code.</div><br>";
   ?>
-    <div class="title">Sign up</div>
-    <br>
-    <div class="text" style="padding:0;margin:0;">
-    <form action="signup.php?action=signup" method="post" enctype="multipart/form-data">
+  <div class="title">Sign in</div><br>
+  <div class="text" style="padding:0;margin:0;">
+    <form action="/dashboard/signup.php?action=signup" method="post" enctype="multipart/form-data">
+      <label>Email</label>
       <input class="input" type="text" name="email" placeholder="Email" />
-      <!--input class="input" type="text" name="code" placeholder="Access Code">
-      <sup><i class="fa-solid fa-circle-info hover-info">
-        <div class="info-box">
-          Limited access without code.<br>
-          <a href="/about" target="_blank">Learn more.</a>
-        </div>
-      </i></sup></input-->
-      <br>
+      <label>Password</label>
       <input class="input" type="password" name="pw" placeholder="Password" />
-      <input class="input" type="password" name="pw2" placeholder="Confirm Password" />
-      <sup><i class="fa-solid fa-circle-info hover-info">
-        <div class="info-box">
-          Encrypted with php.<br>
-          <a href="https://www.php.net/manual/en/function.crypt.php" target="_blank">Learn more.</a>
-        </div>
-      </i></sup>
-      <br>
+      <label>Confirm Password</label>
+      <input class="input" type="password" name="pw2" placeholder="Confirm password" />
+      <label>Access Code</label>
+      <input class="input" type="text" name="code" placeholder="Ask around." />
       <input type="submit" class="submit" value="Sign up" />
     </form>
-    </div>
-  <?php } ?>
   </div>
-  <!--div class="content-block-t">
-    <div class="main-piece">
-      <div class="main-img" style="background-image: url('img/');">
-        <div class="overlay"></div>
-      </div>
-    </div>
-  </div-->
+  <?php endif; ?>
 
+  </div>
 </div>
 
 </div>

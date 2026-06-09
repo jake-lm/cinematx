@@ -62,7 +62,7 @@ require '../database.php';
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
   <link rel="icon" href="/img/iconimg.png" type="image/x-icon"/>
   <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon"/>
-  <link rel="stylesheet" href="../css/sass.css?v=2" />
+  <link rel="stylesheet" href="../css/sass.css" />
   <link href="https://vjs.zencdn.net/7.8.3/video-js.css" rel="stylesheet" />
   <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
@@ -94,7 +94,7 @@ require '../database.php';
       controls
       preload
       poster="/motw/<?php echo $film['poster']; ?>.png"
-      data-setup='{"controls": true, "autoplay": false, "preload": "true"}'
+      data-setup='{"controls": true, "autoplay": false, "preload": "auto", "width": 640, "height": 360}'
       >
       <source class="v-js-s" src="/motw/" type="video/mp4" />
       <!--<track kind="captions" src="/motw/lvl/lavoielactee.srt" srclang="en" label="English" default>-->
@@ -133,10 +133,10 @@ require '../database.php';
           <?php echo $note['note']; ?>
 
           <br><br>
-          
-          <span style="position:relative;display:block;width:100%;padding:1px;text-align:right;background-color:#922E32;color:fff;">
-              programmed by <?php echo $film['program']; ?>
-          </span>
+
+          <?php if(!empty($film['program'])): ?>
+          <span class="motw-programmer">— <?php echo $film['program']; ?></span>
+          <?php endif; ?>
           <!--a href="../about" target="_blank">Please consider donating.</a-->
         </div>
 
@@ -157,6 +157,16 @@ require '../database.php';
         </div></div>
 
         <br><br>
+
+        <div class="player-controls" data-player="motw">
+          <button class="ctrl-btn ctrl-mute" title="Mute / Unmute">
+            <i class="fa-solid fa-volume-high"></i>
+          </button>
+          <input class="ctrl-volume-slider" type="range" min="0" max="1" step="0.05" value="1" />
+          <button class="ctrl-btn ctrl-fullscreen" title="Fullscreen">
+            <i class="fa-solid fa-expand"></i>
+          </button>
+        </div>
 
         <div class="botbar">
           <div class="hold">
