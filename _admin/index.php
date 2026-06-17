@@ -34,95 +34,91 @@ require '../database.php';
   <div class="main-content">
   <?php include '../header.php'; ?>
   <div class="home-base">
-    <style>
-      table tr td {
-        padding: 25px;
-        background-color: rgba(0,0,0,.15);
-        opacity: .65;
-        transition: background-color .25s ease, opacity .25s ease;
-      }
-      table tr td:hover {
-        background-color: rgba(82, 125, 168, .35);
-        opacity: 1;
-      }
-      table tr td:active {
-        background-color: rgba(82, 125, 168, .35);
-        opacity: 1;
-      }
-    </style>
 
-    <table class="adminPanel">
+    <div class="adminPanel">
 
-    <tr>
-    <td>
-    <form id="uploadForm" action="upload.php" method="post" enctype="multipart/form-data">
-      <input name="title" type="text" placeholder="Title" /> <input name="director" type="text" placeholder="director" /><br>
-      <input name="wiki" type="text" placeholder="Wiki" /> <input name="program" type="text" placeholder="selected by..." /><br>
-      video:<input name="film" id="fileInput" type="file" placeholder="MP4" /><br>
-      poster:<input name="poster" type="file" placeholder="PNG" /><br>
-      <progress id="uploadProgress" value="0" max="100"></progress> <span id="estimatedTime"></span>
-      <input id="uploadButton" type="submit" value="Upload" /><br>
-    </form>
-    </td>
+      <div class="admin-panel">
+        <span class="panel-label">Upload Film</span>
+        <form id="uploadForm" action="/_admin/upload.php" method="post" enctype="multipart/form-data">
+          <label>Title</label>
+          <input class="admin-input" name="title" type="text" placeholder="Title" />
+          <label>Director</label>
+          <input class="admin-input" name="director" type="text" placeholder="Director" />
+          <label>Wiki URL</label>
+          <input class="admin-input" name="wiki" type="text" placeholder="https://en.wikipedia.org/..." />
+          <label>Programmed by</label>
+          <input class="admin-input" name="program" type="text" placeholder="Selected by..." />
+          <label>Video file</label>
+          <input class="admin-file" name="film" id="fileInput" type="file" />
+          <label>Poster image</label>
+          <input class="admin-file" name="poster" type="file" />
+          <progress id="uploadProgress" value="0" max="100"></progress>
+          <span id="estimatedTime"></span>
+          <input id="uploadButton" class="admin-submit" type="submit" value="Upload" />
+        </form>
+      </div>
 
-    <td>
-    <form action="note.php" method="post">
-      <select name="film_id">
-        <?php
-        for($i = 0;$i < $films_count ;++$i) {
-          $film = $sql1->fetch();
-          $name = $film['title'];
-          echo '<option value="'.$film['id'].'">'.$name.'</option>';
-        }
-        ?>
-      </select><br>
-      <textarea name="note" placeholder="note.."></textarea><br>
-      <input type="submit" value="add note" />
-    </form>
-    </td>
-    </tr>
+      <div class="admin-panel">
+        <span class="panel-label">Add Note</span>
+        <form action="/_admin/note.php" method="post">
+          <label>Film</label>
+          <select class="admin-select" name="film_id">
+            <?php
+            for($i = 0;$i < $films_count ;++$i) {
+              $film = $sql1->fetch();
+              $name = $film['title'];
+              echo '<option value="'.$film['id'].'">'.$name.'</option>';
+            }
+            ?>
+          </select>
+          <label>Note</label>
+          <textarea class="admin-textarea" name="note" placeholder="Write a note..."></textarea>
+          <input class="admin-submit" type="submit" value="Add Note" />
+        </form>
+      </div>
 
-    <tr>
-    <td>
-    <form action="showtime.php" method="post">
-      <select name="film_id">
-        <?php
-        for($i = 0;$i < $films_count ;++$i) {
-          $film = $sql->fetch();
-          $name = $film['title'];
-          $showtime = date('h:ia',$film['showtime']);
-          echo '<option value="'.$film['id'].'">'.$name.'</option>';
-        }
-        ?>
-      </select>
-      <br>
-      <select name="theatre">
-        <option value="1">theatre 1</option>
-        <option value="2">theatre 2</option>
-      </select>
-      <input name="showtime" type="datetime-local" /> <br>
-      <input type="submit" value="creat showtime" />
-    </form>
-    </td>
+      <div class="admin-panel">
+        <span class="panel-label">Schedule Showtime</span>
+        <form action="/_admin/showtime.php" method="post">
+          <label>Film</label>
+          <select class="admin-select" name="film_id">
+            <?php
+            for($i = 0;$i < $films_count ;++$i) {
+              $film = $sql->fetch();
+              $name = $film['title'];
+              echo '<option value="'.$film['id'].'">'.$name.'</option>';
+            }
+            ?>
+          </select>
+          <label>Theatre</label>
+          <select class="admin-select" name="theatre">
+            <option value="1">Theatre 1</option>
+            <option value="2">Theatre 2</option>
+          </select>
+          <label>Date &amp; Time</label>
+          <input class="admin-input" name="showtime" type="datetime-local" />
+          <input class="admin-submit" type="submit" value="Create Showtime" />
+        </form>
+      </div>
 
-    <td>
-      <form action="delete.php" method="post" onsubmit="return confirm('are you sure?');">
-      <select name="film_id">
-        <?php
-        for($i = 0;$i < $films_count ;++$i) {
-          $film = $sql3->fetch();
-          $name = $film['title'];
-          $showtime = date('h:ia',$film['showtime']);
-          echo '<option value="'.$film['id'].'">'.$name.'</option>';
-        }
-        ?>
-      </select>
-      <input type="submit" value="delete" />
-      </form>
-    </td>
-    </tr>
+      <div class="admin-panel">
+        <span class="panel-label">Delete Film</span>
+        <form action="/_admin/delete.php" method="post" onsubmit="return confirm('Are you sure you want to delete this film?');">
+          <label>Film</label>
+          <select class="admin-select" name="film_id">
+            <?php
+            for($i = 0;$i < $films_count ;++$i) {
+              $film = $sql3->fetch();
+              $name = $film['title'];
+              echo '<option value="'.$film['id'].'">'.$name.'</option>';
+            }
+            ?>
+          </select>
+          <input class="admin-submit admin-delete" type="submit" value="Delete Film" />
+        </form>
+      </div>
 
-    </table>
+    </div>
   </div>
 </div>
 

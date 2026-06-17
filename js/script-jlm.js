@@ -249,6 +249,45 @@ $(document).ready(function(){
     if (p) p.pause();
   });
 
+// post panel — open on click, fetch content via AJAX, close on outside click
+  $(document).on('click', '.post-panel:not(.active)', function() {
+    var $panel = $(this);
+    var postId = $panel.data('post-id');
+    $panel.addClass('active');
+
+    var $content = $panel.find('.post-panel-content');
+    if ($content.is(':empty')) {
+      $content.html('<span style="color:#555;font-size:11px;letter-spacing:1px;font-family:Montserrat;">Loading...</span>');
+      $.ajax({
+        url: '/posts/get.php?id=' + postId,
+        dataType: 'json',
+        success: function(res) {
+          if (!res.post) { $content.html(''); return; }
+          var p = res.post;
+          var html = '';
+          if (p.subtitle) html += '<div class="pp-subtitle">' + $('<div>').text(p.subtitle).html() + '</div>';
+          var meta = '';
+          if (p.author_name) meta += $('<div>').text(p.author_name).html();
+          if (p.stamp) {
+            var d = new Date(p.stamp * 1000);
+            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            if (meta) meta += ' &middot; ';
+            meta += months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+          }
+          if (meta) html += '<div class="pp-meta">' + meta + '</div>';
+          html += '<hr class="pp-divider">';
+          if (p.content) html += p.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+          $content.html(html);
+        }
+      });
+    }
+  });
+  $(document).on('click', function(e) {
+    if (!$(e.target).closest('.post-panel').length) {
+      $('.post-panel').removeClass('active');
+    }
+  });
+
 // signup panel — open on click, close on outside click
   $('#signup-panel').on('click', function() {
     if (!$(this).hasClass('active')) {

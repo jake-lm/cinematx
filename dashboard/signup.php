@@ -46,33 +46,27 @@ if($action==='login') {
 	}
 }
 else if($action==='signup') {
+  $is_ajax = isset($_POST['ajax']);
   $name = null;
   $pass = $_POST['pw'];
   $cPass = $_POST['pw2'];
   $email = $_POST['email'];
+  $code = trim($_POST['code']);
   $phone = null;
   $website = null;
   $sign_date = time();
   $lb = null;
   $dept = 0;
   $position = null;
-  $active = 0;
-  //$code = $_POST['code'];
+  $active = 1;
 
-  $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = '$email'");
-  $sql1->execute();
-  $qUser = $sql1->fetch();
-
-  if(is_array($qUser)) {
-    ?>
-    <script type="text/javascript" language="javascript">
-      window.location="/dashboard/?error=104"
-    </script>
-    <?php
-    exit;
-  }
-
+  // validate fields
   if($email === "" || $pass === "" || $pass != $cPass) {
+    if($is_ajax) {
+      header('Content-Type: application/json');
+      echo json_encode(['success' => false, 'error' => '102']);
+      exit;
+    }
     ?>
     <script type="text/javascript" language="javascript">
       window.location="/dashboard/?error=102"
@@ -81,39 +75,74 @@ else if($action==='signup') {
     exit;
   }
 
-  /*$sql2 = $conn->prepare("SELECT * FROM `codes` WHERE `code` = '$code'");
-  $sql2->execute();
-  $code_q=$sql2->fetch();
+  // check access code
+  $sql_code = $conn->prepare("SELECT * FROM `codes` WHERE `code` = :code AND `active` = 1");
+  $sql_code->execute([':code' => $code]);
+  $valid_code = $sql_code->fetch();
 
-  if($code_q['code'] === $code) {
-    $active = 1;
+  if(!$valid_code) {
+    if($is_ajax) {
+      header('Content-Type: application/json');
+      echo json_encode(['success' => false, 'error' => '108']);
+      exit;
+    }
+    ?>
+    <script type="text/javascript" language="javascript">
+      window.location="/dashboard/?error=108"
+    </script>
+    <?php
+    exit;
   }
-  else {
-    $active = 0;
-  }*/
+
+  // check email not already registered
+  $sql1 = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
+  $sql1->execute([':email' => $email]);
+  $qUser = $sql1->fetch();
+
+  if($qUser) {
+    if($is_ajax) {
+      header('Content-Type: application/json');
+      echo json_encode(['success' => false, 'error' => '104']);
+      exit;
+    }
+    ?>
+    <script type="text/javascript" language="javascript">
+      window.location="/dashboard/?error=104"
+    </script>
+    <?php
+    exit;
+  }
 
   $hash = password_hash($pass, PASSWORD_DEFAULT);
 
-
   $stmt = $conn->prepare("INSERT INTO `users` (name, email, password, phone, website, lb, dept, position, active, sign_date, last_date)
                          VALUES (:name, :email, :password, :phone, :website, :lb, :dept, :position, :active, :sign_date, :last_date)");
+  $stmt->execute([
+    ':name'      => $name,
+    ':email'     => $email,
+    ':password'  => $hash,
+    ':phone'     => $phone,
+    ':website'   => $website,
+    ':lb'        => $lb,
+    ':dept'      => $dept,
+    ':position'  => $position,
+    ':active'    => $active,
+    ':sign_date' => $sign_date,
+    ':last_date' => $sign_date,
+  ]);
 
-  $stmt->bindParam(':name', $name);
-  $stmt->bindParam(':email', $email);
-  $stmt->bindParam(':password', $hash);
-  $stmt->bindParam(':phone', $phone);
-  $stmt->bindParam(':website', $website);
-  $stmt->bindParam(':lb', $lb);
-  $stmt->bindParam(':dept', $dept);
-  $stmt->bindParam(':position', $position);
-  $stmt->bindParam(':active', $active);
-  $stmt->bindParam(':sign_date', $sign_date);
-  $stmt->bindParam(':last_date', $sign_date);
+  // increment code usage counter
+  $conn->prepare("UPDATE `codes` SET `uses` = `uses` + 1 WHERE `id` = :id")
+       ->execute([':id' => $valid_code['id']]);
 
-  $stmt->execute();
+  $_SESSION['logged'] = "yes";
+  $_SESSION['username'] = $email;
 
-  $_SESSION['logged'] ="yes";
-  $_SESSION['username']=$email;
+  if($is_ajax) {
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'uid' => $conn->lastInsertId()]);
+    exit;
+  }
 ?>
   <script type="text/javascript" language="javascript">
     window.location="../"
@@ -128,7 +157,7 @@ else if($action==="updateprof") {
   $website = $_POST['website'];
   $lb = $_POST['lb'];
   $dept = $_POST['dept'];
-  $position = $_POST['position'];
+  $position = $_POST['position'] ?? null;
 
   $stmt = $conn->prepare("UPDATE `users` SET `email` = :email, `name` = :name, `phone` = :phone, `website` = :website, `lb` = :lb, `dept` = :dept, `position` = :position WHERE `id` = :uid");
 
@@ -159,18 +188,21 @@ else if($action==="updateprof") {
   <?php
 }
 else if($action==="firstcontact") {
-  $uid = $_POST['uid'];
+  // look up uid from session — more reliable than trusting a POST'd value
+  $uid_q = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
+  $uid_q->execute([':email' => $_SESSION['username']]);
+  $uid = $uid_q->fetchColumn();
   $name = $_POST['uname'];
   $phone = $_POST['phone'];
   $website = $_POST['website'];
   $lb = $_POST['lb'];
   $dept = $_POST['dept'];
-  $position = $_POST['position'];
+  $position = $_POST['position'] ?? null;
 
   //echo $dept; echo $position; echo $name;
   //exit;
 
-  if($dept == "0" || $position == "" || $position == null || $name == null || $name == "") {
+  if($dept == "0" || $name == null || $name == "") {
     ?>
       <script type="text/javascript" language="javascript">
         window.location="/?error=106"

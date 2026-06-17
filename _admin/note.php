@@ -14,8 +14,8 @@ require '../database.php';
     $stmt1->bindParam(':stamp',$now);
     $stmt1->execute();
 
-    //header("Location: http://www.j-l-m.net/_admin");
-    //exit;
+    header("Location: /_admin");
+    exit;
 
 
 

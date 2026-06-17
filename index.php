@@ -116,6 +116,13 @@ $sql_q1 = $conn->query("SELECT * FROM `showtimes` WHERE `showtime` >
     $community_q->execute();
     $community_members = $community_q->fetchAll(PDO::FETCH_ASSOC);
 
+    $posts_front_q = $conn->prepare("SELECT p.id, p.title, p.subtitle, p.type, p.image, p.stamp, p.edited, u.name AS author_name
+                                     FROM posts p LEFT JOIN users u ON p.uid = u.id
+                                     WHERE p.active = 1
+                                     ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 3");
+    $posts_front_q->execute();
+    $posts_front = $posts_front_q->fetchAll(PDO::FETCH_ASSOC);
+
     // resolved showtime for motw theatre embed
     $motw_showtime_ts = 0;
     if ($playing1 && isset($showtime5['showtime'])) {
@@ -343,6 +350,27 @@ if($fName == "") $fName = null;
           </div>
         </div>
       </div>
+
+      <?php foreach($posts_front as $pf): ?>
+      <div class="post-panel" data-post-id="<?php echo $pf['id']; ?>">
+        <div class="post-panel-header">
+          <div class="lower-bar">
+            <span class="txt"><span class="pp-title-bg"></span><?php echo htmlspecialchars($pf['title']); ?></span>
+            <?php if($pf['subtitle']): ?>
+            <div class="pp-subtitle"><div class="pp-sub-bg"></div><?php echo htmlspecialchars($pf['subtitle']); ?></div>
+            <?php endif; ?>
+          </div>
+          <div class="info-txt">
+            <span class="pp-meta-bg<?php echo $pf['type'] ? ' pp-type-' . htmlspecialchars($pf['type']) : ''; ?>"></span><?php if($pf['type']): ?><?php echo htmlspecialchars($pf['type']); ?> &middot; <?php endif; ?><?php echo htmlspecialchars($pf['author_name'] ?? ''); ?>
+          </div>
+          <div class="bg-gradient" <?php if($pf['image']): ?>style="background-image:url('/uploads/posts/<?php echo htmlspecialchars($pf['image']); ?>');"<?php endif; ?>></div>
+        </div>
+        <div class="post-panel-body">
+          <div class="post-panel-content"></div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+
       <?php
     }
     }

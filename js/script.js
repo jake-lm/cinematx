@@ -224,7 +224,7 @@ $(document).ready(function () {
       const xhr = new XMLHttpRequest();
       let startTime = null;
 
-      xhr.open("POST", "upload.php", true);
+      xhr.open("POST", "/_admin/upload.php", true);
 
       xhr.upload.onprogress = function (event) {
           const progress = $("#uploadProgress");
@@ -253,7 +253,7 @@ $(document).ready(function () {
 
       xhr.onload = function () {
           if (xhr.status === 200) {
-              alert("Files uploaded successfully.");
+              window.location = "/_admin";
           } else {
               alert("File upload failed.");
           }
@@ -368,5 +368,103 @@ $(document).ready(function() {
 
 
 
+
+// marquee border lights
+function buildMarquee() {
+  var motw = document.querySelector('.motw:not(.studio)');
+  if (!motw) return;
+  var banner = motw.querySelector('.banner');
+  if (!banner) return;
+  var border = banner.querySelector('.marquee-border');
+  if (!border) return;
+
+  border.innerHTML = '';
+
+  var ext  = 6;   // how far the border extends beyond the banner edge
+  var w    = banner.offsetWidth  + ext * 2;
+  var h    = banner.offsetHeight + ext * 2;
+  var gap  = 14;  // distance between dot centres
+  var size = 4;   // dot diameter
+  var edge = 3;   // inset from border wall
+  var dots = [];
+
+  // Top: left → right
+  for (var x = gap; x < w - gap / 2; x += gap)
+    dots.push([edge, x - size / 2]);
+
+  // Right: top → bottom
+  for (var y = gap; y < h - gap / 2; y += gap)
+    dots.push([y - size / 2, w - edge - size]);
+
+  // Bottom: right → left
+  for (var x = w - gap; x > gap / 2; x -= gap)
+    dots.push([h - edge - size, x - size / 2]);
+
+  // Left: bottom → top
+  for (var y = h - gap; y > gap / 2; y -= gap)
+    dots.push([y - size / 2, edge]);
+
+  dots.forEach(function(pos) {
+    var dot       = document.createElement('span');
+    dot.className = 'marquee-dot';
+    dot.style.top  = pos[0] + 'px';
+    dot.style.left = pos[1] + 'px';
+    border.appendChild(dot);
+  });
+}
+
+window.addEventListener('load',   buildMarquee);
+window.addEventListener('resize', buildMarquee);
+
+// community panel expand/collapse
+(function() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var panel = document.getElementById('community-panel');
+    if (!panel) return;
+    var body = panel.querySelector('.community-body');
+
+    panel.addEventListener('click', function(e) {
+      // if already open and click is inside the body, don't collapse
+      if (panel.classList.contains('active') && body && body.contains(e.target)) return;
+      panel.classList.toggle('active');
+    });
+
+    // click outside to close
+    document.addEventListener('click', function(e) {
+      if (panel && !panel.contains(e.target)) {
+        panel.classList.remove('active');
+      }
+    });
+  });
+})();
+
+// role description
+(function() {
+  var descriptions = {
+    'Filmmaker':  'You make films, in any capacity.',
+    'Critic':     'You write about, analyze, or review film.',
+    'Enthusiast': 'You love film. That\'s enough.',
+    'Member':     'You\'re here. Welcome.'
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var select = document.getElementById('role-select');
+    var desc   = document.getElementById('role-desc');
+    if (!select || !desc) return;
+
+    select.addEventListener('change', function() {
+      var text = descriptions[this.value] || '';
+      desc.classList.remove('visible');
+      if (text) {
+        setTimeout(function() {
+          desc.textContent = text;
+          desc.classList.add('visible');
+        }, 120);
+      } else {
+        desc.textContent = '';
+      }
+    });
+  });
+})();
 
 // fuck off

@@ -40,7 +40,8 @@ body#about .about {
   background-color: #2A2A2A;
 }
 
-body#signup .signup {
+body#signup .signup,
+body#dashboard .signup {
   border-right: 0px solid #666;
   border-top: 1px solid rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
@@ -887,6 +888,245 @@ a:hover {
 .main-content .community-panel.active .community-header .lower-bar .txt {
   color: #c0c0c0;
   text-shadow: none;
+}
+
+.main-content .post-panel {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  width: 300px;
+  max-height: 125px;
+  margin: 15px 5px;
+  background-color: #e2e2e2;
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  z-index: 999;
+  transition: max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), width 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 1s ease;
+}
+
+.main-content .post-panel:not(.active):hover {
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0);
+}
+
+.main-content .post-panel .post-panel-header {
+  position: relative;
+  width: 100%;
+  height: 125px;
+  flex-shrink: 0;
+  transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content .post-panel .post-panel-header .lower-bar {
+  position: absolute;
+  display: block;
+  bottom: 10px;
+  width: 100%;
+  height: 35px;
+  z-index: 1002;
+  transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content .post-panel .post-panel-header .lower-bar .txt {
+  position: relative;
+  display: inline-block;
+  height: 35px;
+  line-height: 35px;
+  font-size: 16px;
+  color: #444;
+  padding-left: 12px;
+  padding-right: 5px;
+  letter-spacing: 0.5px;
+  font-family: "Montserrat", sans-serif;
+  font-weight: 700;
+  z-index: 1010;
+}
+
+.main-content .post-panel .post-panel-header .info-txt {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 10px;
+  font-family: "Montserrat", sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #666;
+  transition: color 0.4s ease;
+  z-index: 1001;
+}
+
+.main-content .post-panel .post-panel-header .pp-subtitle {
+  position: relative;
+  display: block;
+  z-index: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  padding: 6px 16px 0 12px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  line-height: 15px;
+  color: #e2e2e2;
+  transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.45s ease;
+}
+
+.main-content .post-panel .post-panel-header .bg-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  opacity: 0.15;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 1.5s ease;
+}
+
+.main-content .post-panel .post-panel-header .pp-title-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  z-index: -1;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 1s ease 0.15s;
+}
+
+.main-content .post-panel .post-panel-header .pp-meta-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(40, 40, 40, 0.65);
+  z-index: -1;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 1s ease 0.3s;
+}
+
+.main-content .post-panel .post-panel-header .pp-meta-bg.pp-type-essay {
+  background: rgba(146, 46, 50, 0.65);
+}
+
+.main-content .post-panel .post-panel-header .pp-meta-bg.pp-type-review {
+  background: rgba(60, 90, 119, 0.65);
+}
+
+.main-content .post-panel .post-panel-header .pp-meta-bg.pp-type-note {
+  background: rgba(90, 90, 90, 0.65);
+}
+
+.main-content .post-panel .post-panel-header .pp-sub-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 1s ease 0.3s;
+}
+
+.main-content .post-panel .post-panel-body {
+  position: relative;
+  z-index: 1003;
+  padding: 16px 16px 20px;
+  opacity: 0;
+  background-color: #1c1c1c;
+  transition: opacity 0.3s ease 0.3s;
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .lower-bar {
+  height: 90px;
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .pp-subtitle {
+  height: 55px;
+  opacity: 1;
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .bg-gradient {
+  opacity: 0.75;
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .pp-title-bg,
+.main-content .post-panel:not(.active):hover .post-panel-header .pp-meta-bg {
+  transform: scaleX(1);
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .info-txt {
+  color: #ddd;
+}
+
+.main-content .post-panel:not(.active):hover .post-panel-header .pp-sub-bg {
+  transform: scaleY(1);
+}
+
+.main-content .post-panel.active {
+  max-height: 900px;
+  width: 500px;
+  cursor: default;
+  box-shadow: 12px 12px 0px 0px rgba(0, 0, 0, 0.55);
+}
+
+.main-content .post-panel.active .post-panel-header {
+  height: 55px;
+  background-color: #1c1c1c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.main-content .post-panel.active .post-panel-header .bg-gradient {
+  opacity: 0.75;
+}
+
+.main-content .post-panel.active .post-panel-header .info-txt {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.main-content .post-panel.active .post-panel-header .lower-bar .txt {
+  color: #c0c0c0;
+  font-size: 13px;
+  text-shadow: none;
+}
+
+.main-content .post-panel.active .post-panel-body {
+  opacity: 1;
+}
+
+.post-panel-content {
+  font-family: "Roboto", sans-serif;
+  font-size: 14px;
+  line-height: 1.85;
+  color: #bbb;
+}
+
+.post-panel-content .pp-meta {
+  font-family: "Montserrat", sans-serif;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  margin-bottom: 14px;
+}
+
+.post-panel-content .pp-subtitle {
+  font-family: "Montserrat", sans-serif;
+  font-size: 13px;
+  color: #777;
+  margin-bottom: 12px;
+}
+
+.post-panel-content .pp-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  margin: 0 0 16px;
 }
 
 #signup-panel {

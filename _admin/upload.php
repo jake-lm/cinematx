@@ -32,7 +32,7 @@ require 'getid3/getid3.php';
     $dur = preg_replace("/^([\d]{1,2})\:([\d]{2})$/", "00:$1:$2", $dur);
     sscanf($dur, "%d:%d:%d", $hours, $minutes, $seconds);
     $dur = $hours * 3600 + $minutes * 60 + $seconds;
-    echo $dur;
+    //echo $dur;
     $active = 1;
 
     move_uploaded_file($file_tmp,'../motw/'.$filename.'.mp4');
@@ -52,8 +52,8 @@ require 'getid3/getid3.php';
     $stmt->bindParam(':poster', $poster);
     $stmt->execute();
 
-    //header("Location: http://www.j-l-m.net/_admin");
-    //exit;
+    header("Location: /_admin");
+    exit;
 
 
 
