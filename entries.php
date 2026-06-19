@@ -4,7 +4,16 @@
   $mylist_rows = $conn->query("SELECT count(*) FROM `mylist` WHERE `uid` = '".$uid."' AND `fid` = '".$fid."'")->fetchColumn();
 
   echo '
-  <div class="entry '.$type.'">
+  <div class="entry '.$type.'"
+    data-uid="'.(int)$lUser['id'].'"
+    data-name="'.htmlspecialchars($lUser['name']).'"
+    data-dept="'.htmlspecialchars($lUser['dept'] ?? '').'"
+    data-email="'.htmlspecialchars($lUser['email'] ?? '').'"
+    data-phone="'.htmlspecialchars($lUser['phone'] ?? '').'"
+    data-website="'.htmlspecialchars($lUser['website'] ?? '').'"
+    data-lb="'.htmlspecialchars($lUser['lb'] ?? '').'"
+    data-since="'.htmlspecialchars($lUser['sign_date'] ?? '').'"
+  >
     <b class="name">' . $name . '</b>
     <i class="fa-solid fa-envelope hover-info-list email" onclick="copyToClip(`'.$lUser['email'].'`)">
     <div class="info-box-list"><a style="color:inherit;text-decoration:none;" href="mailto:'.$lUser['email'].'">'.$lUser['email'].'</a></div>
@@ -22,14 +31,10 @@
     echo '<span class="addremove'.$lUser['id'].'">';
 
     if($mylist_rows > 0) {
-      echo '<i class="fa-solid fa-minus remove hover-infoAdd" onclick="removeFrom('.$lUser['id'].','.$qUser['id'].')">
-      <span class="info-boxAdd">remove from list</span>
-      </i>';
+      echo '<i class="fa-solid fa-minus remove hover-infoAdd" onclick="removeFrom('.$lUser['id'].','.$qUser['id'].',this)"></i>';
     }
     else {
-      echo '<i class="fa-solid fa-plus addto hover-infoAdd" onclick="addTo('.$lUser['id'].','.$qUser['id'].')">
-      <span class="info-boxAdd">add to list</span>
-      </i>';
+      echo '<i class="fa-solid fa-plus addto hover-infoAdd" onclick="addTo('.$lUser['id'].','.$qUser['id'].',this)"></i>';
     }
     echo '</span>
     <i class="position">' . $lUser['dept'] . '</i>

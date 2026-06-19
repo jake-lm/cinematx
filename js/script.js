@@ -132,8 +132,19 @@ function list_search() { // search & load entries
   }
 }
 
-function addTo(uid, fid) { // add to mylist
+function floatLabel(el, text) {
+  var rect = el.getBoundingClientRect();
+  var label = document.createElement('span');
+  label.textContent = text;
+  label.className = 'float-label';
+  label.style.left = (rect.right + 7) + 'px';
+  label.style.top  = (rect.top - 2) + 'px';
+  document.body.appendChild(label);
+  setTimeout(function() { label.remove(); }, 1600);
+}
 
+function addTo(uid, fid, el) { // add to mylist
+  floatLabel(el, 'Added');
   jQuery.ajax({
   type: "POST",
   data: {'uid': uid, 'fid': fid},
@@ -141,16 +152,14 @@ function addTo(uid, fid) { // add to mylist
   async: false,
   success: function(response) {
     $('.addremove'+uid).html(
-      `<i class="fa-solid fa-minus remove hover-infoAdd" title="remove from my list" onclick="removeFrom(`+uid+`,`+fid+`)">
-      <span class="info-boxAdd">remove from list</span>
-      </i>`
+      `<i class="fa-solid fa-minus remove hover-infoAdd" onclick="removeFrom(${uid},${fid},this)"></i>`
     );
   }
   });
 }
 
-function removeFrom(uid, fid) { // remove from mylist
-
+function removeFrom(uid, fid, el) { // remove from mylist
+  floatLabel(el, 'Removed');
   jQuery.ajax({
   type: "POST",
   data: {'uid': uid, 'fid': fid},
@@ -158,9 +167,7 @@ function removeFrom(uid, fid) { // remove from mylist
   async: false,
   success: function(response) {
     $('.addremove'+uid).html(
-      `<i class="fa-solid fa-plus addto hover-infoAdd" title="add to my list" onclick="addTo(`+uid+`,`+fid+`)">
-      <span class="info-boxAdd">add to list</span>
-      </i>`
+      `<i class="fa-solid fa-plus addto hover-infoAdd" onclick="addTo(${uid},${fid},this)"></i>`
     );
   }
   });
@@ -424,6 +431,9 @@ window.addEventListener('resize', buildMarquee);
     var body = panel.querySelector('.community-body');
 
     panel.addEventListener('click', function(e) {
+      if (panel.classList.contains('no-toggle')) return;
+      // target was removed from DOM by AJAX before event bubbled (e.g. add/remove icons)
+      if (!e.target.isConnected) return;
       // if already open and click is inside the body, don't collapse
       if (panel.classList.contains('active') && body && body.contains(e.target)) return;
       panel.classList.toggle('active');
@@ -431,6 +441,8 @@ window.addEventListener('resize', buildMarquee);
 
     // click outside to close
     document.addEventListener('click', function(e) {
+      if (panel && panel.classList.contains('no-toggle')) return;
+      if (!e.target.isConnected) return;
       if (panel && !panel.contains(e.target)) {
         panel.classList.remove('active');
       }

@@ -249,9 +249,11 @@ $(document).ready(function(){
     if (p) p.pause();
   });
 
-// post panel — open on click, fetch content via AJAX, close on outside click
+// post panel — navigate to post page if data-url set, otherwise expand in-place
   $(document).on('click', '.post-panel:not(.active)', function() {
     var $panel = $(this);
+    var url = $panel.data('url');
+    if (url) { window.location.href = url; return; }
     var postId = $panel.data('post-id');
     $panel.addClass('active');
 
@@ -285,6 +287,134 @@ $(document).ready(function(){
   $(document).on('click', function(e) {
     if (!$(e.target).closest('.post-panel').length) {
       $('.post-panel').removeClass('active');
+    }
+  });
+
+// featured hero — smooth expand/collapse via scrollHeight measurement
+  $('#featured-read-btn').on('click', function() {
+    var $btn  = $(this);
+    var $body = $('.featured-body');
+    var $fade = $('.featured-fade');
+    var body  = $body[0];
+
+    if ($btn.hasClass('expanded')) {
+      $body.css('max-height', body.scrollHeight + 'px'); // anchor from real height before collapsing
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() { // double rAF ensures browser registers the anchor first
+          $body.css('max-height', '145px');
+          $fade.css('opacity', '1');
+        });
+      });
+      $btn.text('Read →').removeClass('expanded');
+    } else {
+      $body.css('max-height', body.scrollHeight + 'px');
+      $fade.css('opacity', '0');
+      $btn.text('Collapse ↑').addClass('expanded');
+    }
+  });
+
+// quick post — type selector
+  (function() {
+    var $selector = $('#qp-selector');
+    var $btn      = $('#qp-selector-btn');
+    var $list     = $('#qp-selector-list');
+    var $label    = $('#qp-current-label');
+    if (!$selector.length) return;
+
+    $btn.on('click', function(e) {
+      e.stopPropagation();
+      $selector.toggleClass('open');
+    });
+
+    $list.on('click', '.qp-option', function() {
+      var type = $(this).data('type');
+      $list.find('.qp-option').removeClass('active');
+      $(this).addClass('active');
+      $label.text($(this).text());
+      $selector.removeClass('open');
+      $('.qp-mode').removeClass('active').hide();
+      $('#qp-mode-' + type).addClass('active').show();
+    });
+
+    $(document).on('click', function(e) {
+      if (!$(e.target).closest('#qp-selector').length) {
+        $selector.removeClass('open');
+      }
+    });
+  })();
+
+// quick post — submit
+  $(document).on('click', '.qp-submit', function() {
+    var type     = $(this).data('type');
+    var $mode    = $('#qp-mode-' + type);
+    var content  = $mode.find('.qp-textarea').val().trim();
+    var title    = $mode.find('.qp-title-input').val().trim();
+    var subtitle = $mode.find('.qp-subtitle-input').val().trim();
+    var $btn     = $(this);
+
+    if (!content && !title) { alert('Nothing to post.'); return; }
+
+    $btn.text('...').prop('disabled', true);
+
+    $.ajax({
+      type: 'POST',
+      url: '/posts/quick.php',
+      data: { type: type, content: content, title: title, subtitle: subtitle },
+      dataType: 'json',
+      success: function(res) {
+        if (res.success) {
+          alert('Post submitted.');
+          location.reload();
+        } else {
+          alert('Error: ' + (res.error || 'unknown'));
+          $btn.text(type === 'post' ? 'Post' : 'Publish ' + type.charAt(0).toUpperCase() + type.slice(1)).prop('disabled', false);
+        }
+      },
+      error: function() {
+        alert('Server error. Please try again.');
+        $btn.text(type === 'post' ? 'Post' : 'Publish ' + type.charAt(0).toUpperCase() + type.slice(1)).prop('disabled', false);
+      }
+    });
+  });
+
+// member overlay — open on entry click, close on backdrop/button
+  $(document).on('click', '#community-panel .entry', function(e) {
+    if ($(e.target).closest('i, .info-box, .info-box-list, .addremove, .hover-infoAdd').length) return;
+    var $entry   = $(this);
+    var name     = $entry.data('name')    || '';
+    var dept     = $entry.data('dept')    || '';
+    var email    = $entry.data('email')   || '';
+    var phone    = $entry.data('phone')   || '';
+    var website  = $entry.data('website') || '';
+    var lb       = $entry.data('lb')      || '';
+    var since    = $entry.data('since')   || '';
+
+    var html = '<div class="mo-name">' + $('<span>').text(name).html() + '</div>';
+    if (dept) html += '<div class="mo-dept">' + $('<span>').text(dept).html() + '</div>';
+    html += '<div class="mo-divider"></div>';
+    if (email)   html += '<div class="mo-row"><i class="fa-solid fa-envelope"></i> <a href="mailto:' + $('<span>').text(email).html() + '">' + $('<span>').text(email).html() + '</a></div>';
+    if (phone)   html += '<div class="mo-row"><i class="fa-solid fa-phone"></i> <a href="tel:' + $('<span>').text(phone).html() + '">' + $('<span>').text(phone).html() + '</a></div>';
+    if (website) html += '<div class="mo-row"><i class="fa-solid fa-globe"></i> <a href="' + $('<span>').text(website).html() + '" target="_blank" rel="noopener">' + $('<span>').text(website).html() + '</a></div>';
+    if (lb)      html += '<div class="mo-row"><i class="fa-brands fa-letterboxd"></i> <a href="https://letterboxd.com/' + $('<span>').text(lb).html() + '" target="_blank" rel="noopener">' + $('<span>').text(lb).html() + '</a></div>';
+    if (since) {
+      var d = new Date(since);
+      if (!isNaN(d)) {
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        html += '<div class="mo-since">Member since ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</div>';
+      }
+    }
+
+    $('#member-overlay-content').html(html);
+    $('#member-overlay').addClass('active');
+  });
+
+  $('#member-overlay-close').on('click', function() {
+    $('#member-overlay').removeClass('active');
+  });
+
+  $('#member-overlay').on('click', function(e) {
+    if (!$(e.target).closest('#member-overlay-card').length) {
+      $(this).removeClass('active');
     }
   });
 

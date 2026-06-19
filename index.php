@@ -116,6 +116,13 @@ $sql_q1 = $conn->query("SELECT * FROM `showtimes` WHERE `showtime` >
     $community_q->execute();
     $community_members = $community_q->fetchAll(PDO::FETCH_ASSOC);
 
+    $featured_post_q = $conn->prepare(
+      "SELECT p.*, u.name AS author_name FROM posts p LEFT JOIN users u ON p.uid = u.id
+       WHERE p.active = 1 ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 1"
+    );
+    $featured_post_q->execute();
+    $featured_post = $featured_post_q->fetch(PDO::FETCH_ASSOC);
+
     $posts_front_q = $conn->prepare("SELECT p.id, p.title, p.subtitle, p.type, p.image, p.stamp, p.edited, u.name AS author_name
                                      FROM posts p LEFT JOIN users u ON p.uid = u.id
                                      WHERE p.active = 1
@@ -297,79 +304,200 @@ if($fName == "") $fName = null;
     }
     else {
       ?>
-      <div class="community-panel" id="community-panel">
-        <div class="community-header">
-          <div class="lower-bar" style="text-align:right;">
-            <span class="txt">The Directory</span>
-          </div>
-          <div class="info-txt">
-            <?php echo $community_count; ?> members
-          </div>
-          <div class="since-txt">
-            <?php foreach($community_members as $m): ?>
-              <?php echo htmlspecialchars($m['name']); ?><?php if(!empty($m['dept'])): ?> — <?php echo htmlspecialchars($m['dept']); ?><?php endif; ?><br>
-            <?php endforeach; ?>
-          </div>
-          <div class="bg-gradient"></div>
-        </div>
+      <div class="content-block-w member-layout">
 
-        <div class="community-body">
-          <div class="thelist">
-            <span class="subtitle">Sort By:
-              <select id="loadsort" class="subtle" onchange="loadSort()">
-                <option name="sign_date">New</option>
-                <option name="last_date">Most Active</option>
-                <option name="dept" value="<?php echo $qUser['dept'];?>">My Role</option>
-                <option name="mylist">My List</option>
-              </select>
-              &nbsp;
-              <input class="subtle list_search" name="list_search" placeholder="Search" onkeyup="list_search()" />
-              <sup><i class="fa-solid fa-circle-info hover-info">
-                <div class="info-box" style="width:175px;text-align:left;">
-                  Ex. area codes, names, or roles.
+        <!-- LEFT COLUMN -->
+        <div class="home-left">
+
+          <!-- Quick post box -->
+          <div class="quick-post-wrap">
+            <div class="qp-selector" id="qp-selector">
+              <div class="qp-selector-current" id="qp-selector-btn">
+                <span id="qp-current-label">Post</span>
+                <i class="fa-solid fa-chevron-down qp-chevron"></i>
+              </div>
+              <div class="qp-selector-list" id="qp-selector-list">
+                <div class="qp-option active" data-type="post">Post</div>
+                <div class="qp-option" data-type="review">Review</div>
+                <div class="qp-option" data-type="essay">Essay</div>
+              </div>
+            </div>
+            <div class="quick-post-box">
+              <div class="qp-mode active" id="qp-mode-post">
+                <textarea class="qp-textarea" id="qp-content-post" placeholder="What's on your mind?"></textarea>
+                <div class="qp-footer">
+                  <button class="qp-submit" data-type="post">Post</button>
                 </div>
-              </i></sup>
-            </span>
-            <div class="list_entry">
-              <?php
-              for($i = 0;$i < $limiter ;++$i) {
-                $lUser = $sql2->fetch();
-                $name = $lUser['name'];
-                if ($i % 2 == 0)
-                  $type = "odd";
-                else
-                  $type = "even";
-                include 'entries.php';
-              }
-              ?>
-            </div>
-            <div id="reContain"></div>
-            <div class="loadmore-hold">
-              <button class="entry loadmoretxt" onclick="loadMore()">Load more</button>
+              </div>
+              <div class="qp-mode" id="qp-mode-review">
+                <input type="text" class="qp-title-input" id="qp-title-review" placeholder="Title" />
+                <textarea class="qp-textarea" id="qp-content-review" placeholder="Write your review..."></textarea>
+                <div class="qp-footer">
+                  <button class="qp-submit" data-type="review">Publish Review</button>
+                </div>
+              </div>
+              <div class="qp-mode" id="qp-mode-essay">
+                <input type="text" class="qp-title-input" id="qp-title-essay" placeholder="Title" />
+                <input type="text" class="qp-subtitle-input" id="qp-subtitle-essay" placeholder="Subtitle — optional" />
+                <textarea class="qp-textarea" id="qp-content-essay" placeholder="Write your essay..."></textarea>
+                <div class="qp-footer">
+                  <button class="qp-submit" data-type="essay">Publish Essay</button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <?php foreach($posts_front as $pf): ?>
-      <div class="post-panel" data-post-id="<?php echo $pf['id']; ?>">
-        <div class="post-panel-header">
-          <div class="lower-bar">
-            <span class="txt"><span class="pp-title-bg"></span><?php echo htmlspecialchars($pf['title']); ?></span>
-            <?php if($pf['subtitle']): ?>
-            <div class="pp-subtitle"><div class="pp-sub-bg"></div><?php echo htmlspecialchars($pf['subtitle']); ?></div>
+          <!-- Directory -->
+          <div class="community-panel" id="community-panel">
+            <div class="community-header">
+              <div class="lower-bar" style="text-align:right;">
+                <span class="txt">The Directory</span>
+              </div>
+              <div class="info-txt"><?php echo $community_count; ?> members</div>
+              <div class="since-txt">
+                <?php foreach($community_members as $m): ?>
+                  <?php echo htmlspecialchars($m['name']); ?><?php if(!empty($m['dept'])): ?> — <?php echo htmlspecialchars($m['dept']); ?><?php endif; ?><br>
+                <?php endforeach; ?>
+              </div>
+              <div class="bg-gradient"></div>
+            </div>
+            <div class="community-body">
+              <div class="thelist">
+                <span class="subtitle">Sort By:
+                  <select id="loadsort" class="subtle" onchange="loadSort()">
+                    <option name="sign_date">New</option>
+                    <option name="last_date">Most Active</option>
+                    <option name="dept" value="<?php echo $qUser['dept'];?>">My Role</option>
+                    <option name="mylist">My List</option>
+                  </select>
+                  &nbsp;
+                  <input class="subtle list_search" name="list_search" placeholder="Search" onkeyup="list_search()" />
+                  <sup><i class="fa-solid fa-circle-info hover-info">
+                    <div class="info-box" style="width:175px;text-align:left;">
+                      Ex. area codes, names, or roles.
+                    </div>
+                  </i></sup>
+                </span>
+                <div class="list_entry">
+                  <?php
+                  for($i = 0; $i < $limiter; ++$i) {
+                    $lUser = $sql2->fetch();
+                    $name = $lUser['name'];
+                    $type = ($i % 2 == 0) ? 'odd' : 'even';
+                    include 'entries.php';
+                  }
+                  ?>
+                </div>
+                <div id="reContain"></div>
+                <div class="loadmore-hold">
+                  <button class="entry loadmoretxt" onclick="loadMore()">Load more</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /.home-left -->
+
+        <!-- RIGHT COLUMN -->
+        <div class="home-right">
+
+          <?php if($featured_post): ?>
+          <?php
+            $fp_date = date('F j, Y', $featured_post['edited'] ?: $featured_post['stamp']);
+            $fp_excerpt = mb_strlen($featured_post['content']) > 280
+              ? mb_substr($featured_post['content'], 0, 280) . '...'
+              : $featured_post['content'];
+            $fp_slug = preg_replace('/[^a-z0-9]+/', '-', mb_strtolower(trim($featured_post['title'] ?? 'post')));
+            $fp_slug = trim($fp_slug, '-');
+            $fp_url  = '/posts/' . $fp_slug . '-' . $featured_post['id'];
+          ?>
+          <div class="featured-hero">
+            <div class="featured-tag-row">
+              <span class="featured-tag">Featured</span>
+              <?php if($featured_post['type']): ?><span class="post-type-pill"><?php echo htmlspecialchars($featured_post['type']); ?></span><?php endif; ?>
+            </div>
+
+            <h1 class="post-headline"><?php echo htmlspecialchars($featured_post['title'] ?? ''); ?></h1>
+
+            <?php if($featured_post['subtitle']): ?>
+            <p class="post-sub"><?php echo htmlspecialchars($featured_post['subtitle']); ?></p>
             <?php endif; ?>
+
+            <div class="post-meta">
+              <?php if($featured_post['author_name']): ?>
+                <span><?php echo htmlspecialchars($featured_post['author_name']); ?></span>
+                <span class="post-meta-dot">&middot;</span>
+              <?php endif; ?>
+              <span><?php echo $fp_date; ?></span>
+            </div>
+
+            <?php if($featured_post['image']): ?>
+            <div class="post-hero-wrap" style="margin-bottom:14px;">
+              <img class="post-hero" src="/uploads/posts/<?php echo htmlspecialchars($featured_post['image']); ?>" alt="<?php echo htmlspecialchars($featured_post['title'] ?? ''); ?>" />
+              <div class="post-share">
+                <a class="share-btn share-twitter" href="#" title="Share on X">
+                  <span class="share-label">Share</span>
+                  <i class="fa-brands fa-x-twitter"></i>
+                </a>
+                <a class="share-btn share-instagram" href="#" title="Share on Instagram">
+                  <span class="share-label">Share</span>
+                  <i class="fa-brands fa-instagram"></i>
+                </a>
+                <a class="share-btn share-reddit" href="#" title="Share on Reddit">
+                  <span class="share-label">Share</span>
+                  <i class="fa-brands fa-reddit-alien"></i>
+                </a>
+              </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="featured-body-wrap">
+              <div class="featured-body"><?php echo nl2br(htmlspecialchars($featured_post['content'])); ?></div>
+              <div class="featured-fade"></div>
+            </div>
+
+            <button class="featured-read-more" id="featured-read-btn">Read &rarr;</button>
           </div>
-          <div class="info-txt">
-            <span class="pp-meta-bg<?php echo $pf['type'] ? ' pp-type-' . htmlspecialchars($pf['type']) : ''; ?>"></span><?php if($pf['type']): ?><?php echo htmlspecialchars($pf['type']); ?> &middot; <?php endif; ?><?php echo htmlspecialchars($pf['author_name'] ?? ''); ?>
+          <hr class="post-divider" />
+          <?php endif; ?>
+
+          <div class="post-panels-row">
+          <?php foreach($posts_front as $pf): ?>
+          <?php
+            $pf_slug = trim(preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($pf['title'] ?? '')), '-');
+            $pf_url  = '/posts/' . $pf_slug . '-' . $pf['id'];
+          ?>
+          <div class="post-panel" data-post-id="<?php echo $pf['id']; ?>" data-url="<?php echo htmlspecialchars($pf_url); ?>">
+            <div class="post-panel-header">
+              <div class="lower-bar">
+                <span class="txt"><span class="pp-title-bg"></span><?php echo htmlspecialchars($pf['title']); ?></span>
+                <?php if($pf['subtitle']): ?>
+                <div class="pp-subtitle"><div class="pp-sub-bg"></div><?php echo htmlspecialchars($pf['subtitle']); ?></div>
+                <?php endif; ?>
+              </div>
+              <div class="info-txt">
+                <span class="pp-meta-bg<?php echo $pf['type'] ? ' pp-type-' . htmlspecialchars($pf['type']) : ''; ?>"></span><?php if($pf['type']): ?><?php echo htmlspecialchars($pf['type']); ?> &middot; <?php endif; ?><?php echo htmlspecialchars($pf['author_name'] ?? ''); ?>
+              </div>
+              <div class="bg-gradient" <?php if($pf['image']): ?>style="background-image:url('/uploads/posts/<?php echo htmlspecialchars($pf['image']); ?>');"<?php endif; ?>></div>
+            </div>
+            <div class="post-panel-body">
+              <div class="post-panel-content"></div>
+            </div>
           </div>
-          <div class="bg-gradient" <?php if($pf['image']): ?>style="background-image:url('/uploads/posts/<?php echo htmlspecialchars($pf['image']); ?>');"<?php endif; ?>></div>
+          <?php endforeach; ?>
+          </div><!-- /.post-panels-row -->
+
+        </div><!-- /.home-right -->
+
+        <!-- Member overlay -->
+        <div class="member-overlay" id="member-overlay">
+          <div class="member-overlay-card" id="member-overlay-card">
+            <button class="member-overlay-close" id="member-overlay-close">&#x2715;</button>
+            <div class="member-overlay-content" id="member-overlay-content"></div>
+          </div>
         </div>
-        <div class="post-panel-body">
-          <div class="post-panel-content"></div>
-        </div>
-      </div>
-      <?php endforeach; ?>
+
+      </div><!-- /.member-layout -->
 
       <?php
     }
