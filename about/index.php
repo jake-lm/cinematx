@@ -28,7 +28,7 @@
     <div class="text">
       We are a small directory of film culture in Austin, Texas. 
       <br><br>
-      <b>Registration is closed.</b><br>
+      <b>Registration is limited.</b><br>
       Most data is subject to review*.
       <br><br>
       <a href="mailto:contact.cinematx@gmail.com">contact.cinematx@gmail.com</a>

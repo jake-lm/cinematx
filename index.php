@@ -112,23 +112,29 @@ $sql_q1 = $conn->query("SELECT * FROM `showtimes` WHERE `showtime` >
     $note_th1 = $note_q->fetch();
 
     $community_count = $conn->query("SELECT count(*) FROM `users` WHERE `active` = 1 AND `name` != ''")->fetchColumn();
-    $community_q = $conn->prepare("SELECT `name`, `dept` FROM `users` WHERE `active` = 1 AND `name` != '' ORDER BY `sign_date` DESC LIMIT 3");
-    $community_q->execute();
-    $community_members = $community_q->fetchAll(PDO::FETCH_ASSOC);
 
     $featured_post_q = $conn->prepare(
       "SELECT p.*, u.name AS author_name FROM posts p LEFT JOIN users u ON p.uid = u.id
-       WHERE p.active = 1 ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 1"
+       WHERE p.active = 1 AND p.featured = 1 AND p.type IN ('review', 'essay') ORDER BY p.stamp DESC LIMIT 1"
     );
     $featured_post_q->execute();
     $featured_post = $featured_post_q->fetch(PDO::FETCH_ASSOC);
 
     $posts_front_q = $conn->prepare("SELECT p.id, p.title, p.subtitle, p.type, p.image, p.stamp, p.edited, u.name AS author_name
                                      FROM posts p LEFT JOIN users u ON p.uid = u.id
-                                     WHERE p.active = 1
-                                     ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 3");
+                                     WHERE p.active = 1 AND p.type IN ('review', 'essay')
+                                     ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 2");
     $posts_front_q->execute();
     $posts_front = $posts_front_q->fetchAll(PDO::FETCH_ASSOC);
+
+    $posts_feed_q = $conn->prepare(
+      "SELECT p.id, p.uid, p.content, p.type, p.stamp, u.name AS author_name
+       FROM posts p LEFT JOIN users u ON p.uid = u.id
+       WHERE p.active = 1 AND p.type = 'post'
+       ORDER BY p.stamp DESC LIMIT 3"
+    );
+    $posts_feed_q->execute();
+    $posts_feed = $posts_feed_q->fetchAll(PDO::FETCH_ASSOC);
 
     // resolved showtime for motw theatre embed
     $motw_showtime_ts = 0;
@@ -168,19 +174,7 @@ switch($limitview){ // replace w/function
   case 200: $limit=225; break;
 }
 
-$limiter = 8;
-
-$qDept = $qUser['dept'];
-
-$sql2 = $conn->prepare("SELECT * FROM `users` WHERE `active` = 1 AND `dept` != '0' AND `name` != '' ORDER BY `sign_date` DESC LIMIT " . $limit);
-$sql2->execute();
-
-$sql3 = $conn->prepare("SELECT * FROM `users` WHERE `active` = 1 AND `dept` = '$qDept' ORDER BY `sign_date` DESC");
-$sql3->execute();
-$dept_count = $conn->query("SELECT count(*) FROM `users` WHERE `active` = 1 AND `dept` != '0' AND `name` != ''")->fetchColumn();
-
-
-$fName = substr($qUser['name'],0,strrpos($qUser['name'], " ")); //isolate first name
+$fName = substr($qUser['name'],0,strrpos($qUser['name'], " "));
 if($fName == "") $fName = null;
 }
 ?>
@@ -199,8 +193,8 @@ if($fName == "") $fName = null;
   <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
   <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
   <script src="https://vjs.zencdn.net/7.8.3/video.js"></script>
-  <script src="js/script.js"></script>
-  <script src="js/script-jlm.js"></script>
+  <script src="js/script.js?v=<?php echo filemtime('js/script.js'); ?>"></script>
+  <script src="js/script-jlm.js?v=<?php echo filemtime('js/script-jlm.js'); ?>"></script>
   <script>
     var motwShowtime = <?php echo (int)$motw_showtime_ts; ?>;
     var motwDur      = <?php echo (int)($film_th1['dur'] ?? 0); ?>;
@@ -312,28 +306,22 @@ if($fName == "") $fName = null;
           <!-- Quick post box -->
           <div class="quick-post-wrap">
             <div class="qp-selector" id="qp-selector">
-              <div class="qp-selector-current" id="qp-selector-btn">
+              <div class="qp-selector-current">
                 <span id="qp-current-label">Post</span>
-                <i class="fa-solid fa-chevron-down qp-chevron"></i>
-              </div>
-              <div class="qp-selector-list" id="qp-selector-list">
-                <div class="qp-option active" data-type="post">Post</div>
-                <div class="qp-option" data-type="review">Review</div>
-                <div class="qp-option" data-type="essay">Essay</div>
               </div>
             </div>
             <div class="quick-post-box">
               <div class="qp-mode active" id="qp-mode-post">
-                <textarea class="qp-textarea" id="qp-content-post" placeholder="What's on your mind?"></textarea>
+                <textarea class="qp-textarea" id="qp-content-post" name="content" placeholder="What's on your mind?"></textarea>
                 <div class="qp-footer">
-                  <button class="qp-submit" data-type="post">Post</button>
+                  <button type="button" class="qp-submit" id="qp-submit-post" data-type="post">Post</button>
                 </div>
               </div>
               <div class="qp-mode" id="qp-mode-review">
                 <input type="text" class="qp-title-input" id="qp-title-review" placeholder="Title" />
                 <textarea class="qp-textarea" id="qp-content-review" placeholder="Write your review..."></textarea>
                 <div class="qp-footer">
-                  <button class="qp-submit" data-type="review">Publish Review</button>
+                  <button type="button" class="qp-submit" data-type="review">Publish Review</button>
                 </div>
               </div>
               <div class="qp-mode" id="qp-mode-essay">
@@ -341,59 +329,29 @@ if($fName == "") $fName = null;
                 <input type="text" class="qp-subtitle-input" id="qp-subtitle-essay" placeholder="Subtitle — optional" />
                 <textarea class="qp-textarea" id="qp-content-essay" placeholder="Write your essay..."></textarea>
                 <div class="qp-footer">
-                  <button class="qp-submit" data-type="essay">Publish Essay</button>
+                  <button type="button" class="qp-submit" data-type="essay">Publish Essay</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Directory -->
-          <div class="community-panel" id="community-panel">
-            <div class="community-header">
-              <div class="lower-bar" style="text-align:right;">
-                <span class="txt">The Directory</span>
+          <!-- Post feed -->
+          <div class="post-feed" id="post-feed">
+            <?php foreach($posts_feed as $pf): ?>
+            <?php $pf_date = date('M j', $pf['stamp']); ?>
+            <div class="feed-card" data-post-id="<?php echo $pf['id']; ?>">
+              <?php if($pf['uid'] == $qUser['id']): ?>
+              <button class="feed-card-delete" data-post-id="<?php echo $pf['id']; ?>" title="Delete post">&times;</button>
+              <?php endif; ?>
+              <div class="feed-card-body">
+                <div class="feed-card-content"><?php echo nl2br(htmlspecialchars($pf['content'])); ?></div>
               </div>
-              <div class="info-txt"><?php echo $community_count; ?> members</div>
-              <div class="since-txt">
-                <?php foreach($community_members as $m): ?>
-                  <?php echo htmlspecialchars($m['name']); ?><?php if(!empty($m['dept'])): ?> — <?php echo htmlspecialchars($m['dept']); ?><?php endif; ?><br>
-                <?php endforeach; ?>
-              </div>
-              <div class="bg-gradient"></div>
-            </div>
-            <div class="community-body">
-              <div class="thelist">
-                <span class="subtitle">Sort By:
-                  <select id="loadsort" class="subtle" onchange="loadSort()">
-                    <option name="sign_date">New</option>
-                    <option name="last_date">Most Active</option>
-                    <option name="dept" value="<?php echo $qUser['dept'];?>">My Role</option>
-                    <option name="mylist">My List</option>
-                  </select>
-                  &nbsp;
-                  <input class="subtle list_search" name="list_search" placeholder="Search" onkeyup="list_search()" />
-                  <sup><i class="fa-solid fa-circle-info hover-info">
-                    <div class="info-box" style="width:175px;text-align:left;">
-                      Ex. area codes, names, or roles.
-                    </div>
-                  </i></sup>
-                </span>
-                <div class="list_entry">
-                  <?php
-                  for($i = 0; $i < $limiter; ++$i) {
-                    $lUser = $sql2->fetch();
-                    $name = $lUser['name'];
-                    $type = ($i % 2 == 0) ? 'odd' : 'even';
-                    include 'entries.php';
-                  }
-                  ?>
-                </div>
-                <div id="reContain"></div>
-                <div class="loadmore-hold">
-                  <button class="entry loadmoretxt" onclick="loadMore()">Load more</button>
-                </div>
+              <div class="feed-card-foot">
+                <button class="feed-read-more">Read &rarr;</button>
+                <span class="feed-card-meta"><?php echo htmlspecialchars($pf['author_name'] ?? 'Member'); ?> &middot; <?php echo $pf_date; ?></span>
               </div>
             </div>
+            <?php endforeach; ?>
           </div>
 
         </div><!-- /.home-left -->

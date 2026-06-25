@@ -11,3 +11,6 @@ motw/
 .DS_Store
 *.swp
 *.swo
+
+# Local dev server log
+.devserver.log

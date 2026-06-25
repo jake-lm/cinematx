@@ -56,6 +56,8 @@ require '../database.php';
     <span class="dash-tab" data-panel="account">Account</span>
   </nav>
 
+  <div class="dash-card">
+
   <div class="dash-panel" id="panel-posts">
     <?php if(!empty($all_posts)): ?>
     <ul class="drafts-list">
@@ -125,6 +127,9 @@ require '../database.php';
         <option value="essay">Essay</option>
         <option value="note">Note</option>
       </select>
+      <label class="write-featured">
+        <input type="checkbox" id="post-featured" /> Featured
+      </label>
       <textarea id="post-content" class="write-content" placeholder="Write something..."></textarea>
       <div class="write-image-wrap">
         <div class="write-image-row">
@@ -149,6 +154,8 @@ require '../database.php';
       </div>
     </div>
   </div>
+
+  </div><!-- /.dash-card -->
 
   <?php else: ?>
   <?php

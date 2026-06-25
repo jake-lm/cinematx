@@ -19,7 +19,7 @@ function loadMore() { // load more entires
   jQuery.ajax({
   type: "POST",
   data: {'limit': limit, 'option': option, 'dept': dept, 'search': search},
-  url: "function.php?action=loadmore",
+  url: "/function.php?action=loadmore",
   async: false,
   success: function(response) {
     var save = $('#reContain').html();
@@ -39,7 +39,7 @@ function loadSort() { // sort & load entries
     //$('.loadmoretxt').text('loading...');
     jQuery.ajax({
     type: "POST",
-    url: "function.php?action=mostactive",
+    url: "/function.php?action=mostactive",
     async: false,
     success: function(response) {
       $('.list_entry').html(response);
@@ -56,7 +56,7 @@ function loadSort() { // sort & load entries
     jQuery.ajax({
     type: "POST",
     data: {'dept': dept},
-    url: "function.php?action=mydept",
+    url: "/function.php?action=mydept",
     async: false,
     success: function(response) {
       $('.list_entry').html(response);
@@ -73,7 +73,7 @@ function loadSort() { // sort & load entries
     jQuery.ajax({
     type: "POST",
     data: {'dept': dept},
-    url: "function.php?action=mylist",
+    url: "/function.php?action=mylist",
     async: false,
     success: function(response) {
       $('.list_entry').html(response);
@@ -88,7 +88,7 @@ function loadSort() { // sort & load entries
     //$('.loadmoretxt').text('loading...');
     jQuery.ajax({
     type: "POST",
-    url: "function.php?action=new",
+    url: "/function.php?action=new",
     async: false,
     success: function(response) {
       $('.list_entry').html(response);
@@ -107,7 +107,7 @@ function list_search() { // search & load entries
   jQuery.ajax({
   type: "POST",
   data: {'search': search},
-  url: "function.php?action=listsearch",
+  url: "/function.php?action=listsearch",
   async: false,
   success: function(response) {
     var save = $('#reContain').html();
@@ -121,7 +121,7 @@ function list_search() { // search & load entries
     jQuery.ajax({
     type: "POST",
     data: {'search': search},
-    url: "function.php?action=reload",
+    url: "/function.php?action=reload",
     async: false,
     success: function(response) {
       var save = $('#reContain').html();
@@ -148,7 +148,7 @@ function addTo(uid, fid, el) { // add to mylist
   jQuery.ajax({
   type: "POST",
   data: {'uid': uid, 'fid': fid},
-  url: "function.php?action=addto",
+  url: "/function.php?action=addto",
   async: false,
   success: function(response) {
     $('.addremove'+uid).html(
@@ -163,7 +163,7 @@ function removeFrom(uid, fid, el) { // remove from mylist
   jQuery.ajax({
   type: "POST",
   data: {'uid': uid, 'fid': fid},
-  url: "function.php?action=removefrom",
+  url: "/function.php?action=removefrom",
   async: false,
   success: function(response) {
     $('.addremove'+uid).html(

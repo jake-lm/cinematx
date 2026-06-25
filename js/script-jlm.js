@@ -313,6 +313,11 @@ $(document).ready(function(){
     }
   });
 
+// feed cards — init overflow check on page load
+  $('.feed-card').each(function() {
+    try { initFeedCard(this); } catch(e) {}
+  });
+
 // quick post — type selector
   (function() {
     var $selector = $('#qp-selector');
@@ -343,36 +348,116 @@ $(document).ready(function(){
     });
   })();
 
-// quick post — submit
-  $(document).on('click', '.qp-submit', function() {
-    var type     = $(this).data('type');
-    var $mode    = $('#qp-mode-' + type);
-    var content  = $mode.find('.qp-textarea').val().trim();
-    var title    = $mode.find('.qp-title-input').val().trim();
-    var subtitle = $mode.find('.qp-subtitle-input').val().trim();
-    var $btn     = $(this);
+// feed card — init overflow check and expand/collapse
+  function initFeedCard(card) {
+    var $card  = $(card);
+    var $body  = $card.find('.feed-card-body');
+    var $btn   = $card.find('.feed-read-more');
+    if ($body[0].scrollHeight > 120) {
+      $body.append('<div class="feed-card-fade"></div>');
+      $btn.show();
+    }
+  }
 
-    if (!content && !title) { alert('Nothing to post.'); return; }
+  $(document).on('click', '.feed-read-more', function() {
+    var $btn  = $(this);
+    var $card = $btn.closest('.feed-card');
+    var $body = $card.find('.feed-card-body');
+    var $fade = $card.find('.feed-card-fade');
+    var body  = $body[0];
+    if ($btn.hasClass('expanded')) {
+      $body.css('max-height', body.scrollHeight + 'px');
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          $body.css('max-height', '120px');
+          $fade.css('opacity', '1');
+        });
+      });
+      $btn.text('Read →').removeClass('expanded');
+    } else {
+      $body.css('max-height', body.scrollHeight + 'px');
+      $fade.css('opacity', '0');
+      $btn.html('Collapse &uarr;').addClass('expanded');
+    }
+  });
+
+// feed card — delete (author only)
+  $(document).on('click', '.feed-card-delete', function(e) {
+    e.stopPropagation();
+    var $btn  = $(this);
+    var $card = $btn.closest('.feed-card');
+    var pid   = $btn.data('post-id');
+
+    if ($btn.hasClass('confirming')) {
+      $btn.text('...').prop('disabled', true);
+      $.ajax({
+        type: 'POST', url: '/posts/quick.php',
+        data: { type: 'delete', post_id: pid }, dataType: 'json',
+        success: function(res) {
+          if (res.success) {
+            $card.fadeOut(200, function() { $(this).remove(); });
+          } else {
+            $btn.html('&times;').prop('disabled', false).removeClass('confirming');
+          }
+        },
+        error: function() {
+          $btn.html('&times;').prop('disabled', false).removeClass('confirming');
+        }
+      });
+    } else {
+      $btn.text('delete?').addClass('confirming');
+      setTimeout(function() {
+        if ($btn.hasClass('confirming')) {
+          $btn.html('&times;').removeClass('confirming');
+        }
+      }, 2500);
+    }
+  });
+
+// quick post — submit (generic post, direct binding mirrors dashboard pattern)
+  $('#qp-submit-post').on('click', function() {
+    var content = $('#qp-content-post').val().trim();
+    var $btn    = $(this);
+
+    if (!content) { alert('Nothing to post.'); return; }
 
     $btn.text('...').prop('disabled', true);
 
     $.ajax({
       type: 'POST',
       url: '/posts/quick.php',
-      data: { type: type, content: content, title: title, subtitle: subtitle },
+      data: { type: 'post', content: content, title: '', subtitle: '' },
       dataType: 'json',
       success: function(res) {
-        if (res.success) {
-          alert('Post submitted.');
-          location.reload();
+        if (res.success && res.post) {
+          var p = res.post;
+          var escaped = $('<div>').text(p.content).html().replace(/\n/g, '<br>');
+          var $card = $([
+            '<div class="feed-card" data-post-id="' + p.id + '">',
+              '<button class="feed-card-delete" data-post-id="' + p.id + '" title="Delete post">&times;</button>',
+              '<div class="feed-card-body">',
+                '<div class="feed-card-content">' + escaped + '</div>',
+              '</div>',
+              '<div class="feed-card-foot">',
+                '<button class="feed-read-more">Read &rarr;</button>',
+                '<span class="feed-card-meta">' + $('<div>').text(p.author_name).html() + ' &middot; ' + $('<div>').text(p.date).html() + '</span>',
+              '</div>',
+            '</div>'
+          ].join(''));
+          $('#post-feed').prepend($card);
+          try { initFeedCard($card[0]); } catch(e) {}
+          var $cards = $('#post-feed .feed-card');
+          if ($cards.length > 3) $cards.last().remove();
+          $('#qp-content-post').val('');
+          $btn.text('Post').prop('disabled', false);
         } else {
-          alert('Error: ' + (res.error || 'unknown'));
-          $btn.text(type === 'post' ? 'Post' : 'Publish ' + type.charAt(0).toUpperCase() + type.slice(1)).prop('disabled', false);
+          alert('Post error: ' + (res.error || 'unknown'));
+          $btn.text('Post').prop('disabled', false);
         }
       },
-      error: function() {
-        alert('Server error. Please try again.');
-        $btn.text(type === 'post' ? 'Post' : 'Publish ' + type.charAt(0).toUpperCase() + type.slice(1)).prop('disabled', false);
+      error: function(xhr) {
+        alert('Server error: ' + xhr.status + ' — ' + xhr.responseText.substring(0, 200));
+        $btn.text('Post').prop('disabled', false);
       }
     });
   });

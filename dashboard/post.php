@@ -87,7 +87,7 @@ else if ($action === 'unpublish') {
 else if ($action === 'get') {
   $post_id = (int)($_GET['post_id'] ?? 0);
 
-  $stmt = $conn->prepare("SELECT id, title, subtitle, content, type, image, photo_cred, active, stamp, edited
+  $stmt = $conn->prepare("SELECT id, title, subtitle, content, type, image, photo_cred, active, featured, stamp, edited
                           FROM `posts` WHERE id=:post_id AND uid=:uid");
   $stmt->execute([':post_id' => $post_id, ':uid' => $uid]);
   $post = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -156,6 +156,15 @@ else if ($action === 'upload_image') {
   $stmt->execute([':image' => $filename, ':post_id' => $post_id, ':uid' => $uid]);
 
   echo json_encode(['success' => true, 'filename' => $filename]);
+}
+else if ($action === 'feature') {
+  $post_id  = (int)($_POST['post_id'] ?? 0);
+  $featured = (int)($_POST['featured'] ?? 0);
+
+  $stmt = $conn->prepare("UPDATE `posts` SET featured=:featured WHERE id=:post_id AND uid=:uid");
+  $stmt->execute([':featured' => $featured ? 1 : 0, ':post_id' => $post_id, ':uid' => $uid]);
+
+  echo json_encode(['success' => true]);
 }
 else if ($action === 'delete') {
   $post_id = (int)($_POST['post_id'] ?? 0);

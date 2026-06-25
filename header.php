@@ -5,12 +5,18 @@
   <a href="/about"><div class="block about">
     <span class="content">about</span>
   </div></a>
+  <a href="/list"><div class="block list">
+    <span class="content">The List</span>
+  </div></a>
 
     <?php
     if(isset($_SESSION['username'])) {
      ?>
      <a href="/dashboard"><div class="block signup">
        <span class="content">Dashboard</span>
+     </div></a>
+     <a href="/directory"><div class="block directory">
+       <span class="content">Directory</span>
      </div></a>
 
      <form action="/dashboard/signup.php?action=logout" method="post">

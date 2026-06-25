@@ -35,7 +35,25 @@ body#index .index {
   background-color: #2A2A2A;
 }
 
+body#directory .directory {
+  border-right: 0px solid #666;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  opacity: 1;
+  color: #fff;
+  background-color: #2A2A2A;
+}
+
 body#about .about {
+  border-right: 0px solid #666;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  opacity: 1;
+  color: #fff;
+  background-color: #2A2A2A;
+}
+
+body#list .list {
   border-right: 0px solid #666;
   border-top: 1px solid rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
@@ -3063,6 +3081,106 @@ body#index .home-left .community-panel.active {
   cursor: default;
 }
 
+.post-feed {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feed-card {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  padding: 14px 14px 10px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.feed-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  padding: 0 3px;
+  font-size: 13px;
+  line-height: 1;
+  color: #444;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.feed-card-delete:hover {
+  color: #922E32;
+}
+
+.feed-card-delete.confirming {
+  color: #922E32;
+  font-size: 9px;
+  font-family: "Montserrat", sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.feed-card-body {
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+  transition: max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.feed-card-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, #1a1a1a);
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+.feed-card-content {
+  font-family: "Roboto", sans-serif;
+  font-size: 12px;
+  line-height: 1.75;
+  color: #c8c8c8;
+}
+
+.feed-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.feed-read-more {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: "Montserrat", sans-serif;
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #922E32;
+  cursor: pointer;
+  display: none;
+  transition: color 0.2s ease;
+}
+
+.feed-read-more:hover {
+  color: #b03338;
+}
+
+.feed-card-meta {
+  font-family: "Montserrat", sans-serif;
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #555;
+}
+
 .featured-tag-row {
   display: flex;
   align-items: center;
@@ -3260,29 +3378,27 @@ body#dashboard .main-content .home-base {
 
 body#dashboard .main-content .home-base .content-block-w {
   display: block;
-  width: 75%;
 }
 
 .main-content .dash-nav {
   display: flex;
-  flex-direction: row;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  margin-bottom: 28px;
-  padding: 0;
+  gap: 4px;
+  max-width: 900px;
 }
 
 .main-content .dash-tab {
   font-family: "Montserrat", sans-serif;
   font-size: 10px;
   font-weight: bold;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: #555;
-  padding: 14px 20px;
+  color: #666;
+  padding: 11px 20px;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .main-content .dash-tab:hover {
@@ -3291,15 +3407,21 @@ body#dashboard .main-content .home-base .content-block-w {
 
 .main-content .dash-tab.active {
   color: #e2e2e2;
-  border-bottom-color: #922E32;
+  background: #1a1a1a;
+  border-bottom: none;
+}
+
+.main-content .dash-card {
+  max-width: 900px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+  padding: 26px 30px;
 }
 
 .main-content .dash-panel {
   display: none;
-}
-
-.main-content .write-wrap {
-  max-width: 75%;
 }
 
 .main-content .write-title {
@@ -3372,6 +3494,25 @@ body#dashboard .main-content .home-base .content-block-w {
   color: #e2e2e2;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.main-content .write-featured {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  cursor: pointer;
+  margin-bottom: 18px;
+  user-select: none;
+}
+
+.main-content .write-featured input[type=checkbox] {
+  accent-color: #922E32;
+  cursor: pointer;
 }
 
 .main-content .write-content {
@@ -3964,4 +4105,134 @@ body#post-page .main-content .home-base {
   font-size: 15px;
   line-height: 1.9;
   color: #bbb;
+}
+
+body#list .main-content .home-base {
+  padding-top: 35px;
+}
+
+.main-content .list-page {
+  min-width: 560px;
+  max-width: 860px;
+  padding-bottom: 60px;
+}
+.main-content .list-page .list-stamp {
+  display: block;
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #922E32;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(146, 46, 50, 0.35);
+  margin-bottom: 8px;
+}
+.main-content .list-page .list-title {
+  font-family: "Bebas Neue", cursive;
+  font-size: 36px;
+  color: #e2e2e2;
+  margin: 0 0 28px;
+  font-weight: normal;
+  letter-spacing: 2px;
+}
+.main-content .list-page .list-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.main-content .list-page .list-filter-bar .list-filter-btn {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.main-content .list-page .list-filter-bar .list-filter-btn:hover {
+  color: #e2e2e2;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.main-content .list-page .list-filter-bar .list-filter-btn.active {
+  color: #e2e2e2;
+  border-color: #922E32;
+  background: rgba(146, 46, 50, 0.12);
+}
+.main-content .list-page .list-section {
+  margin-bottom: 40px;
+}
+.main-content .list-page .list-day-label {
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #888;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.main-content .list-page .list-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 16px;
+  margin-bottom: 5px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid rgba(146, 46, 50, 0.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background-color 0.2s ease, border-left-color 0.2s ease;
+}
+.main-content .list-page .list-card:hover {
+  background-color: rgba(146, 46, 50, 0.07);
+  border-left-color: #922E32;
+}
+.main-content .list-page .list-card .list-card-date {
+  font-family: "Montserrat", sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  color: #922E32;
+  letter-spacing: 0.5px;
+  min-width: 58px;
+  flex-shrink: 0;
+}
+.main-content .list-page .list-card .list-card-title {
+  font-family: "Montserrat", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e2e2e2;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex: 1;
+}
+.main-content .list-page .list-card .list-card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.main-content .list-page .list-card .list-card-title a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+.main-content .list-page .list-card .list-card-title a:visited {
+  color: inherit;
+}
+.main-content .list-page .list-card .list-card-venue {
+  font-family: "Montserrat", sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #555;
+  flex-shrink: 0;
+}
+.main-content .list-page .list-empty {
+  font-family: "Roboto", sans-serif;
+  font-size: 13px;
+  color: #555;
+  padding: 20px 0;
+  font-style: italic;
 }

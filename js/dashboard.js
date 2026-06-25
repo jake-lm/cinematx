@@ -220,6 +220,7 @@ $(document).ready(function() {
           clearImagePreview();
         }
 
+        $('#post-featured').prop('checked', parseInt(res.post.featured) === 1);
         $('#post-save').prop('disabled', false).text('Save Draft');
 
         if (parseInt(res.post.active) === 1) {
@@ -300,6 +301,7 @@ $(document).ready(function() {
           postId = null; autosaveOn = false; clearTimeout(saveTimer);
           $('#post-title, #post-subtitle, #post-content, #post-photo-cred').val('');
           $('#post-type').val('');
+          $('#post-featured').prop('checked', false);
           $('#post-publish').prop('disabled', true).text('Publish');
           $('#post-save').prop('disabled', false).text('Save Draft');
           clearImagePreview();
@@ -331,6 +333,18 @@ $(document).ready(function() {
       success: function(res) {
         if (res.success) setRowDraft($row);
       }
+    });
+  });
+
+  // ── Featured toggle ────────────────────────────────────────────────────────
+
+  $('#post-featured').on('change', function() {
+    if (!postId) { $(this).prop('checked', false); return; }
+    var val = $(this).is(':checked') ? 1 : 0;
+    $.ajax({
+      type: 'POST', url: '/dashboard/post.php?action=feature',
+      data: { post_id: postId, featured: val }, dataType: 'json',
+      success: function(res) { setStatus(res.success ? 'saved' : 'save failed', res.success ? '' : '#b22222'); }
     });
   });
 
