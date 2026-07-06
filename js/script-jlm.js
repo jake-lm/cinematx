@@ -250,7 +250,8 @@ $(document).ready(function(){
   });
 
 // post panel — navigate to post page if data-url set, otherwise expand in-place
-  $(document).on('click', '.post-panel:not(.active)', function() {
+  $(document).on('click', '.post-panel:not(.active)', function(e) {
+    if ($(e.target).closest('.author-link').length) return;
     var $panel = $(this);
     var url = $panel.data('url');
     if (url) { window.location.href = url; return; }
@@ -269,7 +270,7 @@ $(document).ready(function(){
           var html = '';
           if (p.subtitle) html += '<div class="pp-subtitle">' + $('<div>').text(p.subtitle).html() + '</div>';
           var meta = '';
-          if (p.author_name) meta += $('<div>').text(p.author_name).html();
+          if (p.author_name) meta += '<a class="author-link" href="/users/profile.php?id=' + p.uid + '">' + $('<div>').text(p.author_name).html() + '</a>';
           if (p.stamp) {
             var d = new Date(p.stamp * 1000);
             var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -353,9 +354,15 @@ $(document).ready(function(){
     var $card  = $(card);
     var $body  = $card.find('.feed-card-body');
     var $btn   = $card.find('.feed-read-more');
-    if ($body[0].scrollHeight > 120) {
+    var SNAP   = 25;
+    var CAP    = 120;
+    var snapped = Math.ceil($body[0].scrollHeight / SNAP) * SNAP;
+    if (snapped > CAP) {
+      $body.css('max-height', CAP + 'px');
       $body.append('<div class="feed-card-fade"></div>');
       $btn.show();
+    } else {
+      $body.css('max-height', snapped + 'px');
     }
   }
 
@@ -431,16 +438,22 @@ $(document).ready(function(){
       success: function(res) {
         if (res.success && res.post) {
           var p = res.post;
-          var escaped = $('<div>').text(p.content).html().replace(/\n/g, '<br>');
+          var escaped  = $('<div>').text(p.content).html().replace(/\n/g, '<br>');
+          var avatar   = p.author_photo
+            ? '<img src="/uploads/profiles/' + $('<div>').text(p.author_photo).html() + '" alt="" />'
+            : '<i class="fa-solid fa-user"></i>';
           var $card = $([
             '<div class="feed-card" data-post-id="' + p.id + '">',
               '<button class="feed-card-delete" data-post-id="' + p.id + '" title="Delete post">&times;</button>',
-              '<div class="feed-card-body">',
-                '<div class="feed-card-content">' + escaped + '</div>',
-              '</div>',
-              '<div class="feed-card-foot">',
-                '<button class="feed-read-more">Read &rarr;</button>',
-                '<span class="feed-card-meta">' + $('<div>').text(p.author_name).html() + ' &middot; ' + $('<div>').text(p.date).html() + '</span>',
+              '<a class="feed-card-avatar" href="/users/profile.php?id=' + p.uid + '">' + avatar + '</a>',
+              '<div class="feed-card-main">',
+                '<div class="feed-card-body">',
+                  '<div class="feed-card-content">' + escaped + '</div>',
+                '</div>',
+                '<div class="feed-card-foot">',
+                  '<button class="feed-read-more">Read &rarr;</button>',
+                  '<span class="feed-card-meta"><a class="author-link" href="/users/profile.php?id=' + p.uid + '">' + $('<div>').text(p.author_name).html() + '</a> &middot; ' + $('<div>').text(p.date).html() + '</span>',
+                '</div>',
               '</div>',
             '</div>'
           ].join(''));
@@ -462,45 +475,11 @@ $(document).ready(function(){
     });
   });
 
-// member overlay — open on entry click, close on backdrop/button
+// directory entry — navigate to the member's profile page
   $(document).on('click', '#community-panel .entry', function(e) {
     if ($(e.target).closest('i, .info-box, .info-box-list, .addremove, .hover-infoAdd').length) return;
-    var $entry   = $(this);
-    var name     = $entry.data('name')    || '';
-    var dept     = $entry.data('dept')    || '';
-    var email    = $entry.data('email')   || '';
-    var phone    = $entry.data('phone')   || '';
-    var website  = $entry.data('website') || '';
-    var lb       = $entry.data('lb')      || '';
-    var since    = $entry.data('since')   || '';
-
-    var html = '<div class="mo-name">' + $('<span>').text(name).html() + '</div>';
-    if (dept) html += '<div class="mo-dept">' + $('<span>').text(dept).html() + '</div>';
-    html += '<div class="mo-divider"></div>';
-    if (email)   html += '<div class="mo-row"><i class="fa-solid fa-envelope"></i> <a href="mailto:' + $('<span>').text(email).html() + '">' + $('<span>').text(email).html() + '</a></div>';
-    if (phone)   html += '<div class="mo-row"><i class="fa-solid fa-phone"></i> <a href="tel:' + $('<span>').text(phone).html() + '">' + $('<span>').text(phone).html() + '</a></div>';
-    if (website) html += '<div class="mo-row"><i class="fa-solid fa-globe"></i> <a href="' + $('<span>').text(website).html() + '" target="_blank" rel="noopener">' + $('<span>').text(website).html() + '</a></div>';
-    if (lb)      html += '<div class="mo-row"><i class="fa-brands fa-letterboxd"></i> <a href="https://letterboxd.com/' + $('<span>').text(lb).html() + '" target="_blank" rel="noopener">' + $('<span>').text(lb).html() + '</a></div>';
-    if (since) {
-      var d = new Date(since);
-      if (!isNaN(d)) {
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        html += '<div class="mo-since">Member since ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</div>';
-      }
-    }
-
-    $('#member-overlay-content').html(html);
-    $('#member-overlay').addClass('active');
-  });
-
-  $('#member-overlay-close').on('click', function() {
-    $('#member-overlay').removeClass('active');
-  });
-
-  $('#member-overlay').on('click', function(e) {
-    if (!$(e.target).closest('#member-overlay-card').length) {
-      $(this).removeClass('active');
-    }
+    var uid = $(this).data('uid');
+    if (uid) window.location.href = '/users/profile.php?id=' + uid;
   });
 
 // signup panel — open on click, close on outside click

@@ -71,7 +71,7 @@ $display_date = date('F j, Y', $post['edited'] ?: $post['stamp']);
 
       <div class="post-meta">
         <?php if($post['author_name']): ?>
-          <span><?php echo htmlspecialchars($post['author_name']); ?></span>
+          <a class="author-link" href="/users/profile.php?id=<?php echo $post['uid']; ?>"><?php echo htmlspecialchars($post['author_name']); ?></a>
           <span class="post-meta-dot">&middot;</span>
         <?php endif; ?>
         <span><?php echo $display_date; ?></span>

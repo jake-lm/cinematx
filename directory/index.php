@@ -201,14 +201,6 @@ $sql2->execute();
 
 </div><!-- /.home-base -->
 
-<!-- Member overlay -->
-<div class="member-overlay" id="member-overlay">
-  <div class="member-overlay-card" id="member-overlay-card">
-    <button class="member-overlay-close" id="member-overlay-close">&#x2715;</button>
-    <div class="member-overlay-content" id="member-overlay-content"></div>
-  </div>
-</div>
-
 </div><!-- /.main-content -->
 
 </body>

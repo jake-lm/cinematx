@@ -1,3 +1,4 @@
+@use "sass:color";
 @import url("https://fonts.googleapis.com/css?family=Montserrat:300|Open+Sans|Open+Sans+Condensed:300");
 @import url("https://fonts.googleapis.com/css2?family=Oswald&family=Roboto+Condensed&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Signika:wght@300;400;500;600;700&display=swap");
@@ -62,7 +63,7 @@ body#dashboard .signup {
   background-color: #2A2A2A; }
 
 a:hover {
-  text-decoration: underline; }
+  text-decoration: none; }
 
 .error {
   display: block;
@@ -342,6 +343,12 @@ a:hover {
     @media screen and (max-width: 900px) {
       .main-content .motw .motw-theatre-info {
         display: none; } }
+    .main-content .motw .motw-theatre-info .topbar .title a {
+      color: inherit;
+      text-decoration: none; }
+      .main-content .motw .motw-theatre-info .topbar .title a:hover {
+        color: #fff;
+        text-decoration: none; }
 
   .main-content .motw .motw-th1-link {
     margin-top: 18px;
@@ -1369,10 +1376,11 @@ body#index .main-content .home-base {
         .main-content .home-base .content-block-w {
           width: 100%; } }
       .main-content .home-base .content-block-w a {
-        text-decoration: underline;
+        text-decoration: none;
         color: #f2f2f2; }
         .main-content .home-base .content-block-w a:hover {
           color: #fff;
+          text-decoration: none;
           cursor: pointer; }
       .main-content .home-base .content-block-w a:visited {
         color: inherit; }
@@ -1420,6 +1428,12 @@ body#index .main-content .home-base {
           margin: 0;
           padding-top: 14px;
           width: 320px; }
+          .main-content .home-base .content-block-w .guest-row .text a {
+            color: inherit;
+            text-decoration: none; }
+            .main-content .home-base .content-block-w .guest-row .text a:hover {
+              color: #fff;
+              text-decoration: none; }
         @media screen and (max-width: 600px) {
           .main-content .home-base .content-block-w .guest-row {
             flex-direction: column;
@@ -2031,7 +2045,7 @@ body#index .main-content .home-base {
           color: inherit; }
         .main-content .video-container .video-info .topbar a:hover {
           color: #fff;
-          text-decoration: underline; }
+          text-decoration: none; }
         .main-content .video-container .video-info .topbar .title {
           position: relative;
           display: block;
@@ -2087,7 +2101,7 @@ body#index .main-content .home-base {
           color: #bbb; }
         .main-content .video-container .video-info .info-txt a {
           color: #922E32;
-          text-decoration: underline; }
+          text-decoration: none; }
         .main-content .video-container .video-info .info-txt a:hover {
           color: #c04040; }
         .main-content .video-container .video-info .info-txt .motw-programmer {
@@ -2261,6 +2275,24 @@ body#index .home-left .community-panel {
 .qp-selector {
   position: relative;
   display: inline-block; }
+
+.qp-status-reveal {
+  display: inline-block;
+  margin-left: 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #666;
+  vertical-align: middle;
+  opacity: 0;
+  transform: translateX(-6px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease; }
+
+.qp-selector:hover + .qp-status-reveal {
+  opacity: 1;
+  transform: translateX(0); }
   .qp-selector-current {
     display: flex;
     align-items: center;
@@ -2308,7 +2340,11 @@ body#index .home-left .community-panel {
 .quick-post-box {
   background: #1a1a1a;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55); }
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease; }
+  .quick-post-box:focus-within {
+    background: color.mix(blue, #1a1a1a, 5%);
+    box-shadow: 7px 8px 0px 0px rgba(3, 5, 25, 0.65); }
 
 .qp-mode { display: none; }
 .qp-mode.active { display: block; }
@@ -2338,7 +2374,7 @@ body#index .home-left .community-panel {
 .qp-textarea {
   display: block;
   width: 100%;
-  min-height: 150px;
+  min-height: 75px;
   max-height: 300px;
   background: transparent;
   border: none;
@@ -2350,8 +2386,12 @@ body#index .home-left .community-panel {
   outline: none;
   resize: none;
   overflow-y: auto;
-  box-sizing: border-box; }
+  box-sizing: border-box;
+  transition: min-height 0.3s ease; }
   .qp-textarea::placeholder { color: #333; }
+
+.quick-post-box:focus-within .qp-textarea {
+  min-height: 150px; }
 
 .qp-footer {
   display: flex;
@@ -2373,6 +2413,160 @@ body#index .home-left .community-panel {
   .qp-submit:hover { background: #a83338; }
   .qp-submit:disabled { opacity: 0.5; cursor: default; }
 
+// ── Profile card (users/profile.php) ──────────────────────────────────────────
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  padding: 20px;
+  box-sizing: border-box;
+  margin-bottom: 20px; }
+
+.profile-card-photo {
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #555;
+  font-size: 26px; }
+  .profile-card-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; }
+
+.profile-card-info {
+  min-width: 0; }
+
+.profile-card-name {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 20px;
+  font-weight: bold;
+  color: #e2e2e2; }
+
+.profile-card-meta {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #777;
+  margin-top: 6px; }
+
+// ── Letterboxd panel ──────────────────────────────────────────────────────────
+
+.letterboxd-panel {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
+  padding: 16px 16px 18px;
+  box-sizing: border-box;
+  margin-top: 20px;
+  margin-bottom: 20px; }
+
+.lb-subtitle {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 8px; }
+
+.letterboxd-panel-header {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ff8000;
+  margin-bottom: 14px; }
+
+.lb-favorites {
+  display: flex;
+  gap: 10px; }
+
+.lb-favorite-card {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  aspect-ratio: 2 / 3;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 0.2s ease; }
+  .lb-favorite-card:hover {
+    border-color: #922E32;
+    text-decoration: none; }
+  .lb-favorite-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block; }
+  .lb-favorite-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    text-align: center;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    color: #888; }
+
+.lb-recent-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06); }
+
+.lb-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0; }
+
+.lb-recent-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 12px;
+  padding: 5px 0;
+  color: #999; }
+
+.lb-recent-link {
+  flex: 1;
+  min-width: 0;
+  color: #ccc !important;
+  text-decoration: none;
+  transition: color 0.2s ease; }
+  .lb-recent-link:hover {
+    color: #fff !important;
+    text-decoration: none; }
+
+.lb-recent-year {
+  color: #555;
+  font-size: 11px; }
+
+.lb-recent-date {
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #555; }
+
 // ── Post feed ─────────────────────────────────────────────────────────────────
 
 .post-feed {
@@ -2387,7 +2581,35 @@ body#index .home-left .community-panel {
   box-shadow: 7px 8px 0px 0px rgba(0, 0, 0, 0.55);
   padding: 14px 14px 10px;
   box-sizing: border-box;
-  position: relative; }
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px; }
+
+.feed-card-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #555;
+  font-size: 14px;
+  text-decoration: none; }
+  .feed-card-avatar:hover {
+    text-decoration: none; }
+  .feed-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; }
+
+.feed-card-main {
+  flex: 1;
+  min-width: 0; }
 
 .feed-card-delete {
   position: absolute; top: 8px; right: 8px;
@@ -2518,84 +2740,6 @@ body#index .home-left .community-panel {
   cursor: pointer;
   transition: color 0.2s ease; }
   .featured-read-more:hover { color: #c94a50; }
-
-// ── Member overlay ────────────────────────────────────────────────────────────
-
-.member-overlay {
-  display: none;
-  position: fixed;
-  left: 200px;
-  top: 50px;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.72);
-  z-index: 5000;
-  align-items: center;
-  justify-content: center; }
-  .member-overlay.active { display: flex; }
-
-.member-overlay-card {
-  position: relative;
-  background: #1c1c1c;
-  min-width: 280px;
-  max-width: 420px;
-  padding: 32px 30px 28px;
-  box-shadow: 12px 12px 0px 0px rgba(0, 0, 0, 0.6); }
-
-.member-overlay-close {
-  position: absolute;
-  top: 12px;
-  right: 14px;
-  background: transparent;
-  border: none;
-  color: #444;
-  font-size: 14px;
-  cursor: pointer;
-  transition: color 0.2s ease; }
-  .member-overlay-close:hover { color: #e2e2e2; }
-
-.mo-name {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: #e2e2e2;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px; }
-
-.mo-dept {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 9px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #922E32;
-  margin-bottom: 18px; }
-
-.mo-divider {
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  margin-bottom: 16px; }
-
-.mo-row {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 11px;
-  color: #666;
-  margin-bottom: 9px;
-  display: flex;
-  align-items: center;
-  gap: 9px; }
-  .mo-row i { width: 14px; text-align: center; color: #444; }
-  .mo-row a {
-    color: #777;
-    text-decoration: none;
-    transition: color 0.2s ease; }
-    .mo-row a:hover { color: #e2e2e2; }
-
-.mo-since {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 9px;
-  letter-spacing: 1px;
-  color: #444;
-  text-transform: uppercase;
-  margin-top: 16px; }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -2871,6 +3015,48 @@ body#dashboard .main-content .home-base {
   }
 }
 
+// profile photo upload (Account tab)
+.profile-photo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px; }
+
+.profile-photo-circle {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #555;
+  font-size: 28px; }
+  .profile-photo-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; }
+
+.profile-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px; }
+
+.profile-photo-remove {
+  background: transparent;
+  border: none;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.15s ease; }
+  .profile-photo-remove:hover { color: #922E32; }
+
 // account panel overrides
 body#dashboard .main-content .home-base #panel-account label {
   display: block;
@@ -3118,6 +3304,14 @@ body#post-page .main-content .home-base {
   margin: 0 0 14px;
 }
 
+.author-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease; }
+  .author-link:hover {
+    color: #e2e2e2;
+    text-decoration: none; }
+
 .post-meta {
   font-family: 'Montserrat', sans-serif;
   font-size: 9px;
@@ -3167,6 +3361,7 @@ body#post-page .main-content .home-base {
     width: 90px;
     background: rgba(0, 0, 0, 0.75);
     color: #fff;
+    text-decoration: none;
     .share-label {
       opacity: 1;
     }
@@ -3232,11 +3427,13 @@ body#post-page .main-content .home-base {
 // ── The List page ─────────────────────────────────────────────────────────────
 
 body#list .main-content .home-base {
-  padding-top: 35px; }
+  padding-top: 35px;
+  padding-right: 255px;
+  box-sizing: border-box; }
 
 .main-content .list-page {
   min-width: 560px;
-  max-width: 860px;
+  max-width: 1140px;
   padding-bottom: 60px;
 
   .list-stamp {
@@ -3300,52 +3497,86 @@ body#list .main-content .home-base {
     margin-bottom: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
 
-  .list-card {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding: 13px 16px;
-    margin-bottom: 5px;
-    background-color: rgba(255, 255, 255, 0.03);
-    border-left: 3px solid rgba(146, 46, 50, 0.4);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    transition: background-color .2s ease, border-left-color .2s ease;
+  .list-card-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 175px);
+    gap: 18px; }
 
-    &:hover {
-      background-color: rgba(146, 46, 50, 0.07);
-      border-left-color: #922E32; }
+  .list-card {
+
+    .list-card-poster {
+      display: block;
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      background: #161616;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      text-decoration: none;
+      transition: border-color .2s ease;
+
+      &:hover {
+        border-color: #922E32;
+        text-decoration: none; }
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block; } }
+
+    .list-card-poster-title {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+      text-align: center;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #888; }
+
+    .list-card-info {
+      margin-top: 8px; }
 
     .list-card-date {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
       font-family: 'Montserrat', sans-serif;
       font-size: 11px;
       font-weight: bold;
-      color: #922E32;
       letter-spacing: 0.5px;
-      min-width: 58px;
-      flex-shrink: 0; }
+      color: #fff;
+      background: #922E32;
+      padding: 3px 8px;
+      border-bottom-right-radius: 4px; }
 
     .list-card-title {
       font-family: 'Montserrat', sans-serif;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       color: #e2e2e2;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      flex: 1;
-
-      a {
-        color: inherit;
-        text-decoration: none;
-        &:hover { color: #fff; text-decoration: underline; }
-        &:visited { color: inherit; } } }
+      letter-spacing: 0.3px;
+      line-height: 1.3;
+      margin-top: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden; }
 
     .list-card-venue {
       font-family: 'Montserrat', sans-serif;
-      font-size: 10px;
-      letter-spacing: 1px;
+      font-size: 9px;
+      letter-spacing: 0.5px;
       text-transform: uppercase;
       color: #555;
-      flex-shrink: 0; } }
+      margin-top: 4px; } }
 
   .list-empty {
     font-family: 'Roboto', sans-serif;

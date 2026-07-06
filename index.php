@@ -120,7 +120,7 @@ $sql_q1 = $conn->query("SELECT * FROM `showtimes` WHERE `showtime` >
     $featured_post_q->execute();
     $featured_post = $featured_post_q->fetch(PDO::FETCH_ASSOC);
 
-    $posts_front_q = $conn->prepare("SELECT p.id, p.title, p.subtitle, p.type, p.image, p.stamp, p.edited, u.name AS author_name
+    $posts_front_q = $conn->prepare("SELECT p.id, p.uid, p.title, p.subtitle, p.type, p.image, p.stamp, p.edited, u.name AS author_name
                                      FROM posts p LEFT JOIN users u ON p.uid = u.id
                                      WHERE p.active = 1 AND p.type IN ('review', 'essay')
                                      ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 2");
@@ -128,7 +128,7 @@ $sql_q1 = $conn->query("SELECT * FROM `showtimes` WHERE `showtime` >
     $posts_front = $posts_front_q->fetchAll(PDO::FETCH_ASSOC);
 
     $posts_feed_q = $conn->prepare(
-      "SELECT p.id, p.uid, p.content, p.type, p.stamp, u.name AS author_name
+      "SELECT p.id, p.uid, p.content, p.type, p.stamp, u.name AS author_name, u.photo AS author_photo
        FROM posts p LEFT JOIN users u ON p.uid = u.id
        WHERE p.active = 1 AND p.type = 'post'
        ORDER BY p.stamp DESC LIMIT 3"
@@ -307,9 +307,10 @@ if($fName == "") $fName = null;
           <div class="quick-post-wrap">
             <div class="qp-selector" id="qp-selector">
               <div class="qp-selector-current">
-                <span id="qp-current-label">Post</span>
+                <span id="qp-current-label">Set Status</span>
               </div>
             </div>
+            <span class="qp-status-reveal">Only one status is active at once</span>
             <div class="quick-post-box">
               <div class="qp-mode active" id="qp-mode-post">
                 <textarea class="qp-textarea" id="qp-content-post" name="content" placeholder="What's on your mind?"></textarea>
@@ -343,12 +344,21 @@ if($fName == "") $fName = null;
               <?php if($pf['uid'] == $qUser['id']): ?>
               <button class="feed-card-delete" data-post-id="<?php echo $pf['id']; ?>" title="Delete post">&times;</button>
               <?php endif; ?>
-              <div class="feed-card-body">
-                <div class="feed-card-content"><?php echo nl2br(htmlspecialchars($pf['content'])); ?></div>
-              </div>
-              <div class="feed-card-foot">
-                <button class="feed-read-more">Read &rarr;</button>
-                <span class="feed-card-meta"><?php echo htmlspecialchars($pf['author_name'] ?? 'Member'); ?> &middot; <?php echo $pf_date; ?></span>
+              <a class="feed-card-avatar" href="/users/profile.php?id=<?php echo $pf['uid']; ?>">
+                <?php if(!empty($pf['author_photo'])): ?>
+                <img src="/uploads/profiles/<?php echo htmlspecialchars($pf['author_photo']); ?>" alt="" />
+                <?php else: ?>
+                <i class="fa-solid fa-user"></i>
+                <?php endif; ?>
+              </a>
+              <div class="feed-card-main">
+                <div class="feed-card-body">
+                  <div class="feed-card-content"><?php echo nl2br(htmlspecialchars($pf['content'])); ?></div>
+                </div>
+                <div class="feed-card-foot">
+                  <button class="feed-read-more">Read &rarr;</button>
+                  <span class="feed-card-meta"><a class="author-link" href="/users/profile.php?id=<?php echo $pf['uid']; ?>"><?php echo htmlspecialchars($pf['author_name'] ?? 'Member'); ?></a> &middot; <?php echo $pf_date; ?></span>
+                </div>
               </div>
             </div>
             <?php endforeach; ?>
@@ -383,7 +393,7 @@ if($fName == "") $fName = null;
 
             <div class="post-meta">
               <?php if($featured_post['author_name']): ?>
-                <span><?php echo htmlspecialchars($featured_post['author_name']); ?></span>
+                <a class="author-link" href="/users/profile.php?id=<?php echo $featured_post['uid']; ?>"><?php echo htmlspecialchars($featured_post['author_name']); ?></a>
                 <span class="post-meta-dot">&middot;</span>
               <?php endif; ?>
               <span><?php echo $fp_date; ?></span>
@@ -434,7 +444,7 @@ if($fName == "") $fName = null;
                 <?php endif; ?>
               </div>
               <div class="info-txt">
-                <span class="pp-meta-bg<?php echo $pf['type'] ? ' pp-type-' . htmlspecialchars($pf['type']) : ''; ?>"></span><?php if($pf['type']): ?><?php echo htmlspecialchars($pf['type']); ?> &middot; <?php endif; ?><?php echo htmlspecialchars($pf['author_name'] ?? ''); ?>
+                <span class="pp-meta-bg<?php echo $pf['type'] ? ' pp-type-' . htmlspecialchars($pf['type']) : ''; ?>"></span><?php if($pf['type']): ?><?php echo htmlspecialchars($pf['type']); ?> &middot; <?php endif; ?><?php if($pf['author_name']): ?><a class="author-link" href="/users/profile.php?id=<?php echo $pf['uid']; ?>"><?php echo htmlspecialchars($pf['author_name']); ?></a><?php endif; ?>
               </div>
               <div class="bg-gradient" <?php if($pf['image']): ?>style="background-image:url('/uploads/posts/<?php echo htmlspecialchars($pf['image']); ?>');"<?php endif; ?>></div>
             </div>
@@ -446,14 +456,6 @@ if($fName == "") $fName = null;
           </div><!-- /.post-panels-row -->
 
         </div><!-- /.home-right -->
-
-        <!-- Member overlay -->
-        <div class="member-overlay" id="member-overlay">
-          <div class="member-overlay-card" id="member-overlay-card">
-            <button class="member-overlay-close" id="member-overlay-close">&#x2715;</button>
-            <div class="member-overlay-content" id="member-overlay-content"></div>
-          </div>
-        </div>
 
       </div><!-- /.member-layout -->
 

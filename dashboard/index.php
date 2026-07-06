@@ -93,6 +93,19 @@ require '../database.php';
   </div>
 
   <div class="dash-panel" id="panel-account">
+    <div class="profile-photo-wrap">
+      <div class="profile-photo-circle" id="profile-photo-circle">
+        <img id="profile-photo-preview-img" src="<?php echo !empty($qUser['photo']) ? '/uploads/profiles/' . htmlspecialchars($qUser['photo']) : ''; ?>" alt="" style="<?php echo empty($qUser['photo']) ? 'display:none;' : ''; ?>" />
+        <i class="fa-solid fa-user" id="profile-photo-placeholder" style="<?php echo !empty($qUser['photo']) ? 'display:none;' : ''; ?>"></i>
+      </div>
+      <div class="profile-photo-actions">
+        <label class="write-image-btn enabled" for="profile-photo-input">
+          <i class="fa-solid fa-camera"></i> Change photo
+        </label>
+        <input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+        <button type="button" class="profile-photo-remove" id="profile-photo-remove" style="<?php echo empty($qUser['photo']) ? 'display:none;' : ''; ?>">Remove</button>
+      </div>
+    </div>
     <form action="/dashboard/signup.php?action=updateprof" method="post">
       <label>Email</label>
       <input class="input" type="text" value="<?php echo htmlspecialchars($qUser['email']); ?>" placeholder="Email" disabled />

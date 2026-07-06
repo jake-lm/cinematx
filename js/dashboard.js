@@ -104,6 +104,45 @@ $(document).ready(function() {
     }
   });
 
+  // ── Profile photo upload (Account tab) ──────────────────────────────────────
+
+  $('#profile-photo-input').on('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      $('#profile-photo-preview-img').attr('src', e.target.result).show();
+      $('#profile-photo-placeholder').hide();
+    };
+    reader.readAsDataURL(file);
+
+    var fd = new FormData();
+    fd.append('photo', file);
+    $.ajax({
+      type: 'POST', url: '/dashboard/profile.php?action=upload_photo',
+      data: fd, dataType: 'json',
+      processData: false, contentType: false,
+      success: function(res) {
+        if (res.success) {
+          $('#profile-photo-remove').show();
+        } else {
+          alert('Photo upload failed.');
+        }
+      },
+      error: function() { alert('Photo upload failed.'); }
+    });
+  });
+
+  $('#profile-photo-remove').on('click', function() {
+    $('#profile-photo-preview-img').hide().attr('src', '');
+    $('#profile-photo-placeholder').show();
+    $(this).hide();
+    $.ajax({
+      type: 'POST', url: '/dashboard/profile.php?action=upload_photo&remove=1',
+      data: {}, dataType: 'json'
+    });
+  });
+
   // ── Save ───────────────────────────────────────────────────────────────────
 
   function save() {

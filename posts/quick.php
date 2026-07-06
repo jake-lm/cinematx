@@ -8,15 +8,16 @@ if (!isset($_SESSION['username'])) {
   echo json_encode(['success' => false, 'error' => 'not_logged_in']); exit;
 }
 
-$uid_q = $conn->prepare("SELECT id, name FROM users WHERE email = :email");
+$uid_q = $conn->prepare("SELECT id, name, photo FROM users WHERE email = :email");
 $uid_q->execute([':email' => $_SESSION['username']]);
 $uid_row = $uid_q->fetch(PDO::FETCH_ASSOC);
 
 if (!$uid_row) {
   echo json_encode(['success' => false, 'error' => 'user_not_found']); exit;
 }
-$uid         = $uid_row['id'];
-$author_name = $uid_row['name'];
+$uid          = $uid_row['id'];
+$author_name  = $uid_row['name'];
+$author_photo = $uid_row['photo'];
 
 $type = trim($_POST['type'] ?? '');
 
@@ -58,9 +59,11 @@ try {
 echo json_encode([
   'success' => true,
   'post' => [
-    'id'          => (int)$conn->lastInsertId(),
-    'content'     => $content,
-    'author_name' => $author_name,
-    'date'        => date('M j'),
+    'id'           => (int)$conn->lastInsertId(),
+    'uid'          => $uid,
+    'content'      => $content,
+    'author_name'  => $author_name,
+    'author_photo' => $author_photo,
+    'date'         => date('M j'),
   ]
 ]);
