@@ -12,7 +12,7 @@ $(document).ready(function() {
 
   // honour URL hash on load, default to 'write'
   var initTab = location.hash.replace('#', '');
-  activateTab(['write', 'posts', 'account'].indexOf(initTab) !== -1 ? initTab : 'write');
+  activateTab(['write', 'posts', 'events', 'account'].indexOf(initTab) !== -1 ? initTab : 'write');
 
   $('.dash-tab').on('click', function() {
     activateTab($(this).data('panel'));
@@ -283,6 +283,7 @@ $(document).ready(function() {
   });
 
   $(document).on('click', '.draft-row', function(e) {
+    if ($(this).hasClass('event-row')) return; // event rows share this class for styling only
     if ($(e.target).closest('.draft-delete, .post-unpublish, .post-edit, .draft-confirm').length) return;
     // only load drafts via row click — published rows use the edit button
     if ($(this).attr('data-active') === '1') return;
@@ -405,6 +406,172 @@ $(document).ready(function() {
           var $row = $('.draft-row[data-id="' + pid + '"]');
           if ($row.length) setRowLive($row);
         }
+      }
+    });
+  });
+
+  // ── Events ───────────────────────────────────────────────────────────────
+
+  var eventId          = null;
+  var eventPosterFile  = null;
+
+  function setEventStatus(msg, color) {
+    $('#event-status').text(msg).css('color', color || '');
+  }
+
+  function resetEventForm() {
+    eventId         = null;
+    eventPosterFile = null;
+    $('#event-title, #event-location, #event-address, #event-screentime').val('');
+    $('#event-poster').val('');
+    $('#event-poster-preview').hide();
+    $('#event-poster-thumb').attr('src', '');
+    $('#event-cancel').hide();
+    $('#event-submit').text('Submit').prop('disabled', false);
+    setEventStatus('');
+  }
+
+  $('#event-poster').on('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    eventPosterFile = file;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      $('#event-poster-thumb').attr('src', e.target.result);
+      $('#event-poster-preview').show();
+    };
+    reader.readAsDataURL(file);
+  });
+
+  $('#event-poster-remove').on('click', function() {
+    eventPosterFile = null;
+    $('#event-poster').val('');
+    $('#event-poster-preview').hide();
+    $('#event-poster-thumb').attr('src', '');
+  });
+
+  $('#event-cancel').on('click', function() {
+    resetEventForm();
+  });
+
+  $('#event-submit').on('click', function() {
+    var title      = $('#event-title').val().trim();
+    var location_  = $('#event-location').val().trim();
+    var address    = $('#event-address').val().trim();
+    var screentime = $('#event-screentime').val();
+
+    if (!title || !location_ || !screentime) {
+      setEventStatus('title, location, and screentime are required', '#b22222');
+      return;
+    }
+
+    var fd = new FormData();
+    fd.append('title', title);
+    fd.append('location', location_);
+    fd.append('address', address);
+    fd.append('screentime', screentime);
+    if (eventPosterFile) fd.append('poster', eventPosterFile);
+
+    var isEdit = !!eventId;
+    if (isEdit) fd.append('event_id', eventId);
+
+    $('#event-submit').prop('disabled', true).text('Saving...');
+    setEventStatus('saving...', '#888');
+
+    $.ajax({
+      type: 'POST',
+      url: '/dashboard/event.php?action=' + (isEdit ? 'update' : 'create'),
+      data: fd, dataType: 'json',
+      processData: false, contentType: false,
+      success: function(res) {
+        if (res.success) {
+          location.hash = 'events';
+          location.reload();
+        } else {
+          setEventStatus('error: ' + (res.error || 'unknown'), '#b22222');
+          $('#event-submit').prop('disabled', false).text(isEdit ? 'Update' : 'Submit');
+        }
+      },
+      error: function() {
+        setEventStatus('server error', '#b22222');
+        $('#event-submit').prop('disabled', false).text(isEdit ? 'Update' : 'Submit');
+      }
+    });
+  });
+
+  $(document).on('click', '.event-edit', function() {
+    var id = $(this).data('id');
+    $.ajax({
+      type: 'GET', url: '/dashboard/event.php?action=get&event_id=' + id,
+      dataType: 'json',
+      success: function(res) {
+        if (!res.success) return;
+        var ev = res.event;
+
+        eventId         = id;
+        eventPosterFile = null;
+
+        $('#event-title').val(ev.title);
+        $('#event-location').val(ev.location);
+        $('#event-address').val(ev.address || '');
+        $('#event-screentime').val(ev.screentime_local);
+        $('#event-poster').val('');
+
+        if (ev.poster) {
+          $('#event-poster-thumb').attr('src', '/uploads/events/' + ev.poster);
+          $('#event-poster-preview').show();
+        } else {
+          $('#event-poster-preview').hide();
+        }
+
+        $('#event-cancel').show();
+        $('#event-submit').text('Update').prop('disabled', false);
+        setEventStatus('editing "' + ev.title + '"', '#5a9e6f');
+
+        activateTab('events');
+      }
+    });
+  });
+
+  $(document).on('click', '.event-delete', function(e) {
+    e.stopPropagation();
+    var $btn = $(this);
+    var $row = $btn.closest('.event-row');
+
+    if ($row.find('.draft-confirm').length) return;
+
+    $btn.hide();
+    $row.find('.post-row-actions').append(
+      '<span class="draft-confirm">delete? ' +
+      '<span class="draft-confirm-yes">yes</span> / ' +
+      '<span class="draft-confirm-no">no</span></span>'
+    );
+  });
+
+  $(document).on('click', '.event-row .draft-confirm-no', function(e) {
+    e.stopPropagation();
+    var $row = $(this).closest('.event-row');
+    $row.find('.draft-confirm').remove();
+    $row.find('.event-delete').show();
+  });
+
+  $(document).on('click', '.event-row .draft-confirm-yes', function(e) {
+    e.stopPropagation();
+    var $row = $(this).closest('.event-row');
+    var id   = $row.data('id');
+
+    $.ajax({
+      type: 'POST', url: '/dashboard/event.php?action=delete',
+      data: { event_id: id }, dataType: 'json',
+      success: function(res) {
+        if (!res.success) return;
+        $row.fadeOut(200, function() {
+          $(this).remove();
+          if ($('.event-row').length === 0) {
+            $('#events-list').replaceWith('<p class="drafts-empty">No screenings submitted yet.</p>');
+          }
+        });
+        if (eventId === id) resetEventForm();
       }
     });
   });

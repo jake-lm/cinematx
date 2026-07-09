@@ -18,6 +18,9 @@
      <a href="/directory"><div class="block directory">
        <span class="content">Directory</span>
      </div></a>
+     <a href="/dashboard#events"><div class="block submit-screening">
+       <span class="content">Submit Screening</span>
+     </div></a>
 
      <form action="/dashboard/signup.php?action=logout" method="post">
        <input type="submit" class="submit-u" value="logout" />

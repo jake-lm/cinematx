@@ -63,9 +63,30 @@ foreach ($sources as $src) {
     foreach ($src['films'] as $film) {
         $film['venue']  = $src['venue'];
         $film['poster'] = fetch_tmdb_poster($film['title']);
+        $film['source'] = 'official';
         $all_films[]    = $film;
     }
 }
+
+// User-submitted screenings
+$events_q = $conn->prepare(
+    "SELECT e.id, e.title, e.poster, e.screentime, e.location
+     FROM events e
+     WHERE e.active = 1 AND e.screentime >= :now AND e.screentime <= :week_end
+     ORDER BY e.screentime ASC"
+);
+$events_q->execute([':now' => $now, ':week_end' => $week_end]);
+foreach ($events_q->fetchAll(PDO::FETCH_ASSOC) as $event) {
+    $all_films[] = [
+        'title'        => $event['title'],
+        'timestamp'    => (int)$event['screentime'],
+        'venue'        => $event['location'],
+        'poster'       => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
+        'url'          => '/events/?id=' . $event['id'],
+        'source'       => 'user',
+    ];
+}
+
 usort($all_films, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
 
 // Group by calendar day
@@ -123,19 +144,27 @@ $tomorrow_key = (new DateTime('tomorrow', $tz))->format('Ymd');
         <button class="list-filter-btn" data-filter="week">This Week</button>
       </div>
 
+      <div class="list-filter-bar list-source-filter-bar">
+        <button class="list-filter-btn active" data-source="all">All</button>
+        <button class="list-filter-btn" data-source="user">User</button>
+      </div>
+
       <?php foreach ($days as $day_key => $day): ?>
       <div class="list-section list-day-section" data-day="<?php echo $day_key; ?>">
         <div class="list-day-label"><?php echo htmlspecialchars($day['label']); ?></div>
 
         <div class="list-card-grid">
         <?php foreach ($day['films'] as $film): ?>
-        <div class="list-card">
+        <div class="list-card" data-source="<?php echo htmlspecialchars($film['source'] ?? 'official'); ?>">
           <?php if (!empty($film['url'])): ?>
           <a class="list-card-poster" href="<?php echo htmlspecialchars($film['url']); ?>" target="_blank" rel="noopener">
           <?php else: ?>
           <div class="list-card-poster">
           <?php endif; ?>
             <div class="list-card-date"><?php echo htmlspecialchars($film['display_time']); ?></div>
+            <?php if (($film['source'] ?? 'official') === 'user'): ?>
+            <span class="list-card-badge">Community</span>
+            <?php endif; ?>
             <?php if (!empty($film['poster'])): ?>
             <img src="<?php echo htmlspecialchars($film['poster']); ?>" alt="<?php echo htmlspecialchars($film['title']); ?>" />
             <?php else: ?>
@@ -232,33 +261,50 @@ $tomorrow_key = (new DateTime('tomorrow', $tz))->format('Ymd');
   var emptyMsg    = document.getElementById('list-empty-today');
   var labels      = { today: 'Today', tmrw: 'Tomorrow', week: 'This Week' };
 
-  function applyFilter(filter) {
-    stamp.textContent = labels[filter] || 'Today';
+  var timeFilter   = 'today';
+  var sourceFilter = 'all';
 
-    var dayKey = filter === 'tmrw' ? tomorrowKey : todayKey;
+  function applyFilters() {
+    stamp.textContent = labels[timeFilter] || 'Today';
+    var dayKey = timeFilter === 'tmrw' ? tomorrowKey : todayKey;
 
     var anyVisible = false;
     document.querySelectorAll('.list-day-section').forEach(function (section) {
-      var show = filter === 'week' || section.dataset.day === dayKey;
-      section.style.display = show ? '' : 'none';
-      if (show) anyVisible = true;
+      var dayMatches = timeFilter === 'week' || section.dataset.day === dayKey;
+      var sectionHasVisible = false;
+
+      section.querySelectorAll('.list-card').forEach(function (card) {
+        var sourceMatches = sourceFilter === 'all' || card.dataset.source === sourceFilter;
+        var show = dayMatches && sourceMatches;
+        card.style.display = show ? '' : 'none';
+        if (show) sectionHasVisible = true;
+      });
+
+      section.style.display = sectionHasVisible ? '' : 'none';
+      if (sectionHasVisible) anyVisible = true;
     });
 
-    emptyMsg.textContent = 'No screenings ' + (filter === 'tmrw' ? 'tomorrow' : 'today') + ' — check back soon.';
-    emptyMsg.style.display = (filter !== 'week' && !anyVisible) ? '' : 'none';
+    emptyMsg.textContent = 'No screenings ' + (timeFilter === 'tmrw' ? 'tomorrow' : 'today') + ' — check back soon.';
+    emptyMsg.style.display = (timeFilter !== 'week' && !anyVisible) ? '' : 'none';
   }
 
-  document.querySelectorAll('.list-filter-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('.list-filter-btn').forEach(function (b) {
-        b.classList.remove('active');
+  document.querySelectorAll('.list-filter-bar').forEach(function (bar) {
+    bar.querySelectorAll('.list-filter-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        bar.querySelectorAll('.list-filter-btn').forEach(function (b) {
+          b.classList.remove('active');
+        });
+        this.classList.add('active');
+
+        if (this.dataset.filter) timeFilter = this.dataset.filter;
+        if (this.dataset.source) sourceFilter = this.dataset.source;
+
+        applyFilters();
       });
-      this.classList.add('active');
-      applyFilter(this.dataset.filter);
     });
   });
 
-  applyFilter('today');
+  applyFilters();
 }());
 </script>
 

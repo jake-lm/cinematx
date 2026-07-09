@@ -48,11 +48,19 @@ require '../database.php';
     $posts_q->execute([':uid' => $qUser['id']]);
     $all_posts = $posts_q->fetchAll(PDO::FETCH_ASSOC);
     $post_count = count($all_posts);
+
+    $events_q = $conn->prepare("SELECT id, title, poster, screentime, location, address, stamp, edited
+                                FROM `events` WHERE uid=:uid
+                                ORDER BY screentime DESC");
+    $events_q->execute([':uid' => $qUser['id']]);
+    $all_events  = $events_q->fetchAll(PDO::FETCH_ASSOC);
+    $event_count = count($all_events);
   ?>
 
   <nav class="dash-nav">
     <span class="dash-tab" data-panel="write">Write</span>
     <span class="dash-tab" data-panel="posts">Posts<?php if($post_count > 0): ?> <span class="dash-count"><?php echo $post_count; ?></span><?php endif; ?></span>
+    <span class="dash-tab" data-panel="events">Events<?php if($event_count > 0): ?> <span class="dash-count"><?php echo $event_count; ?></span><?php endif; ?></span>
     <span class="dash-tab" data-panel="account">Account</span>
   </nav>
 
@@ -89,6 +97,62 @@ require '../database.php';
     </ul>
     <?php else: ?>
     <p class="drafts-empty">Nothing here yet.</p>
+    <?php endif; ?>
+  </div>
+
+  <div class="dash-panel" id="panel-events">
+    <div class="write-wrap">
+      <input type="text" id="event-title" class="write-title" placeholder="Title" autocomplete="off" />
+      <input type="text" id="event-location" class="write-subtitle" placeholder="Location — e.g. AFS Cinema, or &quot;My backyard&quot;" autocomplete="off" />
+      <input type="text" id="event-address" class="write-subtitle" placeholder="Address — optional" autocomplete="off" />
+      <input type="datetime-local" id="event-screentime" class="write-subtitle event-datetime" />
+      <div class="write-image-wrap">
+        <div class="write-image-row">
+          <label class="write-image-btn enabled" id="event-poster-label">
+            <i class="fa-solid fa-image"></i> Poster
+            <input type="file" id="event-poster" accept="image/jpeg,image/png,image/webp,image/gif" />
+          </label>
+          <span class="write-image-hint">Optional</span>
+        </div>
+        <div class="write-image-preview" id="event-poster-preview" style="display:none;">
+          <img id="event-poster-thumb" src="" alt="preview" />
+          <button class="write-image-remove" id="event-poster-remove" title="Remove poster">&#x2715;</button>
+        </div>
+      </div>
+      <div class="write-footer">
+        <span id="event-status" class="autosave-status"></span>
+        <div class="write-actions">
+          <button id="event-cancel" class="submit write-save" style="display:none;">Cancel</button>
+          <button id="event-submit" class="submit write-publish">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="events-list-heading">My Screenings</h3>
+    <?php if (!empty($all_events)): ?>
+    <ul class="drafts-list" id="events-list">
+      <?php foreach ($all_events as $event): ?>
+      <li class="draft-row event-row"
+          data-id="<?php echo $event['id']; ?>"
+          data-title="<?php echo htmlspecialchars($event['title']); ?>"
+          data-location="<?php echo htmlspecialchars($event['location']); ?>"
+          data-address="<?php echo htmlspecialchars($event['address'] ?? ''); ?>"
+          data-screentime="<?php echo (new DateTime('@' . $event['screentime']))->setTimezone(new DateTimeZone('America/Chicago'))->format('Y-m-d\TH:i'); ?>">
+        <div class="draft-info">
+          <span class="draft-title"><?php echo htmlspecialchars($event['title']); ?></span>
+          <span class="draft-type"><?php echo htmlspecialchars($event['location']); ?></span>
+          <span class="draft-date"><?php echo date('M j, Y g:ia', $event['screentime']); ?></span>
+        </div>
+        <div class="post-row-actions">
+          <a class="post-view" href="/events/?id=<?php echo $event['id']; ?>" target="_blank">view</a>
+          <button class="event-edit" data-id="<?php echo $event['id']; ?>">edit</button>
+          <button class="event-delete" data-id="<?php echo $event['id']; ?>">&#x2715;</button>
+        </div>
+      </li>
+      <?php endforeach; ?>
+    </ul>
+    <?php else: ?>
+    <p class="drafts-empty">No screenings submitted yet.</p>
     <?php endif; ?>
   </div>
 
