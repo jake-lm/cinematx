@@ -317,11 +317,13 @@ $(document).ready(function() {
   });
 
   $(document).on('click', '.draft-confirm-no', function(e) {
+    if ($(this).closest('.event-row').length) return; // events have their own confirm handler
     e.stopPropagation();
     cancelConfirm($(this).closest('.draft-row'));
   });
 
   $(document).on('click', '.draft-confirm-yes', function(e) {
+    if ($(this).closest('.event-row').length) return; // events have their own confirm handler
     e.stopPropagation();
     var $row = $(this).closest('.draft-row');
     var id   = $row.data('id');
@@ -412,95 +414,166 @@ $(document).ready(function() {
 
   // ── Events ───────────────────────────────────────────────────────────────
 
-  var eventId          = null;
-  var eventPosterFile  = null;
+  var eventId         = null;
+  var eventSaveTimer  = null;
+  var eventAutosaveOn = false;
 
-  function setEventStatus(msg, color) {
-    $('#event-status').text(msg).css('color', color || '');
+  function eventData() {
+    return {
+      title:      $('#event-title').val().trim(),
+      location:   $('#event-location').val().trim(),
+      address:    $('#event-address').val().trim(),
+      screentime: $('#event-screentime').val()
+    };
   }
 
-  function resetEventForm() {
-    eventId         = null;
-    eventPosterFile = null;
-    $('#event-title, #event-location, #event-address, #event-screentime').val('');
-    $('#event-poster').val('');
-    $('#event-poster-preview').hide();
+  function setEventStatus(msg, color) {
+    $('#event-autosave-status').text(msg).css('color', color || '');
+  }
+
+  // ── Event poster upload ──────────────────────────────────────────────────
+
+  function enableEventPosterInput() {
+    $('#event-poster').prop('disabled', false);
+    $('#event-poster-label').addClass('enabled');
+    $('#event-poster-hint').text('');
+  }
+
+  function showEventPosterPreview(src) {
+    $('#event-poster-thumb').attr('src', src);
+    $('#event-poster-preview').show();
+  }
+
+  function clearEventPosterPreview() {
     $('#event-poster-thumb').attr('src', '');
-    $('#event-cancel').hide();
-    $('#event-submit').text('Submit').prop('disabled', false);
-    setEventStatus('');
+    $('#event-poster-preview').hide();
+    $('#event-poster').val('');
+  }
+
+  function uploadEventPoster(file) {
+    if (!eventId || !file) return;
+    var fd = new FormData();
+    fd.append('event_id', eventId);
+    fd.append('poster', file);
+    setEventStatus('uploading poster...');
+    $.ajax({
+      type: 'POST', url: '/dashboard/event.php?action=upload_poster',
+      data: fd, dataType: 'json',
+      processData: false, contentType: false,
+      success: function(res) {
+        if (res.success) {
+          setEventStatus('poster saved');
+        } else {
+          setEventStatus('poster upload failed', '#b22222');
+          clearEventPosterPreview();
+        }
+      },
+      error: function() {
+        setEventStatus('poster upload failed', '#b22222');
+        clearEventPosterPreview();
+      }
+    });
   }
 
   $('#event-poster').on('change', function() {
     var file = this.files[0];
     if (!file) return;
-    eventPosterFile = file;
     var reader = new FileReader();
-    reader.onload = function(e) {
-      $('#event-poster-thumb').attr('src', e.target.result);
-      $('#event-poster-preview').show();
-    };
+    reader.onload = function(e) { showEventPosterPreview(e.target.result); };
     reader.readAsDataURL(file);
+    uploadEventPoster(file);
   });
 
   $('#event-poster-remove').on('click', function() {
-    eventPosterFile = null;
-    $('#event-poster').val('');
-    $('#event-poster-preview').hide();
-    $('#event-poster-thumb').attr('src', '');
-  });
-
-  $('#event-cancel').on('click', function() {
-    resetEventForm();
-  });
-
-  $('#event-submit').on('click', function() {
-    var title      = $('#event-title').val().trim();
-    var location_  = $('#event-location').val().trim();
-    var address    = $('#event-address').val().trim();
-    var screentime = $('#event-screentime').val();
-
-    if (!title || !location_ || !screentime) {
-      setEventStatus('title, location, and screentime are required', '#b22222');
-      return;
+    clearEventPosterPreview();
+    if (eventId) {
+      $.ajax({
+        type: 'POST', url: '/dashboard/event.php?action=upload_poster&remove=1',
+        data: { event_id: eventId }, dataType: 'json'
+      });
     }
-
-    var fd = new FormData();
-    fd.append('title', title);
-    fd.append('location', location_);
-    fd.append('address', address);
-    fd.append('screentime', screentime);
-    if (eventPosterFile) fd.append('poster', eventPosterFile);
-
-    var isEdit = !!eventId;
-    if (isEdit) fd.append('event_id', eventId);
-
-    $('#event-submit').prop('disabled', true).text('Saving...');
-    setEventStatus('saving...', '#888');
-
-    $.ajax({
-      type: 'POST',
-      url: '/dashboard/event.php?action=' + (isEdit ? 'update' : 'create'),
-      data: fd, dataType: 'json',
-      processData: false, contentType: false,
-      success: function(res) {
-        if (res.success) {
-          location.hash = 'events';
-          location.reload();
-        } else {
-          setEventStatus('error: ' + (res.error || 'unknown'), '#b22222');
-          $('#event-submit').prop('disabled', false).text(isEdit ? 'Update' : 'Submit');
-        }
-      },
-      error: function() {
-        setEventStatus('server error', '#b22222');
-        $('#event-submit').prop('disabled', false).text(isEdit ? 'Update' : 'Submit');
-      }
-    });
   });
 
-  $(document).on('click', '.event-edit', function() {
-    var id = $(this).data('id');
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  function saveEvent() {
+    var d = eventData();
+    if (!d.title && !d.location && !d.screentime) return;
+
+    setEventStatus('saving...');
+
+    if (eventId === null) {
+      $.ajax({
+        type: 'POST', url: '/dashboard/event.php?action=create',
+        data: d, dataType: 'json',
+        success: function(res) {
+          if (res.success) {
+            eventId = res.event_id;
+            eventAutosaveOn = true;
+            enableEventPosterInput();
+            $('#event-publish').prop('disabled', false);
+            $('#event-save').text('Save Draft');
+            setEventStatus('draft saved');
+          } else {
+            setEventStatus('save failed', '#b22222');
+            $('#event-save').prop('disabled', false).text('Save Draft');
+          }
+        },
+        error: function() {
+          setEventStatus('save failed', '#b22222');
+          $('#event-save').prop('disabled', false).text('Save Draft');
+        }
+      });
+    } else {
+      d.event_id = eventId;
+      $.ajax({
+        type: 'POST', url: '/dashboard/event.php?action=update',
+        data: d, dataType: 'json',
+        success: function(res) {
+          setEventStatus(res.success ? 'saved' : 'save failed', res.success ? '' : '#b22222');
+        },
+        error: function() { setEventStatus('save failed', '#b22222'); }
+      });
+    }
+  }
+
+  // autosave only fires after the first manual save
+  $('#event-title, #event-location, #event-address, #event-screentime').on('input change', function() {
+    if (!eventAutosaveOn) return;
+    setEventStatus('unsaved', '#888');
+    clearTimeout(eventSaveTimer);
+    eventSaveTimer = setTimeout(saveEvent, IDLE_MS);
+  });
+
+  $('#event-save').on('click', function() {
+    $(this).prop('disabled', true).text('Saving...');
+    saveEvent();
+  });
+
+  // ── Event row state helpers ──────────────────────────────────────────────
+
+  function setEventRowLive($row) {
+    var id = $row.data('id');
+    $row.attr('data-active', '1').addClass('post-live');
+    $row.find('.post-status').attr('class', 'post-status status-live').text('live');
+    $row.find('.post-row-actions').html(
+      '<a class="post-view" href="/events/?id=' + id + '" target="_blank">view</a>' +
+      '<button class="event-edit" data-id="' + id + '">edit</button>' +
+      '<button class="event-unpublish" data-id="' + id + '">unpublish</button>'
+    );
+  }
+
+  function setEventRowDraft($row) {
+    $row.attr('data-active', '0').removeClass('post-live');
+    $row.find('.post-status').attr('class', 'post-status status-draft').text('draft');
+    $row.find('.post-row-actions').html(
+      '<button class="event-delete" data-id="' + $row.data('id') + '">&#x2715;</button>'
+    );
+  }
+
+  // ── Load event into editor (draft row click or edit button) ────────────────
+
+  function loadEvent(id) {
     $.ajax({
       type: 'GET', url: '/dashboard/event.php?action=get&event_id=' + id,
       dataType: 'json',
@@ -508,30 +581,51 @@ $(document).ready(function() {
         if (!res.success) return;
         var ev = res.event;
 
-        eventId         = id;
-        eventPosterFile = null;
-
         $('#event-title').val(ev.title);
         $('#event-location').val(ev.location);
         $('#event-address').val(ev.address || '');
         $('#event-screentime').val(ev.screentime_local);
-        $('#event-poster').val('');
 
+        eventId         = parseInt(id);
+        eventAutosaveOn = true;
+        clearTimeout(eventSaveTimer);
+
+        enableEventPosterInput();
         if (ev.poster) {
-          $('#event-poster-thumb').attr('src', '/uploads/events/' + ev.poster);
-          $('#event-poster-preview').show();
+          showEventPosterPreview('/uploads/events/' + ev.poster);
         } else {
-          $('#event-poster-preview').hide();
+          clearEventPosterPreview();
         }
 
-        $('#event-cancel').show();
-        $('#event-submit').text('Update').prop('disabled', false);
-        setEventStatus('editing "' + ev.title + '"', '#5a9e6f');
+        $('#event-save').prop('disabled', false).text('Save Draft');
+
+        if (parseInt(ev.active) === 1) {
+          $('#event-save').text('Save');
+          $('#event-publish').prop('disabled', true).text('Published');
+          setEventStatus('editing live screening', '#5a9e6f');
+        } else {
+          $('#event-save').text('Save Draft');
+          $('#event-publish').prop('disabled', false).text('Publish');
+          setEventStatus('draft loaded');
+        }
 
         activateTab('events');
       }
     });
+  }
+
+  $(document).on('click', '.event-edit', function(e) {
+    e.stopPropagation();
+    loadEvent($(this).data('id'));
   });
+
+  $(document).on('click', '.event-row', function(e) {
+    if ($(e.target).closest('.event-delete, .event-unpublish, .event-edit, .draft-confirm').length) return;
+    if ($(this).attr('data-active') === '1') return;
+    loadEvent($(this).data('id'));
+  });
+
+  // ── Delete draft (with inline confirmation) ─────────────────────────────────
 
   $(document).on('click', '.event-delete', function(e) {
     e.stopPropagation();
@@ -571,7 +665,53 @@ $(document).ready(function() {
             $('#events-list').replaceWith('<p class="drafts-empty">No screenings submitted yet.</p>');
           }
         });
-        if (eventId === id) resetEventForm();
+        if (eventId === id) {
+          eventId = null; eventAutosaveOn = false; clearTimeout(eventSaveTimer);
+          $('#event-title, #event-location, #event-address, #event-screentime').val('');
+          $('#event-publish').prop('disabled', true).text('Publish');
+          $('#event-save').prop('disabled', false).text('Save Draft');
+          clearEventPosterPreview();
+          $('#event-poster').prop('disabled', true);
+          $('#event-poster-label').removeClass('enabled');
+          $('#event-poster-hint').text('Save a draft first');
+          setEventStatus('');
+        }
+      }
+    });
+  });
+
+  // ── Unpublish ────────────────────────────────────────────────────────────
+
+  $(document).on('click', '.event-unpublish', function(e) {
+    e.stopPropagation();
+    var $row = $(this).closest('.event-row');
+    var id   = parseInt($row.data('id'));
+    $.ajax({
+      type: 'POST', url: '/dashboard/event.php?action=unpublish',
+      data: { event_id: id }, dataType: 'json',
+      success: function(res) {
+        if (res.success) setEventRowDraft($row);
+      }
+    });
+  });
+
+  // ── Publish ──────────────────────────────────────────────────────────────
+
+  $('#event-publish').on('click', function() {
+    if (!eventId) return;
+    var eid = eventId;
+    $.ajax({
+      type: 'POST', url: '/dashboard/event.php?action=publish',
+      data: { event_id: eid }, dataType: 'json',
+      success: function(res) {
+        if (res.success) {
+          setEventStatus('published', '#5a9e6f');
+          $('#event-publish').prop('disabled', true).text('Published');
+          $('#event-save').prop('disabled', true);
+          eventAutosaveOn = false;
+          var $row = $('.event-row[data-id="' + eid + '"]');
+          if ($row.length) setEventRowLive($row);
+        }
       }
     });
   });

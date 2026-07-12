@@ -49,7 +49,7 @@ require '../database.php';
     $all_posts = $posts_q->fetchAll(PDO::FETCH_ASSOC);
     $post_count = count($all_posts);
 
-    $events_q = $conn->prepare("SELECT id, title, poster, screentime, location, address, stamp, edited
+    $events_q = $conn->prepare("SELECT id, title, poster, screentime, location, address, stamp, edited, active
                                 FROM `events` WHERE uid=:uid
                                 ORDER BY screentime DESC");
     $events_q->execute([':uid' => $qUser['id']]);
@@ -108,11 +108,11 @@ require '../database.php';
       <input type="datetime-local" id="event-screentime" class="write-subtitle event-datetime" />
       <div class="write-image-wrap">
         <div class="write-image-row">
-          <label class="write-image-btn enabled" id="event-poster-label">
+          <label class="write-image-btn" id="event-poster-label">
             <i class="fa-solid fa-image"></i> Poster
-            <input type="file" id="event-poster" accept="image/jpeg,image/png,image/webp,image/gif" />
+            <input type="file" id="event-poster" accept="image/jpeg,image/png,image/webp,image/gif" disabled />
           </label>
-          <span class="write-image-hint">Optional</span>
+          <span class="write-image-hint" id="event-poster-hint">Save a draft first</span>
         </div>
         <div class="write-image-preview" id="event-poster-preview" style="display:none;">
           <img id="event-poster-thumb" src="" alt="preview" />
@@ -120,10 +120,10 @@ require '../database.php';
         </div>
       </div>
       <div class="write-footer">
-        <span id="event-status" class="autosave-status"></span>
+        <span id="event-autosave-status" class="autosave-status"></span>
         <div class="write-actions">
-          <button id="event-cancel" class="submit write-save" style="display:none;">Cancel</button>
-          <button id="event-submit" class="submit write-publish">Submit</button>
+          <button id="event-save"    class="submit write-save">Save Draft</button>
+          <button id="event-publish" class="submit write-publish" disabled>Publish</button>
         </div>
       </div>
     </div>
@@ -132,21 +132,24 @@ require '../database.php';
     <?php if (!empty($all_events)): ?>
     <ul class="drafts-list" id="events-list">
       <?php foreach ($all_events as $event): ?>
-      <li class="draft-row event-row"
+      <?php $ev_is_live = (int)$event['active'] === 1; ?>
+      <li class="draft-row event-row <?php echo $ev_is_live ? 'post-live' : ''; ?>"
           data-id="<?php echo $event['id']; ?>"
-          data-title="<?php echo htmlspecialchars($event['title']); ?>"
-          data-location="<?php echo htmlspecialchars($event['location']); ?>"
-          data-address="<?php echo htmlspecialchars($event['address'] ?? ''); ?>"
-          data-screentime="<?php echo (new DateTime('@' . $event['screentime']))->setTimezone(new DateTimeZone('America/Chicago'))->format('Y-m-d\TH:i'); ?>">
+          data-active="<?php echo (int)$event['active']; ?>">
         <div class="draft-info">
           <span class="draft-title"><?php echo htmlspecialchars($event['title']); ?></span>
           <span class="draft-type"><?php echo htmlspecialchars($event['location']); ?></span>
+          <span class="post-status <?php echo $ev_is_live ? 'status-live' : 'status-draft'; ?>"><?php echo $ev_is_live ? 'live' : 'draft'; ?></span>
           <span class="draft-date"><?php echo date('M j, Y g:ia', $event['screentime']); ?></span>
         </div>
         <div class="post-row-actions">
-          <a class="post-view" href="/events/?id=<?php echo $event['id']; ?>" target="_blank">view</a>
-          <button class="event-edit" data-id="<?php echo $event['id']; ?>">edit</button>
-          <button class="event-delete" data-id="<?php echo $event['id']; ?>">&#x2715;</button>
+          <?php if ($ev_is_live): ?>
+            <a class="post-view" href="/events/?id=<?php echo $event['id']; ?>" target="_blank">view</a>
+            <button class="event-edit" data-id="<?php echo $event['id']; ?>">edit</button>
+            <button class="event-unpublish" data-id="<?php echo $event['id']; ?>">unpublish</button>
+          <?php else: ?>
+            <button class="event-delete" data-id="<?php echo $event['id']; ?>">&#x2715;</button>
+          <?php endif; ?>
         </div>
       </li>
       <?php endforeach; ?>
