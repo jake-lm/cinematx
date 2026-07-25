@@ -8,8 +8,8 @@
   --line-2: rgba(255, 255, 255, 0.13);
   --text: #E9E7E3;
   --text-2: #9B9791;
-  --text-3: #6A6761;
-  --text-4: #47443F;
+  --text-3: #8E8980;
+  --text-4: #63605A;
   --red: #922E32;
   --red-hi: #CE565B;
   --red-wash: rgba(146, 46, 50, 0.16);
@@ -60,8 +60,8 @@
   --line-2: rgba(23, 21, 15, 0.18);
   --text: #1A1813;
   --text-2: #55514A;
-  --text-3: #837E75;
-  --text-4: #ADA79C;
+  --text-3: #6E6960;
+  --text-4: #948E84;
   --red: #922E32;
   --red-hi: #922E32;
   --red-wash: rgba(146, 46, 50, 0.09);
@@ -225,12 +225,20 @@ button, input, select, textarea {
 }
 
 .app.is-collapsed .rail__mark, .app.is-collapsed .rail__link .txt, .app.is-collapsed .rail__group {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 .app.is-collapsed .rail__link {
   justify-content: center;
   padding: 0;
+}
+.app.is-collapsed .faces {
+  justify-content: center;
+}
+.app.is-collapsed .face:nth-child(n+4) {
+  display: none;
+}
+.app.is-collapsed .rail__foot {
+  padding: var(--s-3) var(--s-2);
 }
 
 .rail__group {
@@ -565,7 +573,7 @@ button, input, select, textarea {
   font-weight: 600;
   letter-spacing: var(--track);
   text-transform: uppercase;
-  color: var(--text-4);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -716,7 +724,7 @@ button, input, select, textarea {
   font-weight: 600;
   letter-spacing: var(--track);
   text-transform: uppercase;
-  color: var(--text-4);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -816,7 +824,7 @@ button, input, select, textarea {
   font-weight: 600;
   letter-spacing: var(--track);
   text-transform: uppercase;
-  color: var(--text-4);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .note__meta a:hover {
@@ -1221,12 +1229,17 @@ button, input, select, textarea {
     grid-template-columns: var(--rail-sm) minmax(0, 1fr);
   }
   .app .rail__mark, .app .rail__link .txt, .app .rail__group {
-    opacity: 0;
-    pointer-events: none;
+    display: none;
   }
   .app .rail__link {
     justify-content: center;
     padding: 0;
+  }
+  .app .faces {
+    justify-content: center;
+  }
+  .app .face:nth-child(n+4) {
+    display: none;
   }
   .rail__toggle {
     display: none;
@@ -1260,15 +1273,15 @@ button, input, select, textarea {
     gap: var(--s-2);
     overflow-x: auto;
   }
-  .rail__link {
+  .app .rail__link {
     flex: 1;
     flex-direction: column;
     gap: 2px;
     height: auto;
     padding: var(--s-2) 0;
   }
-  .rail__link .txt {
-    opacity: 1 !important;
+  .app .rail__link .txt {
+    display: block;
     font-size: var(--t-3xs);
   }
   .rail__group {

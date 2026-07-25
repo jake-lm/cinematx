@@ -134,7 +134,9 @@ function show_row($s, $now, $e) {
           <?php else: ?><?php echo $e(mb_substr($m['name'], 0, 1)); ?><?php endif; ?>
         </a>
         <?php endforeach; ?>
-        <a class="face" href="/directory" title="All members">+<?php echo max(0, (int)$m_count - count($members)); ?></a>
+        <?php $rest = (int)$m_count - count($members); if ($rest > 0): ?>
+        <a class="face" href="/directory" title="All members">+<?php echo $rest; ?></a>
+        <?php endif; ?>
       </div>
     </div>
   </aside>
@@ -254,7 +256,7 @@ function show_row($s, $now, $e) {
           <div class="card__head">
             <span class="card__n">04</span>
             <span class="card__title">The Room</span>
-            <span class="card__more"><?php echo (int)$m_count; ?> members</span>
+            <a class="card__more" href="/directory"><?php echo (int)$m_count; ?> members &rarr;</a>
           </div>
           <div class="card__body">
             <?php if ($signed): ?>

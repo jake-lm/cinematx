@@ -30,8 +30,10 @@
 
   --text:   #E9E7E3;
   --text-2: #9B9791;
-  --text-3: #6A6761;
-  --text-4: #47443F;
+  // --text-3 carries real information (venue, author, date) at 9–10px, so it
+  // has to clear 4.5:1 on --surface. --text-4 is decorative only.
+  --text-3: #8E8980;
+  --text-4: #63605A;
 
   --red:      #922E32;   // [retained] brand fill
   --red-hi:   #CE565B;   // legible on dark
@@ -93,8 +95,8 @@
 
   --text:   #1A1813;
   --text-2: #55514A;
-  --text-3: #837E75;
-  --text-4: #ADA79C;
+  --text-3: #6E6960;
+  --text-4: #948E84;
 
   --red:      #922E32;
   --red-hi:   #922E32;
@@ -225,9 +227,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .rail__foot { flex: none; padding: var(--s-3); border-top: 1px solid var(--line); }
 
+// Collapsed rail.
+// These must be `display: none`, not `opacity: 0` — an invisible label still
+// occupies layout, which squeezed the icon off-centre and pushed the wordmark
+// (105px) out of a 58px rail.
 .app.is-collapsed {
-  .rail__mark, .rail__link .txt, .rail__group { opacity: 0; pointer-events: none; }
+  .rail__mark, .rail__link .txt, .rail__group { display: none; }
   .rail__link { justify-content: center; padding: 0; }
+
+  // Faces wrap one-per-row at this width, so the strip grew to 218px tall.
+  // Show a short stack instead.
+  .faces { justify-content: center; }
+  .face:nth-child(n + 4) { display: none; }
+  .rail__foot { padding: var(--s-3) var(--s-2); }
 }
 
 .rail__group { padding: var(--s-5) var(--s-3) var(--s-2); @include label; }
@@ -421,7 +433,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .row__title { flex: 1; min-width: 0; font-size: var(--t); font-weight: 500; color: var(--text);
               white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
               transition: color var(--t-fast) var(--ease); }
-.row__meta  { @include label(var(--t-3xs), var(--text-4)); white-space: nowrap; }
+.row__meta  { @include label(var(--t-3xs), var(--text-3)); white-space: nowrap; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  THE SIDE — small quiet cards, always visible
@@ -499,7 +511,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .show__title { display: block; font-size: var(--t-sm); font-weight: 500; color: var(--text);
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                transition: color var(--t-fast) var(--ease); }
-.show__where { display: block; margin-top: 1px; @include label(var(--t-3xs), var(--text-4)); }
+.show__where { display: block; margin-top: 1px; @include label(var(--t-3xs), var(--text-3)); }
 
 .show--member {
   background: var(--red-wash);
@@ -541,7 +553,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .note__text { font-family: var(--f-read); font-size: var(--t-sm); line-height: 1.5;
               color: var(--text-2); overflow-wrap: anywhere; }
-.note__meta { display: flex; gap: var(--s-2); margin-top: var(--s-2); @include label(var(--t-3xs), var(--text-4));
+.note__meta { display: flex; gap: var(--s-2); margin-top: var(--s-2); @include label(var(--t-3xs), var(--text-3));
               a:hover { color: var(--red-hi); } }
 
 .note__del {
@@ -726,8 +738,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 @media (max-width: 900px) {
   .app { grid-template-columns: var(--rail-sm) minmax(0, 1fr); }
-  .app .rail__mark, .app .rail__link .txt, .app .rail__group { opacity: 0; pointer-events: none; }
+  // display, not opacity — same reason as the collapsed rail above.
+  .app .rail__mark, .app .rail__link .txt, .app .rail__group { display: none; }
   .app .rail__link { justify-content: center; padding: 0; }
+  .app .faces { justify-content: center; }
+  .app .face:nth-child(n + 4) { display: none; }
   .rail__toggle { display: none; }
 }
 
@@ -745,8 +760,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   }
   .rail__top, .rail__foot { display: none; }
   .rail__nav { display: flex; padding: var(--s-2); gap: var(--s-2); overflow-x: auto; }
-  .rail__link { flex: 1; flex-direction: column; gap: 2px; height: auto; padding: var(--s-2) 0;
-                .txt { opacity: 1 !important; font-size: var(--t-3xs); } }
+  // Labels come back on the tab bar — must undo the display:none set above.
+  .app .rail__link { flex: 1; flex-direction: column; gap: 2px; height: auto; padding: var(--s-2) 0; }
+  .app .rail__link .txt { display: block; font-size: var(--t-3xs); }
   .rail__group { display: none; }
 
   .bar { grid-column: 1; }
