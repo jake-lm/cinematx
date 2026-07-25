@@ -21,46 +21,24 @@ body {
 
 a:visited { color: inherit; }
 
-body#index .index {
-  border-right: 0px solid #666;
-  border-top: 1px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  opacity: 1;
-  color: #fff;
-  background-color: #2A2A2A; }
-
-body#directory .directory {
-  border-right: 0px solid #666;
-  border-top: 1px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  opacity: 1;
-  color: #fff;
-  background-color: #2A2A2A; }
-
-body#about .about {
-  border-right: 0px solid #666;
-  border-top: 1px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  opacity: 1;
-  color: #fff;
-  background-color: #2A2A2A; }
-
-body#list .list {
-  border-right: 0px solid #666;
-  border-top: 1px solid rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-  opacity: 1;
-  color: #fff;
-  background-color: #2A2A2A; }
-
+body#index .index,
+body#directory .directory,
+body#about .about,
+body#list .list,
 body#signup .signup,
 body#dashboard .signup {
-  border-right: 0px solid #666;
   border-top: 1px solid rgba(0, 0, 0, 0.2);
   border-bottom: 1px solid rgba(0, 0, 0, 0.2);
   opacity: 1;
   color: #fff;
   background-color: #2A2A2A; }
+  body#index .index .icon,
+  body#directory .directory .icon,
+  body#about .about .icon,
+  body#list .list .icon,
+  body#signup .signup .icon,
+  body#dashboard .signup .icon {
+    color: #922E32; }
 
 a:hover {
   text-decoration: none; }
@@ -1160,7 +1138,8 @@ a:hover {
         border-left: 1px solid #1a283545;
         z-index: 1001; } }
     .main-content .menu a {
-      cursor: pointer; }
+      cursor: pointer;
+      text-decoration: none; }
     .main-content .menu .logo {
       width: 168px;
       height: 75px;
@@ -1176,30 +1155,36 @@ a:hover {
         background-size: auto 75px;
         background-repeat: no-repeat; }
     .main-content .menu .block {
-      display: block;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-sizing: border-box;
       width: 200px;
-      height: 25px;
-      padding: 4px 0px 4px 0px;
-      line-height: 25px;
+      height: 50px;
+      padding: 0px 0px 0px 15px;
       opacity: .65;
-      border-right: 0px solid rgba(0, 0, 0, 0);
       border-top: 1px solid rgba(0, 0, 0, 0);
       border-bottom: 1px solid rgba(0, 0, 0, 0);
       cursor: pointer;
+      transition: background-color .2s ease, opacity .2s ease;
       z-index: 1001; }
+      .main-content .menu button.block {
+        background: transparent;
+        border: none;
+        font: inherit;
+        outline: none;
+        padding: 0px 0px 0px 15px;
+        width: 100%; }
       .main-content .menu .block .icon {
-        display: inline-block;
-        padding-left: 5px;
-        width: 15px;
+        width: 22px;
         text-align: center;
-        padding-right: 0px; }
+        font-size: 15px;
+        color: #fff;
+        transition: color .35s ease; }
       .main-content .menu .block .content {
-        display: inline-block;
-        padding-left: 0px;
-        text-align: center;
-        padding-right: 5px;
+        font-family: 'Roboto', sans-serif;
         font-size: 14px;
+        font-weight: 900;
         letter-spacing: 1px;
         opacity: 1;
         color: #fff; }
@@ -1210,6 +1195,10 @@ a:hover {
         background-color: rgba(0, 0, 0, 0.1);
         cursor: pointer;
         opacity: .95; }
+      .main-content .menu .block.logout-btn {
+        background-color: rgba(146, 46, 50, 0.2); }
+        .main-content .menu .block.logout-btn:hover {
+          background-color: rgba(146, 46, 50, 0.35); }
     .main-content .menu .social {
       position: absolute;
       bottom: 0;
@@ -1219,7 +1208,7 @@ a:hover {
       width: 100%;
       line-height: 35px;
       vertical-align: middle;
-      font-size: 16px;
+      font-size: 18px;
       padding: 5px;
       text-align: center; }
       .main-content .menu .social a {
@@ -3597,6 +3586,194 @@ body#post-page .main-content .home-base {
   line-height: 1.9;
   color: #bbb;
 }
+
+// ── Landing screenings panel (logged-out homepage) ─────────────────────────────
+
+.landing-screenings-panel {
+  position: relative;
+  width: 300px;
+  flex-shrink: 0;
+  background-color: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box; }
+
+.landing-panel-header {
+  position: relative;
+  height: 60px;
+  overflow: hidden; }
+  .landing-panel-header .lower-bar {
+    position: absolute;
+    bottom: 10px;
+    width: 100%;
+    padding: 0 15px;
+    box-sizing: border-box;
+    z-index: 2; }
+    .landing-panel-header .lower-bar .txt {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      color: #fff; }
+  .landing-panel-header .info-txt {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 11px;
+    letter-spacing: .5px;
+    color: rgba(255, 255, 255, 0.7);
+    z-index: 2; }
+  .landing-panel-header .bg-gradient {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    background: linear-gradient(to bottom, rgba(146, 46, 50, 0.26) 0%, rgba(146, 46, 50, 0.65) 81%, rgba(146, 46, 50, 0.65) 100%); }
+
+.landing-panel-body {
+  padding: 14px 15px 15px; }
+
+.landing-panel-empty {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  letter-spacing: .5px;
+  color: #555;
+  margin: 10px 0; }
+
+.landing-view-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px; }
+
+.landing-view-tab {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #666;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background .15s ease; }
+  .landing-view-tab:hover {
+    color: #e2e2e2;
+    border-color: rgba(255, 255, 255, 0.25); }
+  .landing-view-tab.active {
+    color: #e2e2e2;
+    border-color: #922E32;
+    background: rgba(146, 46, 50, 0.12); }
+
+.landing-view-posters {
+  display: none;
+  flex-wrap: wrap;
+  gap: 8px; }
+  .landing-view-posters.active {
+    display: flex; }
+
+.landing-poster {
+  position: relative;
+  display: block;
+  width: 82px;
+  aspect-ratio: 2 / 3;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color .2s ease; }
+  .landing-poster:hover {
+    border-color: #922E32;
+    text-decoration: none; }
+  .landing-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block; }
+
+.landing-poster-date {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 2;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 8px;
+  font-weight: bold;
+  color: #fff;
+  background: #922E32;
+  padding: 2px 4px;
+  border-bottom-right-radius: 3px; }
+
+.landing-poster-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 6px;
+  box-sizing: border-box;
+  text-align: center;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: #888; }
+
+.landing-view-list {
+  display: none;
+  flex-direction: column;
+  gap: 2px; }
+  .landing-view-list.active {
+    display: flex; }
+
+.landing-list-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .landing-list-row:last-child {
+    border-bottom: none; }
+
+.landing-list-time {
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  color: #922E32; }
+
+.landing-list-title {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  color: #e2e2e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; }
+
+.landing-list-venue {
+  flex-shrink: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  color: #555;
+  white-space: nowrap; }
+
+.landing-panel-more {
+  display: block;
+  margin-top: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #922E32;
+  text-decoration: none; }
+  .landing-panel-more:hover {
+    color: #c94a50;
+    text-decoration: none; }
+
+@media screen and (max-width: 600px) {
+  .landing-screenings-panel {
+    width: 100%; } }
 
 // ── Event details (events/index.php) ──────────────────────────────────────────
 

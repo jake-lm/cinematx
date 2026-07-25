@@ -2,11 +2,7 @@
 error_reporting(0);
 session_start();
 require dirname(__DIR__) . '/database.php';
-
-require __DIR__ . '/scraper_paramount.php';
-require __DIR__ . '/scraper_afs.php';
-require __DIR__ . '/scraper_hyperreal.php';
-require __DIR__ . '/tmdb.php';
+require __DIR__ . '/fetch_screenings.php';
 
 $tz       = new DateTimeZone('America/Chicago');
 $now      = time();
@@ -44,50 +40,7 @@ $note_q->bindValue(':fid', $sql12_film, PDO::PARAM_INT);
 $note_q->execute();
 $note_th1 = $note_q->fetch();
 
-function filter_week($films, $now, $week_end) {
-    $out = array_values(array_filter($films, function($f) use ($now, $week_end) {
-        return isset($f['timestamp']) && $f['timestamp'] >= $now && $f['timestamp'] <= $week_end;
-    }));
-    usort($out, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
-    return $out;
-}
-
-// Merge all venues into one chronological list
-$sources = [
-    ['films' => filter_week(fetch_paramount_films(), $now, $week_end), 'venue' => 'Paramount Theatre'],
-    ['films' => filter_week(fetch_afs_films(),        $now, $week_end), 'venue' => 'Austin Film Society'],
-    ['films' => filter_week(fetch_hyperreal_films(),  $now, $week_end), 'venue' => 'Hyperreal Film Club'],
-];
-$all_films = [];
-foreach ($sources as $src) {
-    foreach ($src['films'] as $film) {
-        $film['venue']  = $src['venue'];
-        $film['poster'] = fetch_tmdb_poster($film['title']);
-        $film['source'] = 'official';
-        $all_films[]    = $film;
-    }
-}
-
-// User-submitted screenings
-$events_q = $conn->prepare(
-    "SELECT e.id, e.title, e.poster, e.screentime, e.location
-     FROM events e
-     WHERE e.active = 1 AND e.screentime >= :now AND e.screentime <= :week_end
-     ORDER BY e.screentime ASC"
-);
-$events_q->execute([':now' => $now, ':week_end' => $week_end]);
-foreach ($events_q->fetchAll(PDO::FETCH_ASSOC) as $event) {
-    $all_films[] = [
-        'title'        => $event['title'],
-        'timestamp'    => (int)$event['screentime'],
-        'venue'        => $event['location'],
-        'poster'       => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
-        'url'          => '/events/?id=' . $event['id'],
-        'source'       => 'user',
-    ];
-}
-
-usort($all_films, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+$all_films = fetch_all_screenings($conn, $now, $week_end);
 
 // Group by calendar day
 $days = [];

@@ -1,29 +1,34 @@
 <div class="menu">
   <a href="/"><div class="block index">
-    <span class="content">index</span>
+    <i class="icon fa-solid fa-house"></i>
+    <span class="content">Index</span>
   </div></a>
   <a href="/about"><div class="block about">
-    <span class="content">about</span>
+    <i class="icon fa-solid fa-circle-info"></i>
+    <span class="content">About</span>
   </div></a>
   <a href="/list"><div class="block list">
-    <span class="content">The List</span>
+    <i class="icon fa-solid fa-film"></i>
+    <span class="content">The list</span>
   </div></a>
 
     <?php
     if(isset($_SESSION['username'])) {
      ?>
      <a href="/dashboard"><div class="block signup">
+       <i class="icon fa-solid fa-gauge"></i>
        <span class="content">Dashboard</span>
      </div></a>
      <a href="/directory"><div class="block directory">
+       <i class="icon fa-solid fa-users"></i>
        <span class="content">Directory</span>
-     </div></a>
-     <a href="/dashboard#events"><div class="block submit-screening">
-       <span class="content">Submit Screening</span>
      </div></a>
 
      <form action="/dashboard/signup.php?action=logout" method="post">
-       <input type="submit" class="submit-u" value="logout" />
+       <button type="submit" class="block logout-btn">
+         <i class="icon fa-solid fa-arrow-right-from-bracket"></i>
+         <span class="content">Logout</span>
+       </button>
      </form>
     <?php
     }

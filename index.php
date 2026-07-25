@@ -474,6 +474,10 @@ if($fName == "") $fName = null;
       else if($error === "104") { // sign up issue
         echo "<div class='error'>Email already registered.</div><br>";
       }
+
+      require 'list/fetch_screenings.php';
+      $today_end = strtotime('tomorrow', $now) - 1;
+      $today_screenings = array_slice(fetch_all_screenings($conn, $now, $today_end), 0, 6);
     ?>
     <div class="guest-row">
     <div class="content-box blue" id="signup-panel">
@@ -523,10 +527,58 @@ if($fName == "") $fName = null;
           </form>
         </div>
       </div>
-    </div><div class="text">
-      New movies <i>every night</i>.<br>
-      Streamed simultaneously for everyone online.<br>
-      Become a member to access <a href="/about">our directory</a>.
+    </div><div class="landing-screenings-panel" id="landing-screenings-panel">
+      <div class="landing-panel-header">
+        <div class="lower-bar" style="text-align:right;">
+          <span class="txt">Playing Today</span>
+        </div>
+        <div class="info-txt"><?php echo count($today_screenings); ?> screenings</div>
+        <div class="bg-gradient"></div>
+      </div>
+      <div class="landing-panel-body">
+        <?php if ($today_screenings): ?>
+        <div class="landing-view-tabs">
+          <button type="button" class="landing-view-tab active" data-view="posters">Posters</button>
+          <button type="button" class="landing-view-tab" data-view="list">List</button>
+        </div>
+
+        <div class="landing-view-posters active">
+          <?php foreach ($today_screenings as $film): ?>
+          <?php $film_time = date('g:ia', $film['timestamp']); ?>
+          <?php if (!empty($film['url'])): ?>
+          <a class="landing-poster" href="<?php echo htmlspecialchars($film['url']); ?>" target="_blank" rel="noopener">
+          <?php else: ?>
+          <div class="landing-poster">
+          <?php endif; ?>
+            <div class="landing-poster-date"><?php echo htmlspecialchars($film_time); ?></div>
+            <?php if (!empty($film['poster'])): ?>
+            <img src="<?php echo htmlspecialchars($film['poster']); ?>" alt="<?php echo htmlspecialchars($film['title']); ?>" />
+            <?php else: ?>
+            <span class="landing-poster-title"><?php echo htmlspecialchars($film['title']); ?></span>
+            <?php endif; ?>
+          <?php if (!empty($film['url'])): ?>
+          </a>
+          <?php else: ?>
+          </div>
+          <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+
+        <div class="landing-view-list">
+          <?php foreach ($today_screenings as $film): ?>
+          <div class="landing-list-row">
+            <span class="landing-list-time"><?php echo htmlspecialchars(date('g:ia', $film['timestamp'])); ?></span>
+            <span class="landing-list-title"><?php echo htmlspecialchars($film['title']); ?></span>
+            <span class="landing-list-venue"><?php echo htmlspecialchars($film['venue']); ?></span>
+          </div>
+          <?php endforeach; ?>
+        </div>
+
+        <a class="landing-panel-more" href="/list">See full list &rarr;</a>
+        <?php else: ?>
+        <p class="landing-panel-empty">No screenings today — check back soon.</p>
+        <?php endif; ?>
+      </div>
     </div>
     </div><!-- /.guest-row -->
 

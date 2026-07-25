@@ -482,6 +482,15 @@ $(document).ready(function(){
     if (uid) window.location.href = '/users/profile.php?id=' + uid;
   });
 
+// landing screenings panel — Posters / List view toggle
+  $(document).on('click', '.landing-view-tab', function() {
+    var view = $(this).data('view');
+    $('.landing-view-tab').removeClass('active');
+    $(this).addClass('active');
+    $('.landing-view-posters, .landing-view-list').removeClass('active');
+    $('.landing-view-' + view).addClass('active');
+  });
+
 // signup panel — open on click, close on outside click
   $('#signup-panel').on('click', function() {
     if (!$(this).hasClass('active')) {
