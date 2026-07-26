@@ -55,6 +55,51 @@ v3–v5 promoted everything to focal and threw that away. v6 returns to it.
 
 ---
 
+## Comfort and atmosphere
+
+These are **two different problems** and were being treated as one.
+
+**Comfort is subtractive** — removing friction. No overwhelm, no hunting,
+predictable, legible, forgiving. Every version since v3 has been fighting this
+battle; v6 largely won it.
+
+**Atmosphere is additive** — putting presence in. Signs of life, ritual,
+warmth, a sense of *somewhere* rather than *something*. Barely started.
+
+The goal is a place people visit daily and stay in — not only for the
+information, but for the feeling of being there.
+
+### The governing principle
+
+> **Comfort in the mechanics. Personality in the atmosphere.**
+> Never make something harder to use in order to seem distinctive.
+
+This resolves the apparent conflict between "don't look generic" (the v4 note)
+and "be comfortable" (this one). Screen Slate resolves it the wrong way — it
+buys uniqueness with friction, and reads as clunky and confusing as a result.
+Get distinctiveness from what the site *is*, not from an unusual interface.
+
+### Atmosphere assets already owned
+
+- **The synced screening.** Everyone watching the same thing at the same time
+  is a real daily ritual and a reason to be here *now*. No listings site can
+  copy it. Currently under-used — a small card.
+- **The programmer's note.** `notes.note` + `films.program` — a named human
+  saying why tonight's film is on. The warmest content in the database.
+  **v6 dropped it entirely**; v4 and v5 showed it. Restore it.
+- **The multilingual welcome.** Pure warmth, zero function. Protect it.
+- **The room.** Statuses are the beginning of a presence layer.
+
+### Missing
+
+- **Presence.** Nobody can tell anyone else is here. No "3 in the theatre",
+  no sense of live company.
+- **Return reward.** Nothing is meaningfully different because you came back.
+- **Ritual beyond the showtime.** The showtime is the anchor; nothing else
+  gives a reason to arrive at a particular moment.
+
+---
+
 ## Locked decisions
 
 Settled across sessions. Do not relitigate without a reason.
