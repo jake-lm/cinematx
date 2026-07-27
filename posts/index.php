@@ -40,14 +40,15 @@ $ctx_scroll = true;
 $ctx_video  = false;
 
 ob_start(); ?>
-<link rel="canonical" href="<?php echo $e($canonical); ?>" />
+<link rel="canonical" href="<?php echo $e(ctx_url($canonical)); ?>" />
 <meta property="og:type" content="article" />
+<meta property="og:url" content="<?php echo $e(ctx_url($canonical)); ?>" />
 <meta property="og:title" content="<?php echo $e($post['title']); ?>" />
 <?php if (!empty($post['subtitle'])): ?>
 <meta property="og:description" content="<?php echo $e($post['subtitle']); ?>" />
 <?php endif; ?>
 <?php if (!empty($post['image'])): ?>
-<meta property="og:image" content="/uploads/posts/<?php echo $e($post['image']); ?>" />
+<meta property="og:image" content="<?php echo $e(ctx_url('/uploads/posts/' . $post['image'])); ?>" />
 <?php endif; ?>
 <?php $ctx_meta = ob_get_clean();
 
@@ -94,7 +95,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       // The old page's share buttons all pointed at "#". These are real: X and
       // Reddit take share URLs, Instagram has no web share endpoint, so that
       // slot becomes copy-link — which is the one people actually use.
-      $share_url = 'https://cinematx.com' . $canonical;
+      $share_url = ctx_url($canonical);
       ?>
       <div class="reading__share">
         <span class="reading__share-label">Share</span>

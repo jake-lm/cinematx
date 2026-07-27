@@ -35,10 +35,11 @@ $ctx_scroll = true;
 $ctx_video  = false;
 
 ob_start(); ?>
+<meta property="og:url" content="<?php echo $e(ctx_url('/events/?id=' . $id)); ?>" />
 <meta property="og:title" content="<?php echo $e($event['title']); ?>" />
 <meta property="og:description" content="<?php echo $e($when . ' — ' . $event['location']); ?>" />
 <?php if (!empty($event['poster'])): ?>
-<meta property="og:image" content="/uploads/events/<?php echo $e($event['poster']); ?>" />
+<meta property="og:image" content="<?php echo $e(ctx_url('/uploads/events/' . $event['poster'])); ?>" />
 <?php endif; ?>
 <?php $ctx_meta = ob_get_clean();
 

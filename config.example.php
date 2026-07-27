@@ -8,3 +8,7 @@ define('TMDB_API_KEY', 'your_tmdb_api_key');
 // Show PHP errors in the browser. Leave false on any public server — errors
 // are always written to the log either way.
 define('CTX_DEBUG', false);
+
+// Canonical public origin, used for share links and Open Graph tags. No
+// trailing slash.
+define('CTX_SITE_URL', 'https://cinematx.net');

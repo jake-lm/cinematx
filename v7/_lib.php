@@ -30,6 +30,18 @@ define('CTX_HOME', '/');
 /** Escape for HTML. Every page uses this rather than rolling its own. */
 function ctx_e($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
 
+// Anything that leaves the page needs an absolute URL, and until now nothing
+// knew one: the share buttons carried a hardcoded https://cinematx.com — a
+// domain that is not ours — and every og:image was a root-relative path, which
+// no link-preview scraper will resolve. Overridable from config.php so a
+// domain change is one line rather than a hunt.
+if (!defined('CTX_SITE_URL')) define('CTX_SITE_URL', 'https://cinematx.net');
+
+/** Absolute URL for a site-root-relative path. */
+function ctx_url($path = '/') {
+    return rtrim(CTX_SITE_URL, '/') . '/' . ltrim((string)$path, '/');
+}
+
 /** Canonical post URL. Mirrors the rewrite rule in router.php / .htaccess. */
 function ctx_post_url($id, $title) {
     $slug = trim(preg_replace('/[^a-z0-9]+/', '-', mb_strtolower((string)$title)), '-');

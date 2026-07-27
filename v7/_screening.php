@@ -52,12 +52,13 @@ $ctx_shell   = 'app--screening';   // rail and bar go dark too
 // Open Graph, carried over from the old /th1/ — these links get shared.
 ob_start(); ?>
 <?php if ($film): ?>
+<meta property="og:url" content="<?php echo $e(ctx_url('/th' . $screen . '/')); ?>" />
 <meta property="og:title" content="<?php echo $e($film['title']); ?><?php echo $show_ts ? ' — ' . date('g:ia', $show_ts) : ''; ?>" />
 <?php if (!empty($note['note'])): ?>
 <meta property="og:description" content="<?php echo $e($note['note']); ?>" />
 <?php endif; ?>
 <?php if (!empty($film['poster'])): ?>
-<meta property="og:image" content="/motw/<?php echo $e($film['poster']); ?>.png" />
+<meta property="og:image" content="<?php echo $e(ctx_url('/motw/' . $film['poster'] . '.png')); ?>" />
 <?php endif; ?>
 <?php endif; ?>
 <?php $ctx_meta = ob_get_clean();
