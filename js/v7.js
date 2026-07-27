@@ -38,13 +38,19 @@
   function initWelcome() {
     var el = $('#welcome');
     if (!el) return;
+
+    // Rendered server-side too, so the greeting is already correct before this
+    // runs and does not flash a nameless version first.
+    var name = el.getAttribute('data-name') || '';
+    var greet = function (s) { return name ? s + ', ' + name : s; };
+
     var i = 0;
-    el.textContent = GREETINGS[0];
+    el.textContent = greet(GREETINGS[0]);
     setInterval(function () {
       el.classList.add('is-out');
       setTimeout(function () {
         i = (i + 1) % GREETINGS.length;
-        el.textContent = GREETINGS[i];
+        el.textContent = greet(GREETINGS[i]);
         el.classList.remove('is-out');
       }, 500);
     }, 10000);

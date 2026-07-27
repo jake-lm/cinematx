@@ -20,7 +20,7 @@ $dir        = ctx_members($conn, 7);
 $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 ?>
 <aside class="rail">
-  <div class="rail__top"><a class="rail__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX</a></div>
+  <div class="rail__top"><a class="rail__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></a></div>
 
   <nav class="rail__nav">
     <a class="rail__link<?php echo $on('index'); ?>" href="<?php echo CTX_HOME; ?>">
@@ -60,8 +60,12 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 
 <header class="bar">
   <button class="ibtn rail__toggle" id="rail-toggle" title="Collapse"><i class="fa-solid fa-bars"></i></button>
-  <a class="bar__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX</a>
-  <span class="welcome" id="welcome">Welcome to the Cinema</span>
+  <a class="bar__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></a>
+  <?php // First name only — "Welcome to the Cinema, Jake Martinez" reads like
+        // a form letter. Absent when signed out, and the rotator omits the
+        // comma entirely rather than trailing one.
+  $first = $me && !empty($me['name']) ? preg_split('/\s+/', trim($me['name']))[0] : ''; ?>
+  <span class="welcome" id="welcome"<?php echo $first ? ' data-name="' . ctx_e($first) . '"' : ''; ?>>Welcome to the Cinema<?php echo $first ? ', ' . ctx_e($first) : ''; ?></span>
 
   <div class="bar__end">
     <button class="ibtn" id="theme" title="Dark"><i class="fa-solid fa-moon"></i></button>

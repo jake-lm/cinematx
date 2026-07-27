@@ -202,6 +202,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &:hover { color: var(--text); }
 }
 
+// Superscripted off the wordmark's top right. Deliberately quiet: it is a
+// disclaimer, not a badge, and the wordmark should not have to share billing
+// with it. Colour carries the meaning; size keeps it in its place.
+.mark__beta {
+  margin-left: 3px;
+  vertical-align: super;
+  font-family: var(--f-ui);
+  font-size: 8px;
+  font-weight: 600;
+  // The wordmark's -0.015em tracking would otherwise pull the B into the X.
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--red-hi);
+  opacity: 0.85;
+}
+
 .rail__nav { flex: 1; padding: var(--s-4) var(--s-3); @include scroller; }
 
 .rail__link {
