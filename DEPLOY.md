@@ -39,9 +39,9 @@ Writable by the web server — set them **all** at once rather than listing
 directories by hand, because the list is longer than it looks:
 
 ```bash
-chown -R root:www-data motw uploads list
+chown -R root:www-data motw uploads list data
 find uploads -type d -exec chmod 775 {} \;
-chmod 775 motw list
+chmod 775 motw list data data/visits
 ```
 
 ```
@@ -50,6 +50,7 @@ uploads/posts/        images attached to journal posts
 uploads/profiles/     member photos
 uploads/events/       event posters
 list/                 scrape caches are written here
+data/                 visitor counts and the hashing salt
 ```
 
 Two that bite:

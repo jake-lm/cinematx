@@ -31,6 +31,9 @@ RedirectMatch 404 (?i)^/list/cache_.*\.json$
 # never reached at all.
 RedirectMatch 404 (?i)^/bin(/|$)
 
+# Visitor counts and the hashing salt.
+RedirectMatch 404 (?i)^/data(/|$)
+
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"

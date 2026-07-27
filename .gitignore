@@ -17,3 +17,6 @@ motw/
 
 # Scrape lock files
 list/*.lock
+
+# Visitor counts
+data/

@@ -54,7 +54,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
       <div class="reading__kicker"><span>Signed in as <?php echo $e($admin_user['name'] ?: 'admin'); ?></span></div>
       <h1 class="reading__title">Admin</h1>
-      <div class="reading__by"><?php echo count($films); ?> films &middot; <?php echo count($booked); ?> upcoming showtimes</div>
+      <?php $v = ctx_visit_stats(7); ?>
+      <div class="reading__by"><?php echo count($films); ?> films &middot; <?php echo count($booked); ?> upcoming showtimes
+        &middot; <?php echo $v['total']; ?> visitors<?php echo $v['today'] ? ', ' . $v['today'] . ' today' : ''; ?></div>
 
       <div class="admin-grid">
 

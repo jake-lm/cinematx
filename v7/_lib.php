@@ -17,6 +17,7 @@ require_once dirname(__DIR__) . '/database.php';
 require_once dirname(__DIR__) . '/roles.php';
 require_once dirname(__DIR__) . '/list/fetch_screenings.php';
 require_once __DIR__ . '/screenings.php';
+require_once __DIR__ . '/visits.php';
 
 $CTX_NOW    = time();
 $CTX_SIGNED = isset($_SESSION['username']);
@@ -26,6 +27,10 @@ $CTX_SIGNED = isset($_SESSION['username']);
 // are still under /v7/ until the conversion finishes and that directory is
 // flattened into the project root.
 define('CTX_HOME', '/');
+
+// Counted here so it happens once per page, never for an asset — CSS, JS and
+// images do not run PHP. /_admin is skipped because that is only ever us.
+if (strpos($_SERVER['REQUEST_URI'] ?? '', '/_admin') !== 0) ctx_visit();
 
 /** Escape for HTML. Every page uses this rather than rolling its own. */
 function ctx_e($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
