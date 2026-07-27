@@ -97,7 +97,12 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <div class="listing__title">
           <span class="card__n">01</span>
           <h1 class="listing__h">The List</h1>
-          <span class="listing__sub"><span id="list-count"><?php echo count($films); ?></span> screenings &middot; next seven days</span>
+          <?php // The scope word is driven by the Week/Today/Tomorrow control,
+                // not baked in — it used to keep saying "next seven days" while
+                // the number beside it changed to today's. ?>
+          <span class="listing__sub"><span id="list-count"><?php echo count($films); ?></span>
+            <span id="list-noun"><?php echo count($films) === 1 ? 'screening' : 'screenings'; ?></span>
+            &middot; <span id="list-scope">next seven days</span></span>
         </div>
 
         <div class="listing__controls">

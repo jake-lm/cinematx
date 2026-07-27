@@ -69,7 +69,8 @@ require __DIR__ . '/_chrome.php';
         <div class="card__head">
           <span class="card__n">01</span>
           <span class="card__title"><?php echo $e($label); ?> in Austin</span>
-          <a class="card__more" href="/list"><span id="list-count"><?php echo count($films); ?></span> screenings &rarr;</a>
+          <a class="card__more" href="/list"><span id="list-count"><?php echo count($films); ?></span>
+                <span id="list-noun"><?php echo count($films) === 1 ? 'screening' : 'screenings'; ?></span> &rarr;</a>
         </div>
 
         <div class="controls">

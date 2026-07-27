@@ -174,6 +174,17 @@
       var count = $('#list-count');
       if (count) count.textContent = shown;
 
+      var noun = $('#list-noun');
+      if (noun) noun.textContent = shown === 1 ? 'screening' : 'screenings';
+
+      // Both surfaces share this function; only /list/ has the time control,
+      // and only /list/ has a scope word to keep honest.
+      var scope = $('#list-scope');
+      if (scope) {
+        scope.textContent = { week: 'next seven days', today: 'today', tmrw: 'tomorrow' }[state.when]
+                          || 'next seven days';
+      }
+
       ['#grid-empty', '#rows-empty', '#list-empty'].forEach(function (sel) {
         var el = $(sel);
         if (el) el.style.display = shown ? 'none' : '';
