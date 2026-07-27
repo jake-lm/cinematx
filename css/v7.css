@@ -198,6 +198,14 @@ button, input, select, textarea {
   color: var(--text);
 }
 
+.rail__icon {
+  display: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  flex: none;
+}
+
 .mark__beta {
   margin-left: 3px;
   vertical-align: super;
@@ -279,8 +287,15 @@ button, input, select, textarea {
   border-top: 1px solid var(--line);
 }
 
-.app.is-collapsed .rail__mark, .app.is-collapsed .rail__link .txt, .app.is-collapsed .rail__group {
+.app.is-collapsed .rail__word, .app.is-collapsed .rail__link .txt, .app.is-collapsed .rail__group {
   display: none;
+}
+.app.is-collapsed .rail__icon {
+  display: block;
+}
+.app.is-collapsed .rail__top {
+  padding: 0;
+  justify-content: center;
 }
 .app.is-collapsed .rail__link {
   justify-content: center;
@@ -2453,8 +2468,15 @@ button, input, select, textarea {
   .app {
     grid-template-columns: var(--rail-sm) minmax(0, 1fr);
   }
-  .app .rail__mark, .app .rail__link .txt, .app .rail__group {
+  .app .rail__word, .app .rail__link .txt, .app .rail__group {
     display: none;
+  }
+  .app .rail__icon {
+    display: block;
+  }
+  .app .rail__top {
+    padding: 0;
+    justify-content: center;
   }
   .app .rail__link {
     justify-content: center;

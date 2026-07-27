@@ -20,7 +20,15 @@ $dir        = ctx_members($conn, 7);
 $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 ?>
 <aside class="rail">
-  <div class="rail__top"><a class="rail__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></a></div>
+  <div class="rail__top">
+    <?php // Two marks, one shown at a time: the wordmark when there is room for
+          // it, the icon when the rail is narrow. alt carries the name so the
+          // link is never anonymous once the words are gone. ?>
+    <a class="rail__mark" href="<?php echo CTX_HOME; ?>">
+      <img class="rail__icon" src="/img/iconimg.png" alt="Cinema, TX" width="100" height="100" />
+      <span class="rail__word">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></span>
+    </a>
+  </div>
 
   <nav class="rail__nav">
     <a class="rail__link<?php echo $on('index'); ?>" href="<?php echo CTX_HOME; ?>">

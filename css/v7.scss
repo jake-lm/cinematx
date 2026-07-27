@@ -202,6 +202,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &:hover { color: var(--text); }
 }
 
+// Shown only once the rail is too narrow for words — see the collapsed and
+// <=900px blocks. 26px because the small rail is 58px wide and its padding
+// collapses to nothing at that size.
+.rail__icon {
+  display: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  flex: none;
+}
+
 // Superscripted off the wordmark's top right. Deliberately quiet: it is a
 // disclaimer, not a badge, and the wordmark should not have to share billing
 // with it. Colour carries the meaning; size keeps it in its place.
@@ -239,7 +250,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // Collapsed — display, never opacity: an invisible label still takes space.
 .app.is-collapsed {
-  .rail__mark, .rail__link .txt, .rail__group { display: none; }
+  .rail__word, .rail__link .txt, .rail__group { display: none; }
+  .rail__icon { display: block; }
+  // 16px of padding either side leaves 26px inside a 58px rail — not enough
+  // for the icon and the reason the wordmark had to go in the first place.
+  .rail__top { padding: 0; justify-content: center; }
   .rail__link { justify-content: center; padding: 0; }
   .faces { justify-content: center; }
   .face:nth-child(n + 4) { display: none; }
@@ -1458,7 +1473,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 @media (max-width: 900px) {
   .app { grid-template-columns: var(--rail-sm) minmax(0, 1fr); }
-  .app .rail__mark, .app .rail__link .txt, .app .rail__group { display: none; }
+  .app .rail__word, .app .rail__link .txt, .app .rail__group { display: none; }
+  .app .rail__icon { display: block; }
+  .app .rail__top { padding: 0; justify-content: center; }
   .app .rail__link { justify-content: center; padding: 0; }
   .app .faces { justify-content: center; }
   .app .face:nth-child(n + 4) { display: none; }
