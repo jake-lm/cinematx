@@ -2512,6 +2512,10 @@ button, input, select, textarea {
     z-index: 100;
     background: var(--surface);
   }
+  .app--scroll .rail {
+    height: auto;
+    top: auto;
+  }
   .rail__top, .rail__foot {
     display: none;
   }

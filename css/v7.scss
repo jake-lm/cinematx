@@ -1495,6 +1495,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
     position: sticky; bottom: 0; z-index: 100;
     background: var(--surface);
   }
+
+  // .app--scroll pins the side rail with `height: 100dvh; top: 0`. Down here
+  // the rail is a bottom bar, but that two-class selector outranks the bare
+  // .rail above — media queries add no specificity — so it kept winning and
+  // the nav became a full-viewport block sitting on top of the page. Every
+  // scrolling page was unreadable below 760px; the index escaped only because
+  // it is not a scroll page.
+  .app--scroll .rail { height: auto; top: auto; }
   .rail__top, .rail__foot { display: none; }
   .rail__nav { display: flex; padding: var(--s-2); gap: var(--s-2); overflow-x: auto; }
   .app .rail__link { flex: 1; flex-direction: column; gap: 2px; height: auto; padding: var(--s-2) 0; }
