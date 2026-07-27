@@ -97,7 +97,10 @@
   // Each screening is rendered once per view, so counts only tally .shot.
 
   function initList() {
-    if (!$$('.grid-view, .rows-view').length) return;
+    // Gate on the toggle, not on the views. The profile page reuses .rows-view
+    // for its writing list with is-on set server-side; without this guard
+    // applyView() stripped that class and silently emptied the section.
+    if (!$$('[data-view]').length) return;
 
     var listing  = $('#listing');
     var todayKey = listing && listing.getAttribute('data-today');
@@ -453,10 +456,75 @@
     });
   }
 
+  // ══ Directory ════════════════════════════════════════════════════════════
+  // Every member is rendered server-side, so search and role narrowing are
+  // pure DOM work. The old page round-tripped to function.php for each of
+  // these, which is where its SQL injection lived.
+
+  function initDirectory() {
+    var roster = $('#roster');
+    if (!roster) return;
+
+    var search = $('#dir-search');
+    var count  = $('#dir-count');
+    var empty  = $('#dir-empty');
+    var role   = 'all';
+
+    function apply() {
+      var term  = (search && search.value || '').trim().toLowerCase();
+      var shown = 0;
+
+      $$('.member', roster).forEach(function (m) {
+        var okRole = role === 'all'
+                  || (role === 'saved' ? m.getAttribute('data-saved') === '1'
+                                       : m.getAttribute('data-role') === role);
+        var okTerm = !term || (m.getAttribute('data-search') || '').indexOf(term) !== -1;
+        var ok = okRole && okTerm;
+        m.classList.toggle('is-hidden', !ok);
+        if (ok) shown++;
+      });
+
+      $$('[data-role]').forEach(function (c) {
+        if (c.tagName === 'BUTTON') c.classList.toggle('is-on', c.getAttribute('data-role') === role);
+      });
+
+      if (count) count.textContent = shown;
+      if (empty) empty.style.display = shown ? 'none' : '';
+    }
+
+    if (search) search.addEventListener('input', apply);
+    $$('button[data-role]').forEach(function (b) {
+      b.addEventListener('click', function () { role = b.getAttribute('data-role'); apply(); });
+    });
+
+    // Save / unsave. The endpoint derives whose list it is from the session,
+    // so only the target id travels.
+    $$('[data-save]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var uid  = btn.getAttribute('data-save');
+        var on   = btn.classList.contains('is-on');
+        var next = on ? 'removefrom' : 'addto';
+        btn.disabled = true;
+
+        post('/function.php?action=' + next, { uid: uid })
+          .then(function (res) {
+            if (!res || !res.ok) throw new Error('rejected');
+            btn.classList.toggle('is-on', !on);
+            btn.title = !on ? 'Saved to your list' : 'Save to your list';
+            btn.innerHTML = '<i class="fa-' + (!on ? 'solid' : 'regular') + ' fa-bookmark"></i>';
+            var card = btn.closest('.member');
+            if (card) card.setAttribute('data-saved', !on ? '1' : '0');
+          })
+          .catch(function () {})
+          .then(function () { btn.disabled = false; });
+      });
+    });
+  }
+
   function boot() {
     initWelcome(); initTheme(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
-    initCopyLink(); initTheatre();
+    initCopyLink(); initDirectory(); initTheatre();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
