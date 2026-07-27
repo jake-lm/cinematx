@@ -91,12 +91,10 @@ Done, don't re-open:
 - `function.php` reduced to `addto`/`removefrom`; the injectable search/paging branches and `entries.php` are gone.
 - `motw/stream.php` and `_admin/delete.php` use `basename()` before touching the filesystem.
 
-## Before the production deploy
-- [ ] **Cron the caches.** Scraper caches have a 6h TTL and refill *lazily* — whichever visitor hits a cold cache pays for three venue scrapes plus TMDB inline. A fresh prod with an empty `cache_tmdb.json` makes that first visitor wait on ~110 HTTP round-trips. Needs an out-of-band warm plus a lock file.
-- [ ] **`events/index.php` still on `sass.css`** — and The List links to it for member-submitted screenings, so it's a visible seam mid-design.
-- [ ] **`events` table has never held a real row.** The whole member-submitted path (`.line--member`, "By members" chip, `events/index.php`) is unverified against real data.
-- [ ] **Create `config.php` on prod** — it's gitignored. Needs DB creds, `TMDB_API_KEY`, and `CTX_DEBUG` false.
-- [ ] **Restyle `/_admin/`** — the last surface on the old stylesheet. Design debt behind a login now, not a blocker.
+## Deploying
+See **DEPLOY.md**. The two steps that matter most and are easiest to skip:
+`AllowOverride All` (or `.htaccess` is ignored silently, including the deny
+rules) and running `php bin/warm-cache.php` once before announcing the site.
 
 ## Active TODOs
 - [ ] **Social icons (Discord/Instagram)** — added to `header.php` as FA icons in `.menu .social`, visible fix attempted (color added to `.social a`) but user still couldn't see them — may need further investigation
@@ -105,7 +103,9 @@ Done, don't re-open:
 - [ ] **Email verification on signup** — deferred
 - [ ] **Discord/Instagram real URLs** — social icon hrefs are currently `#`
 - [ ] **TMDB match override map** — "MIRROR" resolves to *Mirror Mirror* (2012) across poster, runtime and Wikipedia link. A one-word title with nothing to disambiguate on; needs a small manual override table.
-- [ ] **Retire `script.js` / `script-jlm.js`** once `events/` and `_admin/` convert — they hold the old `theatre_1()`, now superseded by `startSync()` in `v7.js`.
+- [ ] **Retire `script.js` / `script-jlm.js`** — nothing loads them any more; the v7 conversion is complete and `startSync()` in `v7.js` supersedes `theatre_1()`. Safe to delete once you're happy.
+- [ ] **Rewrite `dashboard.js` / `quick-create.js`** in vanilla — ~1,200 lines of jQuery, the last of the old front-end.
+- [ ] **Drop `films.motw`** — dead column, still written as 0 on upload.
 
 ---
 

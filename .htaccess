@@ -2,7 +2,43 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /
 
-# Pretty post URLs: /posts/my-post-title-42 → /posts/index.php?id=42
+# ── Keep private things private ────────────────────────────────────────────
+# Deploying by `git clone` or `git pull` leaves .git in the web root, and it is
+# world-readable unless something says otherwise — that is the entire source
+# and history, served as static files.
+RedirectMatch 404 (?i)/\.git(/|$)
+
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+# Credentials. Served through PHP it emits nothing, but a broken or
+# misconfigured PHP handler serves it as text, and this is the one file where
+# that is unrecoverable.
+<FilesMatch "^(config\.php|config\.example\.php)$">
+  Require all denied
+</FilesMatch>
+
+# Project notes, sources and lock files. Nothing fetches these.
+<FilesMatch "\.(md|lock|sql|scss|map)$">
+  Require all denied
+</FilesMatch>
+
+# Scrape caches. Harmless but no reason to serve them.
+RedirectMatch 404 (?i)^/list/cache_.*\.json$
+
+# CLI only. warm-cache.php refuses a web SAPI on its own; this means it is
+# never reached at all.
+RedirectMatch 404 (?i)^/bin(/|$)
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# ── Pretty post URLs ───────────────────────────────────────────────────────
+# /posts/my-post-title-42 → /posts/index.php?id=42
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^posts/([a-z0-9-]+)-([0-9]+)/?$ /posts/index.php?id=$2 [L,QSA]
