@@ -11,7 +11,6 @@
 if (!defined('CTX_LIB')) {
 define('CTX_LIB', 1);
 
-error_reporting(0);
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once dirname(__DIR__) . '/database.php';

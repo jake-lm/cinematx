@@ -1,7 +1,5 @@
 <?php
-ini_set('display_errors', 1);
 session_start();
-error_reporting(1);
 date_default_timezone_set('America/Chicago');
 
 require '../database.php';
