@@ -103,5 +103,11 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
 </div>
 <?php endif; ?>
 
+<?php
+// Page-specific scripts, emitted last. The dashboard uses this to bring in
+// jQuery and dashboard.js, whose 700-odd lines of working upload / autosave /
+// publish logic are deliberately untouched by the conversion.
+if (!empty($ctx_scripts)) echo $ctx_scripts;
+?>
 </body>
 </html>
