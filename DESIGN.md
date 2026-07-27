@@ -206,6 +206,52 @@ win for Screen Slate because NYC first-run houses play a film five times a
 day. Austin's venues are repertory — only six titles repeat across a week.
 The mechanic does not pay for itself here.
 
+---
+
+## Conversion plan
+
+Decided: content pages scroll normally (only the index is one screen);
+`/th1/` and `/th2/` survive as full pages; the dashboard keeps its jQuery for
+now; cutover happens **per page** as each is finished.
+
+| Phase | | Status |
+|---|---|---|
+| 0 | Shared chrome + shared data includes | **done** |
+| 0.5 | Onboarding states in v7 (`onboard`, `gated`) | blocker for root swap |
+| 1 | Swap `/` to v7 | |
+| 2 | `/list/` — immediately after, same journey | |
+| 3 | `/posts/`, `/about/` | |
+| 4 | `/directory/`, `/users/profile.php` | |
+| 5 | `/dashboard/` — markup restyle only | |
+| 6 | `/th1/`, `/th2/` | |
+| — | `_admin/` — deliberately left on the old stylesheet | won't do |
+
+### Phase 0 shape
+
+    v7/_lib.php      bootstrap, escaping, one function per content pillar
+    v7/_head.php     <head> + shell open;  $ctx_scroll picks the shell variant
+    v7/_chrome.php   rail + bar;  $ctx_active drives the nav highlight
+    v7/_foot.php     shell close, scrim, universal account panel, theatre
+
+`ctx_state()` returns **guest / onboard / gated / member** — the front page
+has to branch four ways, not two. Every reference build so far handled only
+two, which is why the onboarding states are a cutover blocker.
+
+`CTX_HOME` in `_lib.php` is the cutover switch: it points at `/v7/` today and
+becomes `/` when the root swaps. Nothing else needs editing.
+
+### Tech debt, written down so "later" is real
+
+- **`dashboard.js` + `quick-create.js` (1,222 lines of jQuery)** stay as-is
+  through the conversion; only their markup is restyled. Rewriting working
+  upload / autosave / draft logic is the highest-risk change available for no
+  user-visible gain. Revisit once everything is on v7 and stable.
+- The **signup SQL injection** in `dashboard/signup.php` (string interpolation
+  rather than bound parameters) will be touched during the auth work. Fix it
+  then rather than shipping around it.
+- `script-jlm.js` and `script.js` retire when the last old page converts,
+  taking the `[th1]` console noise with them.
+
 ## Taste profile
 
 Evidence-based, from six versions of feedback.

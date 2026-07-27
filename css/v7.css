@@ -139,6 +139,31 @@ button, input, select, textarea {
   grid-template-columns: var(--rail-sm) minmax(0, 1fr);
 }
 
+.app--scroll {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+}
+.app--scroll .rail {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+}
+.app--scroll .bar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+.app--scroll .canvas {
+  overflow: visible;
+}
+.app--scroll .canvas__in {
+  height: auto;
+}
+.app--scroll .card__body {
+  overflow: visible;
+}
+
 .rail {
   grid-row: 1/-1;
   display: flex;

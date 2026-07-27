@@ -163,6 +163,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .app.is-collapsed { grid-template-columns: var(--rail-sm) minmax(0, 1fr); }
 
+// Content pages scroll normally. Only the index is locked to one screen —
+// reading a long essay through a fixed panel would be worse than page scroll.
+.app--scroll {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+
+  .rail { position: sticky; top: 0; height: 100dvh; }
+  .bar  { position: sticky; top: 0; z-index: 90; }
+  .canvas { overflow: visible; }
+  .canvas__in { height: auto; }
+  .card__body { overflow: visible; }
+}
+
 // ── Rail ───────────────────────────────────────────────────────────────────
 
 .rail {
