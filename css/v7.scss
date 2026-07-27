@@ -410,7 +410,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .shot:hover & { color: var(--red-hi); }
 }
 
-.shot__series { margin-top: 3px; @include label(var(--t-3xs), var(--red-hi)); }
+// The series sits inline after the title in a quieter face — a curatorial
+// annotation, not a label competing with the title for attention.
+.shot__series,
+.line__series {
+  margin-left: 5px;
+  font-family: var(--f-read);
+  font-size: var(--t-xs);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
 .shot__venue  { margin-top: 2px; @include label(var(--t-3xs), var(--text-3)); }
 
 .shot--member .shot__art { border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }

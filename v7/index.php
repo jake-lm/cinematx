@@ -209,8 +209,7 @@ $m_count = $conn->query("SELECT count(*) FROM `users` WHERE `active` = 1 AND `na
                 <?php endif; ?>
                 <span class="shot__time"><?php echo date('g:ia', $s['timestamp']); ?><?php echo $other ? ' · ' . date('D', $s['timestamp']) : ''; ?></span>
               </span>
-              <span class="shot__title"><?php echo $e($s['display_title']); ?></span>
-              <?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?>
+              <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
               <span class="shot__venue">
                 <?php if ($member): ?><span class="shot__by">&#9679; By a member</span><?php else: ?><?php echo $e($s['venue']); ?><?php endif; ?>
               </span>
@@ -231,10 +230,9 @@ $m_count = $conn->query("SELECT count(*) FROM `users` WHERE `active` = 1 AND `na
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
               <span>
-                <span class="line__title"><?php echo $e($s['display_title']); ?></span>
+                <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
                 <span class="line__sub">
                   <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
-                  <?php if (!empty($s['series'])): ?><?php echo $e($s['series']); ?> &middot; <?php endif; ?>
                   <?php echo $e($s['venue']); ?><?php echo $other ? ' · ' . date('D j M', $s['timestamp']) : ''; ?>
                 </span>
               </span>
