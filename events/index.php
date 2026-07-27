@@ -1,6 +1,15 @@
 <?php
-session_start();
-require '../database.php';
+// ═══════════════════════════════════════════════════════════════════════════
+//  CINEMA, TX — a member-submitted screening
+//
+//  The last public page on the old stylesheet, and The List links straight
+//  into it, so it was a visible seam mid-design.
+//
+//  A reading surface rather than a listing: by the time you are here you have
+//  chosen this one screening and want the particulars — when, where, and how
+//  to get there.
+// ═══════════════════════════════════════════════════════════════════════════
+require dirname(__DIR__) . '/v7/_lib.php';
 
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: /list'); exit; }
@@ -14,93 +23,90 @@ $stmt = $conn->prepare(
 $stmt->execute([':id' => $id]);
 $event = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$event) {
-  header('Location: /list'); exit;
-}
+if (!$event) { header('Location: /list'); exit; }
 
-$display_datetime = date('l, F j, Y \a\t g:ia', $event['screentime']);
+$e    = 'ctx_e';
+$when = date('l, F j, Y \a\t g:ia', $event['screentime']);
+$past = $event['screentime'] < $CTX_NOW;
+
+$ctx_title  = $event['title'] . ' — Cinema, TX';
+$ctx_active = 'list';                 // it was reached from The List
+$ctx_scroll = true;
+$ctx_video  = false;
+
+ob_start(); ?>
+<meta property="og:title" content="<?php echo $e($event['title']); ?>" />
+<meta property="og:description" content="<?php echo $e($when . ' — ' . $event['location']); ?>" />
+<?php if (!empty($event['poster'])): ?>
+<meta property="og:image" content="/uploads/events/<?php echo $e($event['poster']); ?>" />
+<?php endif; ?>
+<?php $ctx_meta = ob_get_clean();
+
+require dirname(__DIR__) . '/v7/_head.php';
+require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta property="og:title" content="<?php echo htmlspecialchars($event['title']); ?>" />
-  <meta property="og:description" content="<?php echo htmlspecialchars($display_datetime . ' — ' . $event['location']); ?>" />
-  <?php if ($event['poster']): ?>
-  <meta property="og:image" content="/uploads/events/<?php echo htmlspecialchars($event['poster']); ?>" />
-  <?php endif; ?>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
-  <link rel="icon" href="/img/iconimg.png" type="image/x-icon" />
-  <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon" />
-  <link rel="stylesheet" href="/css/sass.css" />
-  <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
-  <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-  <script src="/js/script-jlm.js"></script>
-  <title><?php echo htmlspecialchars($event['title']); ?> — Cinema, TX</title>
-</head>
-<body id="event-page">
 
-<div class="main-content">
+  <main class="canvas">
+    <article class="reading">
 
-  <?php include '../header.php'; ?>
-
-  <div class="home-base">
-    <div class="post-single">
-
-      <span class="post-type-pill">Screening</span>
-
-      <h1 class="post-headline"><?php echo htmlspecialchars($event['title']); ?></h1>
-
-      <div class="post-meta">
-        <span><?php echo $display_datetime; ?></span>
-        <span class="post-meta-dot">&middot;</span>
-        <span><?php echo htmlspecialchars($event['location']); ?></span>
+      <div class="reading__kicker">
+        <span>Submitted by a member</span>
+        <?php if ($past): ?><span class="reading__past">Already screened</span><?php endif; ?>
       </div>
 
-      <?php if ($event['poster']): ?>
-      <div class="post-hero-wrap">
-        <img class="post-hero" src="/uploads/events/<?php echo htmlspecialchars($event['poster']); ?>" alt="<?php echo htmlspecialchars($event['title']); ?>" />
+      <h1 class="reading__title"><?php echo $e($event['title']); ?></h1>
+
+      <div class="reading__by">
+        <?php echo $e($when); ?> &middot; <?php echo $e($event['location']); ?>
+      </div>
+
+      <?php if (!empty($event['poster'])): ?>
+      <div class="reading__figure">
+        <img src="/uploads/events/<?php echo $e($event['poster']); ?>" alt="<?php echo $e($event['title']); ?>" />
       </div>
       <?php endif; ?>
 
-      <hr class="post-divider" />
-
-      <div class="event-details">
-        <div class="event-details-row">
-          <span class="event-details-label">When</span>
-          <span class="event-details-value"><?php echo $display_datetime; ?></span>
+      <?php // No blurb here on purpose — the events table stores a title, a
+            // time and a place, and nothing else. If a description column is
+            // ever added, it belongs above this block. ?>
+      <div class="deets">
+        <div class="deets__row">
+          <span class="deets__label">When</span>
+          <span class="deets__value"><?php echo $e($when); ?></span>
         </div>
-        <div class="event-details-row">
-          <span class="event-details-label">Where</span>
-          <span class="event-details-value"><?php echo htmlspecialchars($event['location']); ?></span>
+        <div class="deets__row">
+          <span class="deets__label">Where</span>
+          <span class="deets__value"><?php echo $e($event['location']); ?></span>
         </div>
         <?php if (!empty($event['address'])): ?>
-        <div class="event-details-row">
-          <span class="event-details-label">Address</span>
-          <span class="event-details-value">
-            <?php echo htmlspecialchars($event['address']); ?>
-            <a class="event-directions-link" href="https://www.google.com/maps/search/?api=1&query=<?php echo urlencode($event['address']); ?>" target="_blank" rel="noopener">Get directions &rarr;</a>
+        <div class="deets__row">
+          <span class="deets__label">Address</span>
+          <span class="deets__value">
+            <?php echo $e($event['address']); ?>
+            <a class="deets__map" href="https://www.google.com/maps/search/?api=1&amp;query=<?php echo urlencode($event['address']); ?>"
+               target="_blank" rel="noopener">Get directions <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
           </span>
         </div>
         <?php endif; ?>
       </div>
 
-      <?php if ($event['author_name']): ?>
-      <div class="event-submitter">
-        <a class="feed-card-avatar" href="/users/profile.php?id=<?php echo $event['uid']; ?>">
+      <?php if (!empty($event['author_name'])): ?>
+      <div class="reading__share">
+        <a class="face" href="/users/profile.php?id=<?php echo (int)$event['uid']; ?>" title="<?php echo $e($event['author_name']); ?>">
           <?php if (!empty($event['author_photo'])): ?>
-          <img src="/uploads/profiles/<?php echo htmlspecialchars($event['author_photo']); ?>" alt="" />
-          <?php else: ?>
-          <i class="fa-solid fa-user"></i>
-          <?php endif; ?>
+          <img src="/uploads/profiles/<?php echo $e($event['author_photo']); ?>" alt="" />
+          <?php else: ?><?php echo $e(mb_substr($event['author_name'], 0, 1)); ?><?php endif; ?>
         </a>
-        <span>Submitted by <a class="author-link" href="/users/profile.php?id=<?php echo $event['uid']; ?>"><?php echo htmlspecialchars($event['author_name']); ?></a></span>
+        <span class="reading__share-label">Submitted by</span>
+        <a class="reading__link" href="/users/profile.php?id=<?php echo (int)$event['uid']; ?>"><?php echo $e($event['author_name']); ?></a>
       </div>
       <?php endif; ?>
 
-    </div>
-  </div>
+      <div class="reading__fineprint">
+        Member-submitted. <a class="reading__link" href="/list">The List</a> has everything else playing this week.
+      </div>
 
-</div>
+    </article>
+  </main>
 
-</body>
-</html>
+<?php require dirname(__DIR__) . '/v7/_foot.php'; ?>

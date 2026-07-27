@@ -1220,6 +1220,58 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  EVENT PARTICULARS  (/events/)
+//  A member-submitted screening is mostly facts, so they get a table rather
+//  than prose pretending to be a paragraph.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.deets {
+  margin-top: var(--s-6);
+  border-top: 1px solid var(--line);
+}
+
+.deets__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.deets__label { @include label(var(--t-3xs), var(--text-3)); padding-top: 2px; }
+
+.deets__value {
+  min-width: 0;
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  color: var(--text);
+}
+
+.deets__map {
+  display: block;
+  margin-top: var(--s-2);
+  color: var(--red-hi);
+  text-decoration: none;
+  @include label(var(--t-3xs), var(--red-hi));
+  i { font-size: 0.82em; opacity: 0.7; }
+  &:hover { text-decoration: underline; }
+}
+
+// A screening that has already happened should say so before you read the
+// address and drive there.
+.reading__past {
+  margin-left: var(--s-3);
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  @include label(var(--t-3xs), var(--text-3));
+}
+
+@media (max-width: 560px) {
+  .deets__row { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  HOVERCARD
 //
 //  A generic preview, positioned by JS and filled from data-hover. It sits on

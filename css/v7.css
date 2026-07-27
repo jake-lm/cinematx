@@ -2089,6 +2089,78 @@ button, input, select, textarea {
   color: var(--dark-2nd);
 }
 
+.deets {
+  margin-top: var(--s-6);
+  border-top: 1px solid var(--line);
+}
+
+.deets__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--s-4);
+  padding: var(--s-4) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.deets__label {
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+
+.deets__value {
+  min-width: 0;
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  color: var(--text);
+}
+
+.deets__map {
+  display: block;
+  margin-top: var(--s-2);
+  color: var(--red-hi);
+  text-decoration: none;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--red-hi);
+  font-variant-numeric: tabular-nums;
+}
+.deets__map i {
+  font-size: 0.82em;
+  opacity: 0.7;
+}
+.deets__map:hover {
+  text-decoration: underline;
+}
+
+.reading__past {
+  margin-left: var(--s-3);
+  padding: 2px var(--s-2);
+  border: 1px solid var(--line-2);
+  border-radius: 3px;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .deets__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-2);
+  }
+}
 .hovercard {
   position: absolute;
   z-index: 700;
