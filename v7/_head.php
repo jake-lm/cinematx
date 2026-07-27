@@ -8,6 +8,7 @@
 //                          The index is the only surface locked to one screen.
 //    $ctx_video   bool     load video.js and expose the theatre sync globals
 //    $ctx_theatre array    from ctx_theatre(); required when $ctx_video
+//    $ctx_meta    string   extra <head> markup — Open Graph, canonical, etc.
 // ═══════════════════════════════════════════════════════════════════════════
 
 $ctx_title  = $ctx_title  ?? 'Cinema, TX';
@@ -16,11 +17,12 @@ $ctx_video  = $ctx_video  ?? false;
 $root       = dirname(__DIR__);
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title><?php echo ctx_e($ctx_title); ?></title>
+<?php if (!empty($ctx_meta)) echo $ctx_meta; ?>
 <script>try{var t=localStorage.getItem('ctx-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <link rel="stylesheet" href="/css/v7.css?v=<?php echo filemtime($root . '/css/v7.css'); ?>" />
 <?php if ($ctx_video): ?>

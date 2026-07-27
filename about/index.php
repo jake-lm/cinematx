@@ -1,54 +1,39 @@
-<?php session_start();?>
-<html>
-<head>
-  <meta name="author" content="Dr. Zoidberg" />
-  <meta name="viewport" content="width=device-width" />
-  <meta property="og:title" content="" />
-  <meta property="og:description" content="" />
-  <link rel="stylesheet" href="../css/sass.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
-  <link rel="icon" href="/img/iconimg.png" type="image/x-icon"/>
-  <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon"/>
-  <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
-  <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-  <script src="/script.js"></script>
-  <title>about</title>
-</head>
-<body id="about" onload="cycle()">
+<?php
+// ═══════════════════════════════════════════════════════════════════════════
+//  CINEMA, TX — About
+//  Copy carried over verbatim; only the setting changes.
+// ═══════════════════════════════════════════════════════════════════════════
+require dirname(__DIR__) . '/v7/_lib.php';
 
-<div class="main-content">
+$ctx_title  = 'About — Cinema, TX';
+$ctx_active = 'about';
+$ctx_scroll = true;
+$ctx_video  = false;
 
-<?php require '../header.php'; ?>
+require dirname(__DIR__) . '/v7/_head.php';
+require dirname(__DIR__) . '/v7/_chrome.php';
+?>
 
-<div class="home-base">
+  <main class="canvas">
+    <article class="reading">
 
-  <div class="content-block-w">
-    <div class="title">What the f#ck is this sh*t?</div>
-    <br>
-    <div class="text">
-      We are a small directory of film culture in Austin, Texas. 
-      <br><br>
-      <b>Registration is limited.</b><br>
-      Most data is subject to review*.
-      <br><br>
-      <a href="mailto:contact.cinematx@gmail.com">contact.cinematx@gmail.com</a>
-      <br><br><br><br>
-      <div style="color:#a2a2a2;font-size:8px;">*Very few cookies are used on this site. Passwords are one-way encrypted.
-      <br>&nbsp;&nbsp;No unvolunteered data is collected.
-      <br>&nbsp;&nbsp;We are commited to privacy and transparency. Email for more info, though there is none.</div>
-    </div>
-  </div>
-  <!--div class="content-block-t">
-    <div class="main-piece">
-      <div class="main-img" style="background-image: url('img/');">
-        <div class="overlay"></div>
+      <div class="reading__kicker"><span>Austin, Texas</span></div>
+
+      <h1 class="reading__title">What the f#ck is this sh*t?</h1>
+
+      <div class="reading__body prose">
+        <p>We are a small directory of film culture in Austin, Texas.</p>
+        <p><strong>Registration is limited.</strong><br />Most data is subject to review.<sup>*</sup></p>
+        <p><a class="reading__link" href="mailto:contact.cinematx@gmail.com">contact.cinematx@gmail.com</a></p>
       </div>
-    </div>
-  </div-->
 
-</div>
+      <div class="reading__fineprint">
+        <sup>*</sup> Very few cookies are used on this site. Passwords are one-way encrypted.
+        No unvolunteered data is collected. We are committed to privacy and transparency —
+        email for more info, though there is none.
+      </div>
 
-</div>
+    </article>
+  </main>
 
-</body>
-</html>
+<?php require dirname(__DIR__) . '/v7/_foot.php'; ?>

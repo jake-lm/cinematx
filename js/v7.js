@@ -420,9 +420,43 @@
     }
   }
 
+  // ══ Copy link ════════════════════════════════════════════════════════════
+  // Replaces the old Instagram share button, which pointed at "#" — Instagram
+  // has no web share endpoint, and copy-link is what people actually use.
+
+  function initCopyLink() {
+    var btn = $('#copy-link');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+      var url  = btn.getAttribute('data-url') || location.href;
+      var mark = function () {
+        var was = btn.innerHTML;
+        btn.classList.add('is-done');
+        btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+        setTimeout(function () { btn.classList.remove('is-done'); btn.innerHTML = was; }, 1600);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(mark).catch(fallback);
+      } else { fallback(); }
+
+      function fallback() {
+        var t = document.createElement('textarea');
+        t.value = url;
+        t.style.cssText = 'position:fixed;opacity:0;';
+        document.body.appendChild(t);
+        t.select();
+        try { document.execCommand('copy'); mark(); } catch (e) {}
+        t.remove();
+      }
+    });
+  }
+
   function boot() {
     initWelcome(); initTheme(); initRail(); initList();
-    initOverlays(); initComposer(); initNotes(); initJoin(); initTheatre();
+    initOverlays(); initComposer(); initNotes(); initJoin();
+    initCopyLink(); initTheatre();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

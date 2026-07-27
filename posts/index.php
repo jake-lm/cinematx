@@ -1,115 +1,127 @@
 <?php
-session_start();
-require '../database.php';
+// ═══════════════════════════════════════════════════════════════════════════
+//  CINEMA, TX — a single piece of writing
+//  A reading surface: normal page scroll, a real measure, serif body.
+// ═══════════════════════════════════════════════════════════════════════════
+require dirname(__DIR__) . '/v7/_lib.php';
 
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: /'); exit; }
 
-$stmt = $conn->prepare(
+$q = $conn->prepare(
   "SELECT p.*, u.name AS author_name
-   FROM posts p
-   LEFT JOIN users u ON p.uid = u.id
-   WHERE p.id = :id AND p.active = 1"
+   FROM posts p LEFT JOIN users u ON p.uid = u.id
+   WHERE p.id = :id AND p.active = 1 LIMIT 1"
 );
-$stmt->execute([':id' => $id]);
-$post = $stmt->fetch(PDO::FETCH_ASSOC);
+$q->execute([':id' => $id]);
+$post = $q->fetch(PDO::FETCH_ASSOC);
 
-if (!$post) {
-  http_response_code(404);
-  header('Location: /');
-  exit;
-}
+if (!$post) { http_response_code(404); header('Location: /'); exit; }
 
-function slugify($text) {
-  $text = mb_strtolower(trim($text));
-  $text = preg_replace('/[^a-z0-9\s-]/', '', $text);
-  $text = preg_replace('/[\s-]+/', '-', $text);
-  return trim($text, '-');
-}
+$canonical = ctx_post_url($post['id'], $post['title']);
+$date      = date('j F Y', $post['edited'] ?: $post['stamp']);
 
-$canonical    = '/posts/' . slugify($post['title']) . '-' . $post['id'];
-$display_date = date('F j, Y', $post['edited'] ?: $post['stamp']);
+// More from the journal, for the foot of the piece.
+$q = $conn->prepare(
+  "SELECT p.id, p.title, p.type, p.stamp, p.edited, u.name AS author_name
+   FROM posts p LEFT JOIN users u ON p.uid = u.id
+   WHERE p.active = 1 AND p.type IN ('review','essay') AND p.id != :id
+   ORDER BY COALESCE(p.edited, p.stamp) DESC LIMIT 4"
+);
+$q->execute([':id' => $id]);
+$more = $q->fetchAll(PDO::FETCH_ASSOC);
+
+$e = 'ctx_e';
+
+// Shell
+$ctx_title  = $post['title'] . ' — Cinema, TX';
+$ctx_active = '';
+$ctx_scroll = true;
+$ctx_video  = false;
+
+ob_start(); ?>
+<link rel="canonical" href="<?php echo $e($canonical); ?>" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="<?php echo $e($post['title']); ?>" />
+<?php if (!empty($post['subtitle'])): ?>
+<meta property="og:description" content="<?php echo $e($post['subtitle']); ?>" />
+<?php endif; ?>
+<?php if (!empty($post['image'])): ?>
+<meta property="og:image" content="/uploads/posts/<?php echo $e($post['image']); ?>" />
+<?php endif; ?>
+<?php $ctx_meta = ob_get_clean();
+
+require dirname(__DIR__) . '/v7/_head.php';
+require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
-<html prefix="og: https://ogp.me/ns#">
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta property="og:title" content="<?php echo htmlspecialchars($post['title']); ?>" />
-  <?php if($post['subtitle']): ?>
-  <meta property="og:description" content="<?php echo htmlspecialchars($post['subtitle']); ?>" />
-  <?php endif; ?>
-  <?php if($post['image']): ?>
-  <meta property="og:image" content="/uploads/posts/<?php echo htmlspecialchars($post['image']); ?>" />
-  <?php endif; ?>
-  <link rel="canonical" href="<?php echo $canonical; ?>" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.css" />
-  <link rel="icon" href="/img/iconimg.png" type="image/x-icon" />
-  <link rel="shortcut icon" href="/img/iconimg.png" type="image/x-icon" />
-  <link rel="stylesheet" href="/css/sass.css" />
-  <script src="https://kit.fontawesome.com/7ea7b5f42f.js" crossorigin="anonymous"></script>
-  <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-  <script src="/js/script-jlm.js"></script>
-  <title><?php echo htmlspecialchars($post['title']); ?> — Cinema, TX</title>
-</head>
-<body id="post-page">
 
-<div class="main-content">
+  <main class="canvas">
+    <article class="reading">
 
-  <?php include '../header.php'; ?>
-
-  <div class="home-base">
-    <div class="post-single">
-
-      <?php if($post['type']): ?>
-      <span class="post-type-pill"><?php echo htmlspecialchars($post['type']); ?></span>
-      <?php endif; ?>
-
-      <h1 class="post-headline"><?php echo htmlspecialchars($post['title']); ?></h1>
-
-      <?php if($post['subtitle']): ?>
-      <p class="post-sub"><?php echo htmlspecialchars($post['subtitle']); ?></p>
-      <?php endif; ?>
-
-      <div class="post-meta">
-        <?php if($post['author_name']): ?>
-          <a class="author-link" href="/users/profile.php?id=<?php echo $post['uid']; ?>"><?php echo htmlspecialchars($post['author_name']); ?></a>
-          <span class="post-meta-dot">&middot;</span>
+      <div class="reading__kicker">
+        <?php if (!empty($post['type'])): ?>
+        <span class="pill"><?php echo $e($post['type']); ?></span>
         <?php endif; ?>
-        <span><?php echo $display_date; ?></span>
+        <span><?php echo $e($date); ?></span>
       </div>
 
-      <?php if($post['image']): ?>
-      <div class="post-hero-wrap">
-        <img class="post-hero" src="/uploads/posts/<?php echo htmlspecialchars($post['image']); ?>" alt="<?php echo htmlspecialchars($post['title']); ?>" />
-        <div class="post-share">
-          <a class="share-btn share-twitter" href="#" title="Share on X">
-            <span class="share-label">Share</span>
-            <i class="fa-brands fa-x-twitter"></i>
-          </a>
-          <a class="share-btn share-instagram" href="#" title="Share on Instagram">
-            <span class="share-label">Share</span>
-            <i class="fa-brands fa-instagram"></i>
-          </a>
-          <a class="share-btn share-reddit" href="#" title="Share on Reddit">
-            <span class="share-label">Share</span>
-            <i class="fa-brands fa-reddit-alien"></i>
-          </a>
-        </div>
-        <?php if($post['photo_cred']): ?>
-        <span class="post-photo-cred"><?php echo htmlspecialchars($post['photo_cred']); ?></span>
+      <h1 class="reading__title"><?php echo $e($post['title']); ?></h1>
+
+      <?php if (!empty($post['subtitle'])): ?>
+      <p class="reading__deck"><?php echo $e($post['subtitle']); ?></p>
+      <?php endif; ?>
+
+      <div class="reading__by">
+        <?php if (!empty($post['author_name'])): ?>
+        <a href="/users/profile.php?id=<?php echo (int)$post['uid']; ?>"><?php echo $e($post['author_name']); ?></a>
+        <span>&middot;</span>
         <?php endif; ?>
+        <span>Cinema, TX</span>
+      </div>
+
+      <?php if (!empty($post['image'])): ?>
+      <figure class="reading__figure">
+        <img src="/uploads/posts/<?php echo $e($post['image']); ?>" alt="<?php echo $e($post['title']); ?>" />
+        <?php if (!empty($post['photo_cred'])): ?>
+        <figcaption><?php echo $e($post['photo_cred']); ?></figcaption>
+        <?php endif; ?>
+      </figure>
+      <?php endif; ?>
+
+      <div class="reading__body prose"><?php echo nl2br($e($post['content'])); ?></div>
+
+      <?php
+      // The old page's share buttons all pointed at "#". These are real: X and
+      // Reddit take share URLs, Instagram has no web share endpoint, so that
+      // slot becomes copy-link — which is the one people actually use.
+      $share_url = 'https://cinematx.com' . $canonical;
+      ?>
+      <div class="reading__share">
+        <span class="reading__share-label">Share</span>
+        <a class="share" target="_blank" rel="noopener" title="Share on X"
+           href="https://x.com/intent/tweet?url=<?php echo urlencode($share_url); ?>&text=<?php echo urlencode($post['title']); ?>">
+          <i class="fa-brands fa-x-twitter"></i></a>
+        <a class="share" target="_blank" rel="noopener" title="Share on Reddit"
+           href="https://reddit.com/submit?url=<?php echo urlencode($share_url); ?>&title=<?php echo urlencode($post['title']); ?>">
+          <i class="fa-brands fa-reddit-alien"></i></a>
+        <button class="share" id="copy-link" data-url="<?php echo $e($share_url); ?>" title="Copy link">
+          <i class="fa-solid fa-link"></i></button>
+      </div>
+
+      <?php if ($more): ?>
+      <div class="reading__more">
+        <div class="reading__more-head">More from the journal</div>
+        <?php foreach ($more as $m): ?>
+        <a class="row" href="<?php echo $e(ctx_post_url($m['id'], $m['title'])); ?>">
+          <span class="row__type"><?php echo $e($m['type']); ?></span>
+          <span class="row__title"><?php echo $e($m['title']); ?></span>
+          <span class="row__meta"><?php echo date('j M', $m['edited'] ?: $m['stamp']); ?></span>
+        </a>
+        <?php endforeach; ?>
       </div>
       <?php endif; ?>
 
-      <hr class="post-divider" />
+    </article>
+  </main>
 
-      <div class="post-body">
-        <?php echo nl2br(htmlspecialchars($post['content'])); ?>
-      </div>
-
-    </div>
-  </div>
-
-</div>
-
-</body>
-</html>
+<?php require dirname(__DIR__) . '/v7/_foot.php'; ?>

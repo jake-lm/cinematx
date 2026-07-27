@@ -543,6 +543,117 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .empty { padding: var(--s-7) var(--s-4); text-align: center; @include label(var(--t-3xs), var(--text-4)); }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  READING SURFACES  (/posts/, /about/)
+//  A real measure, serif body, page scroll. The one place the site stops
+//  being an app and behaves like a page.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.reading {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--s-8) 0 var(--s-9);
+}
+
+.reading__kicker {
+  display: flex; align-items: center; gap: var(--s-3);
+  margin-bottom: var(--s-4);
+  @include label(var(--t-3xs), var(--text-3));
+}
+
+.pill {
+  padding: 2px var(--s-2);
+  border: 1px solid var(--red-wash);
+  border-radius: 4px;
+  background: var(--red-wash);
+  @include label(9px, var(--red-hi));
+}
+
+.reading__title {
+  margin: 0 0 var(--s-4);
+  font-family: var(--f-display);
+  font-size: clamp(28px, 3.4vw, 44px);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 22, 'WONK' 1;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+}
+
+.reading__deck {
+  margin: 0 0 var(--s-5);
+  font-family: var(--f-read);
+  font-size: var(--t-xl);
+  font-style: italic;
+  font-weight: 300;
+  line-height: 1.36;
+  color: var(--text-2);
+}
+
+.reading__by {
+  display: flex; gap: var(--s-2); flex-wrap: wrap;
+  padding-bottom: var(--s-5);
+  margin-bottom: var(--s-6);
+  border-bottom: 1px solid var(--line);
+  @include label(var(--t-3xs), var(--text-3));
+  a:hover { color: var(--red-hi); }
+}
+
+.reading__figure {
+  margin: 0 0 var(--s-6);
+  img { width: 100%; border-radius: var(--radius); }
+  figcaption { margin-top: var(--s-2); @include label(9px, var(--text-4)); }
+}
+
+.reading__body {
+  font-size: var(--t-md);
+  line-height: 1.78;
+  color: var(--text);
+  p { margin: 0 0 1.2em; }
+  strong { font-weight: 600; }
+}
+
+.reading__link { color: var(--red-hi); border-bottom: 1px solid var(--red-wash);
+  &:hover { border-bottom-color: var(--red); } }
+
+.reading__fineprint {
+  margin-top: var(--s-7);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  color: var(--text-4);
+}
+
+.reading__share {
+  display: flex; align-items: center; gap: var(--s-2);
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+.reading__share-label { margin-right: var(--s-2); @include label(var(--t-3xs), var(--text-3)); }
+
+.share {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text-3);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+              border-color var(--t-fast) var(--ease);
+  &:hover { background: var(--surface-2); border-color: var(--line-2); color: var(--text); }
+  &.is-done { background: var(--red); border-color: var(--red); color: #fff; }
+}
+
+.reading__more {
+  margin-top: var(--s-8);
+  border-top: 1px solid var(--line);
+}
+.reading__more-head { padding: var(--s-5) 0 var(--s-3); @include label; }
+.reading__more .row { padding-left: 0; padding-right: 0; }
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  THE LIST PAGE  (/list/)
 //  Seven days, grouped by day. Scrolls normally, with the controls sticking
 //  so narrowing is always reachable without going back to the top.

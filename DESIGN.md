@@ -221,7 +221,7 @@ now; cutover happens **per page** as each is finished.
 | 0.5 | Onboarding states in v7 (`onboard`, `gated`) | **done** |
 | 1 | Swap `/` to v7 | **done** |
 | 2 | `/list/` — immediately after, same journey | **done** |
-| 3 | `/posts/`, `/about/` | |
+| 3 | `/posts/`, `/about/` | **done** |
 | 4 | `/directory/`, `/users/profile.php` | |
 | 5 | `/dashboard/` — markup restyle only | |
 | 6 | `/th1/`, `/th2/` | |
