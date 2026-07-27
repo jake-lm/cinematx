@@ -6,11 +6,14 @@ A PHP/MySQL website for a pseudo-cinema streaming experience. Users visit theatr
 ---
 
 ## Compile Pipeline
-**Always run after editing `sass.scss`:**
+**Always run after editing `v7.scss`:**
 ```
-sass css/sass.scss css/sass.css --no-source-map
+sass css/v7.scss css/v7.css --no-source-map
 ```
-Then bump the CSS cache buster (`?v=N`) in the relevant page's `<link>` tag.
+No cache buster to bump — `_head.php` appends `?v=<filemtime>` automatically.
+
+`css/sass.scss` is the **old** stylesheet. Nothing loads it any more; the v7
+conversion is complete. Don't edit it.
 
 ---
 
@@ -18,63 +21,69 @@ Then bump the CSS cache buster (`?v=N`) in the relevant page's `<link>` tag.
 
 | File | Purpose |
 |------|---------|
-| `css/sass.scss` | Master stylesheet — edit this, never `sass.css` directly |
-| `css/sass.css` | Compiled output |
-| `header.php` | Shared nav menu (included on all pages) |
-| `index.php` | Homepage — welcome message, directory panel, sign-in logic |
-| `th1/index.php` | Theatre 1 page — queries DB for current/next showtime, renders video player |
-| `js/script-jlm.js` | Main JS — `theatre_1()` sync function, menu toggle, quote rotator |
-| `js/script.js` | Legacy JS (mostly untouched) |
-| `motw/stream.php` | PHP video streaming handler — serves `.mp4` with HTTP range support (206 Partial Content) for seeking |
-| `_admin/showtime.php` | Admin: add showtimes — uses `America/Chicago` timezone explicitly |
-| `database.php` | PDO connection + `date_default_timezone_set('America/Chicago')` |
+| `css/v7.scss` | Master stylesheet — edit this, never `v7.css` |
+| `js/v7.js` | All front-end behaviour, vanilla, no jQuery |
+| `v7/_lib.php` | Bootstrap: `ctx_e()`, `ctx_me()`, `ctx_state()`, `ctx_theatre()`, `ctx_journal()`, `ctx_members()` |
+| `v7/_head.php` `_chrome.php` `_foot.php` | The shell — set `$ctx_title`, `$ctx_scroll`, `$ctx_video`, `$ctx_overlay`, `$ctx_shell`, `$ctx_meta`, `$ctx_scripts` before including |
+| `v7/_screening.php` | Shared body of `/th1/` and `/th2/`; they set `$ctx_screen` and include it |
+| `v7/screenings.php` | Title cleaning, series parsing, `ctx_bits()`, `ctx_hover()` |
+| `list/tmdb.php` | TMDB lookup — poster, year, runtime, plot, genres, director, Wikipedia link. Versioned cache (`TMDB_CACHE_V`) |
+| `list/cache.php` | `ctx_cached_scrape()` — TTL, locking, stale-beats-empty |
+| `bin/warm-cache.php` | Cron entry point. CLI only |
+| `_admin/_guard.php` | Admin auth + CSRF. Included first by every `_admin/` file |
+| `motw/stream.php` | Video streaming with HTTP range support (206) for seeking |
+| `database.php` | PDO connection, timezone, and the central error policy |
+
+`index.php` is a three-line shim to `v7/index.php`. The `v7/` partials will be
+flattened into the project root eventually.
 
 ---
 
-## Cache Busters
-Removed for development. When deploying to production, add `?v=<?php echo filemtime(...); ?>` to CSS/JS links — it auto-updates on recompile with no manual work.
+## Design System (v7)
+Tokens live at the top of `v7.scss`. Paper is the default; dark is an override
+under `:root[data-theme="dark"]`.
+
+- **Paper:** `--bg #F4F1EB`, `--surface #FBF9F5`
+- **Accent red:** `--red #922E32` (unchanged from v1 — it is sacred)
+- **Theatre:** `--dark #14120F`, `--dark-ink #F2EEE5`, `--dark-red #C4494E`.
+  These are **fixed and never flip with the theme** — a screening room is dark
+  in both. `.app--screening` remaps the whole shell onto them.
+- **Fonts:** Fraunces (display), Newsreader (prose), Instrument Sans (UI)
+
+The design brief, and what each of v1–v7 taught, is in **DESIGN.md**. The core
+finding: claustrophobia came from simultaneous competing claims on attention,
+not from tight spacing. Hierarchy is the fix — one loud element, everything
+else compact and muted.
 
 ---
 
-## Design System
-- **Background:** `#2a2a2a` (body), `#4A4A4A` (left menu), `#141414` (video info panel)
-- **Accent red:** `#922E32`
-- **Top bar:** `#922e32` with logo image
-- **Text:** `#e2e2e2` primary, `#999` secondary, `#555` tertiary
-- **Fonts:** Bebas Neue (menu), Montserrat (headings/labels), Roboto (body)
-- **Left menu width:** 200px fixed; content offset `left: 200px`
-- **Top bar height:** 50px fixed; content offset `top: 50px`
+## Theatre Sync (`startSync()` in `js/v7.js`)
+Reads `window.CTX_SHOWTIME`, `CTX_DUR`, `CTX_FILE`, injected by `_head.php`
+when `$ctx_video` is set. One implementation drives both the front-page overlay
+and the standalone `/th1/` `/th2/` pages.
 
----
+1. `player.preload('auto')` — **required.** The markup says `preload="none"` so
+   the homepage doesn't pull a 250MB film just for having the card on screen,
+   but then the browser fetches nothing and `loadedmetadata` never fires.
+2. Set source to `/motw/stream.php?f=<filename>` (range handler, needed to seek)
+3. `diff = now - showtime`; return if pre-show or past the end
+4. `muted(true)` → `currentTime(diff)` → wait for `seeked` → `play()`
+5. On muted autoplay, inject an unmute nudge
+6. Every 3s, correct drift over 2s; snap back on any scrub
 
-## Theatre Sync (`theatre_1()` in script-jlm.js)
-The function takes `(showtime, dur, filename)` from PHP-injected `onload` params.
-
-Flow:
-1. Set video source to `/motw/stream.php?f=<filename>` (range-request handler, required for seeking)
-2. Wait for `loadedmetadata`
-3. Calculate `diff = now - showtime` (seconds elapsed)
-4. If pre-show: park at 0, poll every 5s to reload when showtime arrives
-5. If playing: `muted(true)` → `currentTime(diff)` → wait for `seeked` → `play()`
-6. On muted autoplay success: inject unmute nudge button into `.video-hold`
-7. Every 3s: re-sync if drift > 2s; snap back on any scrub attempt
-
-**Why `stream.php` exists:** PHP's built-in dev server returns `200 OK` for range requests instead of `206 Partial Content`, which blocks video seeking. `stream.php` handles `Range:` headers properly.
+**Why `stream.php` exists:** PHP's dev server returns `200 OK` for range
+requests instead of `206 Partial Content`, which blocks seeking.
 
 ---
 
 ## Database Tables (relevant)
-- `showtimes` — `id`, `f_id`, `showtime` (unix timestamp), `endtime`, `theatre`
-- `films` — `id`, `title`, `director`, `dur` (seconds), `filename`, `poster`, `wiki`, `program`
-- `notes` — `f_id`, `note`
+- `showtimes` — `id`, `f_id`, `showtime` (unix), `endtime`, `theatre`
+- `films` — `id`, `title`, `director`, `dur` (seconds), `filename`, `poster`, `wiki`, `program`, `active`, `motw` (dead)
+- `notes` — `f_id`, `note`, `stamp`
+- `events` — member-submitted screenings: `title`, `poster`, `screentime`, `location`, `address`, `active`. No description column.
+- `users` — `admin` gates `/_admin/`; `active` gates sign-in
 
-Showtimes stored in Unix time, `America/Chicago` timezone. `_admin/showtime.php` uses `DateTime::createFromFormat(..., new DateTimeZone('America/Chicago'))`.
-
----
-
-## CSS Specificity Notes
-- General `.home-base .content-block-w .thelist .entry` styles live late in the file and will override community panel dark styles unless countered.
-- Community/Directory panel inner styles use `#community-panel` ID selector (+ `!important` on bg/color/shadow) to win specificity fights.
+Showtimes are Unix time, `America/Chicago`.
 
 ---
 
