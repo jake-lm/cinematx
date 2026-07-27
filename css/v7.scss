@@ -813,7 +813,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // The featured marker. Outlined rather than filled, in all three places it
 // appears, so it reads as a state the piece is in rather than a second
 // category competing with the type beside it.
-.lead__flag,
 .pill--featured,
 .draft-featured {
   padding: 2px 6px;
@@ -851,8 +850,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .lead__by {
   display: flex; gap: var(--s-3);
-  padding-bottom: var(--s-4); margin-bottom: var(--s-4);
-  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s-4);
   @include label(var(--t-3xs), var(--text-3));
   a:hover { color: var(--red-hi); }
 }
@@ -873,7 +871,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   pointer-events: none;
 }
 .lead__wrap { position: relative; }
-.lead__foot { margin-top: var(--s-4); }
+.lead__foot { margin-top: var(--s-4); display: flex; justify-content: flex-end; }
 
 .strip { border-top: 1px solid var(--line); }
 .strip__head { padding: var(--s-3) var(--s-5); @include label; }

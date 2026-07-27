@@ -176,11 +176,6 @@ require __DIR__ . '/_chrome.php';
               </a>
               <?php endif; ?>
               <div class="lead__kicker">
-                <?php // Strictly redundant here — ctx_journal() only ever puts a
-                      // featured post in this slot — but it is the line people
-                      // look at to check the flag took, and the old front page
-                      // carried it in exactly this position. ?>
-                <span class="lead__flag">Featured</span>
                 <span><?php echo $e($lead['type'] ?: 'Essay'); ?></span>
                 <span><?php echo date('j F Y', $lead['edited'] ?: $lead['stamp']); ?></span>
               </div>

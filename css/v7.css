@@ -1229,7 +1229,6 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.lead__flag,
 .pill--featured,
 .draft-featured {
   padding: 2px 6px;
@@ -1282,9 +1281,7 @@ button, input, select, textarea {
 .lead__by {
   display: flex;
   gap: var(--s-3);
-  padding-bottom: var(--s-4);
   margin-bottom: var(--s-4);
-  border-bottom: 1px solid var(--line);
   font-family: var(--f-ui);
   font-size: var(--t-3xs);
   font-weight: 600;
@@ -1323,6 +1320,8 @@ button, input, select, textarea {
 
 .lead__foot {
   margin-top: var(--s-4);
+  display: flex;
+  justify-content: flex-end;
 }
 
 .strip {
