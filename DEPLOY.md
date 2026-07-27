@@ -35,18 +35,34 @@ Deploy the working tree. Do **not** deploy `.git` if you can avoid it — if you
 deploy by cloning, confirm `https://yourdomain/.git/config` returns 404 before
 going further.
 
-Writable by the web server:
+Writable by the web server — set them **all** at once rather than listing
+directories by hand, because the list is longer than it looks:
+
+```bash
+chown -R root:www-data motw uploads list
+find uploads -type d -exec chmod 775 {} \;
+chmod 775 motw list
+```
 
 ```
 motw/                 uploaded films and posters
+uploads/posts/        images attached to journal posts
 uploads/profiles/     member photos
 uploads/events/       event posters
 list/                 scrape caches are written here
 ```
 
-`list/` is the one people forget. If it isn't writable, every page request
-re-scrapes because the cache can never be saved, and The List becomes
-extremely slow rather than visibly broken.
+Two that bite:
+
+`uploads/posts/` and `uploads/profiles/` contain tracked files, so a checkout
+creates them at 755 — readable but **not** group-writable. Every image upload
+then fails with a bare "image upload failed" and nothing in the Apache error
+log, because the handler catches `move_uploaded_file` returning false and
+answers with JSON. Chmod the whole tree, not the directories you remember.
+
+`list/` is the other one. If it isn't writable, every page request re-scrapes
+because the cache can never be saved, and The List becomes extremely slow
+rather than visibly broken.
 
 ---
 
