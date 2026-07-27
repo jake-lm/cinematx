@@ -11,11 +11,12 @@ if($action==='login') {
 	$pass = $_POST['pw'];
 	$hash = password_hash($pass, PASSWORD_DEFAULT);
 
-  $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = '$user'");
-  $sql1->execute();
+  $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = :email LIMIT 1");
+  $sql1->execute([':email' => $user]);
   $qUser = $sql1->fetch();
 
-  $pwv = password_verify($pass, $qUser['password']);
+  // Guarded: an unknown email used to index into `false` and warn.
+  $pwv = $qUser ? password_verify($pass, $qUser['password']) : false;
 
 	if($user == "" || $pass == "" || $pwv == false) {
 		?>
@@ -150,7 +151,15 @@ else if($action==='signup') {
 <?php
 }
 else if($action==="updateprof") {
-  $uid = $_POST['uid'];
+  // Same fix as activateacct: the uid is whoever is signed in, never whoever
+  // POST says. This branch writes `email`, so trusting POST meant any caller
+  // could repoint another member's address at their own and take the account.
+  if (!isset($_SESSION['username'])) { header('Location: /?error=100'); exit; }
+  $uid_q = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
+  $uid_q->execute([':email' => $_SESSION['username']]);
+  $uid = $uid_q->fetchColumn();
+  if (!$uid) { header('Location: /?error=100'); exit; }
+
   $email = $_POST['email'];
   $name = $_POST['uname'];
   $phone = $_POST['phone'];
@@ -239,33 +248,29 @@ else if($action==="firstcontact") {
 <?php
 }
 else if($action==='activateacct') {
-  $code = $_POST['code'];
-  $uid = $_POST['uid'];
-  $sql2 = $conn->prepare("SELECT * FROM `codes` WHERE `code` = '$code'");
-  $sql2->execute();
-  $code_q=$sql2->fetch();
+  // Requires a session. The uid comes from it, never from POST — previously
+  // any caller could name an arbitrary uid and flip its active flag.
+  if (!isset($_SESSION['username'])) { header('Location: /?error=100'); exit; }
 
-  if($code_q['code'] === $code) {
-    $active = 1;
+  $uid_q = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
+  $uid_q->execute([':email' => $_SESSION['username']]);
+  $uid = $uid_q->fetchColumn();
+  if (!$uid) { header('Location: /?error=100'); exit; }
+
+  // Bound, not interpolated.
+  $code = $_POST['code'] ?? '';
+  $code_q = $conn->prepare("SELECT `code` FROM `codes` WHERE `code` = :code LIMIT 1");
+  $code_q->execute([':code' => $code]);
+
+  if ($code_q->fetchColumn() !== false) {
+    $stmt = $conn->prepare("UPDATE `users` SET `active` = 1 WHERE `id` = :uid");
+    $stmt->execute([':uid' => $uid]);
+    header('Location: /'); exit;
   }
-  else {
-    $active = 0;
-  }
 
-  $stmt = $conn->prepare("UPDATE `users` SET `active` = :active WHERE `id` = :uid");
-  $stmt->execute(
-    array(
-      'active' => $active,
-      'uid' => $uid
-    )
-  );
-
-  ?>
-  <script type="text/javascript" language="javascript">
-    window.location="../"
-  </script>
-  <?php
-
+  // A wrong code now simply fails. It used to set active = 0, which meant a
+  // bad submission could deactivate an already-active account.
+  header('Location: /?error=108'); exit;
 }
 else if($action==='logout') {
 	session_destroy();

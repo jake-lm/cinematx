@@ -11,6 +11,22 @@ $state   = ctx_state($conn);
 $signed  = $state !== 'guest';
 $me      = ctx_me($conn);
 
+// Someone mid-signup or awaiting an access code gets the gate, not the front
+// page. Four states, not two — see ctx_state().
+if ($state === 'onboard' || $state === 'gated') {
+    $ctx_title  = $state === 'gated' ? 'Access code — Cinema, TX' : 'Welcome — Cinema, TX';
+    $ctx_active = 'index';
+    $ctx_scroll = true;      // a form should never be trapped in a fixed panel
+    $ctx_video  = false;
+    $ctx_gate   = $state;
+
+    require __DIR__ . '/_head.php';
+    require __DIR__ . '/_chrome.php';
+    require __DIR__ . '/_gate.php';
+    require __DIR__ . '/_foot.php';
+    exit;
+}
+
 $tonight = ctx_tonight($conn, $now);
 $films   = $tonight['screenings'];
 $label   = $tonight['label'];

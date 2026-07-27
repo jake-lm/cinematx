@@ -13,6 +13,9 @@
 $ctx_active = $ctx_active ?? '';
 $me         = ctx_me($conn);
 $signed     = $me !== null;
+// Member-only links are gated on full membership, not merely on being signed
+// in — someone mid-onboarding or awaiting an access code cannot use them.
+$full       = ctx_state($conn) === 'member';
 $dir        = ctx_members($conn, 7);
 $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 ?>
@@ -27,7 +30,7 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
     <a class="rail__link<?php echo $on('about'); ?>" href="/about">
       <span class="ico"><i class="fa-solid fa-circle-info"></i></span><span class="txt">About</span></a>
 
-    <?php if ($signed): ?>
+    <?php if ($full): ?>
     <div class="rail__group">Yours</div>
     <a class="rail__link<?php echo $on('dashboard'); ?>" href="/dashboard">
       <span class="ico"><i class="fa-solid fa-gauge"></i></span><span class="txt">Dashboard</span></a>
@@ -61,7 +64,7 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
   <div class="bar__end">
     <button class="ibtn" id="theme" title="Dark"><i class="fa-solid fa-moon"></i></button>
     <?php if ($signed): ?>
-      <a class="ibtn" href="/dashboard" title="Write"><i class="fa-solid fa-pen"></i></a>
+      <?php if ($full): ?><a class="ibtn" href="/dashboard" title="Write"><i class="fa-solid fa-pen"></i></a><?php endif; ?>
       <form action="/dashboard/signup.php?action=logout" method="post" style="display:flex;">
         <button class="ibtn" type="submit" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
       </form>

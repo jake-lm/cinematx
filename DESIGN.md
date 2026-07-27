@@ -217,7 +217,7 @@ now; cutover happens **per page** as each is finished.
 | Phase | | Status |
 |---|---|---|
 | 0 | Shared chrome + shared data includes | **done** |
-| 0.5 | Onboarding states in v7 (`onboard`, `gated`) | blocker for root swap |
+| 0.5 | Onboarding states in v7 (`onboard`, `gated`) | **done** |
 | 1 | Swap `/` to v7 | |
 | 2 | `/list/` — immediately after, same journey | |
 | 3 | `/posts/`, `/about/` | |
@@ -246,9 +246,11 @@ becomes `/` when the root swaps. Nothing else needs editing.
   through the conversion; only their markup is restyled. Rewriting working
   upload / autosave / draft logic is the highest-risk change available for no
   user-visible gain. Revisit once everything is on v7 and stable.
-- The **signup SQL injection** in `dashboard/signup.php` (string interpolation
-  rather than bound parameters) will be touched during the auth work. Fix it
-  then rather than shipping around it.
+- ~~The **signup SQL injection**~~ — **fixed at Phase 0.5**, along with two
+  worse bugs found beside it. `activateacct` and `updateprof` both took `uid`
+  straight from POST with no session check, so any caller could deactivate an
+  arbitrary account or repoint another member's email at their own. All uid
+  values now come from the session; all queries are bound.
 - `script-jlm.js` and `script.js` retire when the last old page converts,
   taking the `[th1]` console noise with them.
 

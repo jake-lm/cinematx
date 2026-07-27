@@ -282,6 +282,74 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  GATE — onboarding
+//  One calm card with one thing to do. Not the moment for a front page.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: var(--s-7) var(--s-5);
+}
+
+.gate__card {
+  width: min(520px, 100%);
+  padding: var(--s-7);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.gate__step  { @include label(var(--t-3xs), var(--red-hi)); }
+
+.gate__title {
+  margin: var(--s-3) 0 var(--s-3);
+  font-family: var(--f-display);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 22, 'WONK' 1;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.gate__lede {
+  margin: 0 0 var(--s-6);
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.gate__optional {
+  margin: var(--s-6) 0;
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+.gate__optional-head { margin-bottom: var(--s-4); @include label; }
+
+.gate__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+
+.gate__aside {
+  margin: var(--s-6) 0 0;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  a { color: var(--red-hi); &:hover { text-decoration: underline; } }
+}
+
+.gate .btn { margin-top: var(--s-3); padding: var(--s-3) var(--s-5); }
+
+@media (max-width: 560px) {
+  .gate { padding: var(--s-5) var(--s-4); }
+  .gate__card { padding: var(--s-5); }
+  .gate__row { grid-template-columns: 1fr; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
