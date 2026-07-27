@@ -1198,6 +1198,24 @@ button, input, select, textarea {
   padding: var(--s-5);
 }
 
+.lead__art {
+  display: block;
+  margin-bottom: var(--s-4);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.lead__art img {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.lead__art:hover img {
+  opacity: 0.9;
+}
+
 .lead__kicker {
   display: flex;
   gap: var(--s-3);
@@ -1218,6 +1236,15 @@ button, input, select, textarea {
   font-weight: 600;
   font-variation-settings: "SOFT" 22, "WONK" 1;
   line-height: 1.08;
+}
+.lead__title a {
+  color: inherit;
+  text-decoration: none;
+}
+.lead__title a:hover {
+  color: var(--red-hi);
+}
+.lead__title {
   letter-spacing: -0.02em;
   color: var(--text);
 }

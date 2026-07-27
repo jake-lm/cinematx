@@ -161,12 +161,24 @@ require __DIR__ . '/_chrome.php';
           </div>
           <div class="card__body">
             <?php if ($lead): ?>
+            <?php $lead_url = ctx_post_url($lead['id'], $lead['title']); ?>
             <article class="lead">
+              <?php // The image earns its place by replacing the truncated
+                    // excerpt below, not by sitting on top of it — this card
+                    // already overflows its box. A picture teases a piece
+                    // better than four clipped lines of it anyway. ?>
+              <?php if (!empty($lead['image'])): ?>
+              <a class="lead__art" href="<?php echo $e($lead_url); ?>">
+                <?php // Not lazy: this sits near the top of the front page, so deferring
+                    // it only delays the one image the page actually leads with. ?>
+                <img src="/uploads/posts/<?php echo $e($lead['image']); ?>" alt="" />
+              </a>
+              <?php endif; ?>
               <div class="lead__kicker">
                 <span><?php echo $e($lead['type'] ?: 'Essay'); ?></span>
                 <span><?php echo date('j F Y', $lead['edited'] ?: $lead['stamp']); ?></span>
               </div>
-              <h1 class="lead__title"><?php echo $e($lead['title']); ?></h1>
+              <h1 class="lead__title"><a href="<?php echo $e($lead_url); ?>"><?php echo $e($lead['title']); ?></a></h1>
               <?php if (!empty($lead['subtitle'])): ?>
               <p class="lead__deck"><?php echo $e($lead['subtitle']); ?></p>
               <?php endif; ?>
@@ -175,11 +187,13 @@ require __DIR__ . '/_chrome.php';
                 <a href="/users/profile.php?id=<?php echo (int)$lead['uid']; ?>"><?php echo $e($lead['author_name']); ?></a>
                 <?php endif; ?>
               </div>
+              <?php if (empty($lead['image'])): ?>
               <div class="lead__wrap">
                 <div class="lead__body"><?php echo nl2br($e($lead['content'])); ?></div>
                 <div class="lead__fade"></div>
               </div>
-              <div class="lead__foot"><button class="btn btn--quiet" data-open="essay">Read in full</button></div>
+              <?php endif; ?>
+              <div class="lead__foot"><a class="btn btn--quiet" href="<?php echo $e($lead_url); ?>">Read in full</a></div>
             </article>
             <?php endif; ?>
 
@@ -278,24 +292,4 @@ require __DIR__ . '/_chrome.php';
     </div>
   </main>
 
-<?php
-// Page-specific overlay: the lead essay in full.
-if ($lead):
-  ob_start(); ?>
-<div class="sheet" id="sheet-essay">
-  <div class="sheet__head">
-    <span class="sheet__title"><?php echo $e($lead['title']); ?></span>
-    <button class="ibtn sheet__x" data-close title="Close"><i class="fa-solid fa-xmark"></i></button>
-  </div>
-  <div class="sheet__body">
-    <?php if (!empty($lead['subtitle'])): ?><p class="lead__deck"><?php echo $e($lead['subtitle']); ?></p><?php endif; ?>
-    <div class="lead__by">
-      <?php if (!empty($lead['author_name'])): ?><span><?php echo $e($lead['author_name']); ?></span><?php endif; ?>
-      <span><?php echo date('j F Y', $lead['edited'] ?: $lead['stamp']); ?></span>
-    </div>
-    <div class="prose"><?php echo nl2br($e($lead['content'])); ?></div>
-  </div>
-</div>
-<?php $ctx_extra_sheets = ob_get_clean(); endif;
-
-require __DIR__ . '/_foot.php';
+<?php require __DIR__ . '/_foot.php'; ?>

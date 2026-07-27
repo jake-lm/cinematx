@@ -793,6 +793,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .lead { padding: var(--s-5); }
 
+// Fixed height rather than an aspect ratio: the card's height is spoken for by
+// the one-screen layout, so the picture crops to a budget instead of setting
+// one. It stands in for the clipped excerpt when a piece has an image.
+.lead__art {
+  display: block;
+  margin-bottom: var(--s-4);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+
+  img { display: block; width: 100%; height: 132px; object-fit: cover;
+        transition: opacity var(--t-fast) var(--ease); }
+  &:hover img { opacity: 0.9; }
+}
+
 .lead__kicker { display: flex; gap: var(--s-3); margin-bottom: var(--s-3); @include label(var(--t-3xs), var(--red-hi)); }
 
 .lead__title {
@@ -802,6 +817,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 600;
   font-variation-settings: 'SOFT' 22, 'WONK' 1;
   line-height: 1.08;
+
+  // The whole lead points at the article now — title, picture and button.
+  a { color: inherit; text-decoration: none;
+      &:hover { color: var(--red-hi); } }
   letter-spacing: -0.02em;
   color: var(--text);
 }
