@@ -1,7 +1,7 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — front page
-//  Weight order: 1 The List · 2 The Journal · 3 The Theatre · 4 The Room
+//  Weight order: 1 The List · 2 The Journal · 3 The Theatre · 4 The Lobby
 //  The only surface locked to a single screen.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_lib.php';
@@ -43,7 +43,7 @@ $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
 
-$notes   = ctx_room($conn, 10);
+$notes   = ctx_lobby($conn, 10);
 $dir     = ctx_members($conn, 7);
 
 // Shell configuration
@@ -220,11 +220,11 @@ require __DIR__ . '/_chrome.php';
           <?php endif; ?>
         </section>
 
-        <!-- 04 · The Room -->
+        <!-- 04 · The Lobby -->
         <section class="card">
           <div class="card__head">
             <span class="card__n">04</span>
-            <span class="card__title">The Room</span>
+            <span class="card__title">The Lobby</span>
             <a class="card__more" href="/directory"><?php echo $dir['count']; ?> members &rarr;</a>
           </div>
           <div class="card__body">

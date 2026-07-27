@@ -158,9 +158,9 @@ function ctx_journal($conn, $more = 4) {
     return ['lead' => $lead, 'items' => $q->fetchAll(PDO::FETCH_ASSOC)];
 }
 
-// ── 04 · The Room ──────────────────────────────────────────────────────────
+// ── 04 · The Lobby ─────────────────────────────────────────────────────────
 
-function ctx_room($conn, $limit = 10) {
+function ctx_lobby($conn, $limit = 10) {
     $q = $conn->prepare("SELECT p.id, p.uid, p.content, p.stamp, u.name AS author_name
         FROM posts p LEFT JOIN users u ON p.uid = u.id
         WHERE p.active = 1 AND p.type = 'post'

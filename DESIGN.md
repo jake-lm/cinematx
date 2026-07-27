@@ -128,14 +128,14 @@ Settled across sessions. Do not relitigate without a reason.
   room, members. Also stated three times.
 
 **Content model**
-- Weight order is **1 The List · 2 The Journal · 3 The Theatre · 4 The Room**
+- Weight order is **1 The List · 2 The Journal · 3 The Theatre · 4 The Lobby**
   (settled at v7; supersedes the earlier "journal earns the most room").
   Nothing may be isolated — everything stays represented above the fold.
 - The list is a **social surface, not a timetable**. Member-submitted
   screenings sit in the same chronological stream, visibly attributed.
 - Every screening for the window is **on the front page**. The separate
   `/list/` page is optional, never mandatory.
-- The **social layer is prominent** — statuses, the room, who's here.
+- The **social layer is prominent** — statuses, the lobby, who's here.
 
 **Depth**
 - Reached through **overlays that blur the page behind them**. Reading in full
@@ -175,7 +175,7 @@ does not transfer to a repertory city.
 
 ## v7 — weight order
 
-Settled ranking: **1 The List · 2 The Journal · 3 The Theatre · 4 The Room.**
+Settled ranking: **1 The List · 2 The Journal · 3 The Theatre · 4 The Lobby.**
 
 The reason the list leads is **cadence**. Screenings change every day; essays
 change weekly at best. The thing that makes the site a daily habit has to be

@@ -26,7 +26,7 @@ $q = $conn->prepare(
 $q->execute([':uid' => $profile_id]);
 $writing = $q->fetchAll(PDO::FETCH_ASSOC);
 
-// Their notes in the room.
+// Their notes in the lobby.
 $q = $conn->prepare(
   "SELECT p.id, p.uid, p.content, p.stamp FROM posts p
    WHERE p.active = 1 AND p.uid = :uid AND p.type = 'post'
@@ -120,7 +120,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
           <?php if ($notes): ?>
           <div class="day__label" style="margin-top:var(--s-7);">
-            <span class="day__name">From the room</span>
+            <span class="day__name">From the lobby</span>
             <span class="day__rule"></span>
           </div>
           <div class="profile__notes">
