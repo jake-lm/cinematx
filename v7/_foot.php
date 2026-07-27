@@ -39,7 +39,10 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
     $err = $_GET['error'] ?? null;
     $msg = ['100' => 'Retry your email or password.',
             '102' => 'Registration error.',
-            '104' => 'That email is already registered.'][$err] ?? null;
+            '104' => 'That email is already registered.',
+            '108' => 'That access code is not valid.',
+            '109' => 'Too many failed attempts. Wait fifteen minutes and try again.',
+            '110' => 'Passwords must be at least 8 characters.'][$err] ?? null;
     if ($msg): ?><div class="alert"><?php echo ctx_e($msg); ?></div><?php endif; ?>
 
     <div id="join-step-1">

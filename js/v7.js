@@ -315,7 +315,8 @@
           }
           var msgs = { '102': 'Fill every field and make sure the passwords match.',
                        '104': 'That email is already registered.',
-                       '108': 'Invalid access code.' };
+                       '108': 'Invalid access code.',
+                       '110': 'Passwords must be at least 8 characters.' };
           if (err) { err.textContent = msgs[res && res.error] || 'Something went wrong.'; err.style.display = 'block'; }
           btn.value = label; btn.disabled = false;
         })
