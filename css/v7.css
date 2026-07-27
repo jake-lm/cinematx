@@ -1553,6 +1553,50 @@ button, input, select, textarea {
   color: var(--red-hi);
 }
 
+.shut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  padding: var(--s-3) var(--s-4);
+}
+
+.shut__lede {
+  font-family: var(--f-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shut__text {
+  margin-top: var(--s-2);
+  max-width: 34ch;
+  font-family: var(--f-read);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.shut__text em {
+  font-style: italic;
+  color: var(--red-hi);
+}
+
+.shut__cta {
+  margin-top: var(--s-2);
+}
+
+@media (max-height: 700px) {
+  .shut__text {
+    display: none;
+  }
+}
+.card__more--flat {
+  color: var(--text-4);
+  cursor: default;
+}
+
 .faces {
   display: flex;
   flex-wrap: wrap;

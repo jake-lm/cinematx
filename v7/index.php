@@ -43,7 +43,9 @@ $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
 
-$notes   = ctx_lobby($conn, 10);
+// The Lobby is members-only, so a guest's page never fetches it — the notes
+// are absent from the HTML rather than merely hidden by CSS.
+$notes   = $signed ? ctx_lobby($conn, 10) : [];
 $dir     = ctx_members($conn, 7);
 
 // Shell configuration
@@ -225,7 +227,13 @@ require __DIR__ . '/_chrome.php';
           <div class="card__head">
             <span class="card__n">04</span>
             <span class="card__title">The Lobby</span>
+            <?php // /directory redirects guests to the front page, so it is a
+                  // dead end for them — show the count without the link. ?>
+            <?php if ($signed): ?>
             <a class="card__more" href="/directory"><?php echo $dir['count']; ?> members &rarr;</a>
+            <?php else: ?>
+            <span class="card__more card__more--flat"><?php echo $dir['count']; ?> members</span>
+            <?php endif; ?>
           </div>
           <div class="card__body">
             <?php if ($signed): ?>
@@ -237,7 +245,16 @@ require __DIR__ . '/_chrome.php';
               </div>
             </div>
             <?php else: ?>
-            <p class="pitch">Members keep a running note of what they're watching, and <em>put on their own screenings</em>.</p>
+            <?php // Say what is behind the door and open it, rather than
+                  // showing an empty panel and leaving them to guess. ?>
+            <div class="shut">
+              <p class="shut__lede">The Lobby is for members.</p>
+              <p class="shut__text">
+                What everyone's watching, and <em>screenings members
+                put on themselves</em>.
+              </p>
+              <button class="btn shut__cta" data-open="account">Become a member</button>
+            </div>
             <?php endif; ?>
 
             <div id="notes">

@@ -970,6 +970,53 @@ button, input, select, textarea { font: inherit; color: inherit; }
          line-height: 1.5; color: var(--text-2); border-bottom: 1px solid var(--line);
          em { font-style: italic; color: var(--red-hi); } }
 
+// What a guest sees where the Lobby would be. An empty card reads as broken;
+// a closed door does not. It has to fit the panel at its shortest — the Lobby
+// shares the side column with two other cards, and on a 720px-tall window its
+// body is about 127px, so no icon and tight leading. Overshooting put the call
+// to action below the fold, which is the one thing it cannot afford.
+.shut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+  padding: var(--s-3) var(--s-4);
+}
+
+.shut__lede {
+  font-family: var(--f-display);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shut__text {
+  margin-top: var(--s-2);
+  max-width: 34ch;
+  font-family: var(--f-read);
+  font-size: var(--t-xs);
+  line-height: 1.5;
+  color: var(--text-3);
+  em { font-style: italic; color: var(--red-hi); }
+}
+
+.shut__cta { margin-top: var(--s-2); }
+
+// The index is locked to one screen, so viewport height sets the card height
+// directly. Below this there is not room for all three parts, and the sentence
+// is the one that can go — the heading already says what is happening and the
+// button is the whole point. Better than making someone scroll a panel to
+// reach a call to action.
+@media (max-height: 700px) {
+  .shut__text { display: none; }
+}
+
+// The member count stays informative for a guest without pretending to lead
+// somewhere they can reach.
+.card__more--flat { color: var(--text-4); cursor: default; }
+
 // ── Members ────────────────────────────────────────────────────────────────
 
 .faces { display: flex; flex-wrap: wrap; gap: var(--s-2); }
