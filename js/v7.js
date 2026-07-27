@@ -313,7 +313,6 @@
       post('/dashboard/signup.php?action=signup', new FormData(form))
         .then(function (res) {
           if (res && res.success) {
-            var uid = $('#join-uid'); if (uid) uid.value = res.uid;
             var s1 = $('#join-step-1'), s2 = $('#join-step-2');
             if (s1) s1.style.display = 'none';
             if (s2) s2.style.display = 'block';

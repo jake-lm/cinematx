@@ -42,7 +42,8 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
             '104' => 'That email is already registered.',
             '108' => 'That access code is not valid.',
             '109' => 'Too many failed attempts. Wait fifteen minutes and try again.',
-            '110' => 'Passwords must be at least 8 characters.'][$err] ?? null;
+            '110' => 'Passwords must be at least 8 characters.',
+            '106' => 'Add your name and pick a role.'][$err] ?? null;
     if ($msg): ?><div class="alert"><?php echo ctx_e($msg); ?></div><?php endif; ?>
 
     <div id="join-step-1">
@@ -62,17 +63,33 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
     </div>
 
     <div id="join-step-2" style="display:none;">
+      <?php // Same fields as the onboarding gate in _gate.php. Someone who
+            // fills these in here never has to go find them in the dashboard.
+            //
+            // No uid field: firstcontact derives it from the session and
+            // ignores anything POSTed, so carrying one would only suggest
+            // otherwise to whoever reads this next. ?>
       <form action="/dashboard/signup.php?action=firstcontact" method="post">
-        <input type="hidden" name="uid" id="join-uid" value="" />
         <div class="field"><label class="field__label" for="j-name">Name</label>
-          <input class="field__input" id="j-name" type="text" name="uname" /></div>
+          <input class="field__input" id="j-name" type="text" name="uname" required /></div>
         <div class="field"><label class="field__label" for="j-role">Role</label>
-          <select class="field__input" id="j-role" name="dept">
+          <select class="field__input" id="j-role" name="dept" required>
             <option value="0">Select one</option>
             <?php foreach ($roles as $r): ?><option value="<?php echo ctx_e($r); ?>"><?php echo ctx_e($r); ?></option><?php endforeach; ?>
           </select></div>
+
+        <div class="field__label" style="margin:var(--s-5) 0 var(--s-3);">Optional</div>
+
         <div class="field"><label class="field__label" for="j-lb">Letterboxd</label>
-          <input class="field__input" id="j-lb" type="text" name="lb" placeholder="Optional" /></div>
+          <?php // Username, not a URL — it is interpolated into
+                // letterboxd.com/<lb>/ and handed to the scraper. Pasted URLs
+                // are unpicked server-side, but ask for the right thing first. ?>
+          <input class="field__input" id="j-lb" type="text" name="lb" placeholder="username" /></div>
+        <div class="field"><label class="field__label" for="j-phone">Phone</label>
+          <input class="field__input" id="j-phone" type="tel" name="phone" autocomplete="tel" /></div>
+        <div class="field"><label class="field__label" for="j-site">Website</label>
+          <input class="field__input" id="j-site" type="text" name="website" placeholder="https://" /></div>
+
         <input class="btn btn--block" type="submit" value="Continue" />
       </form>
     </div>

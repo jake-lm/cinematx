@@ -62,6 +62,24 @@ function auth_login($email) {
     $_SESSION['username'] = $email;
 }
 
+/**
+ * Letterboxd stores a bare username: it is interpolated into
+ * letterboxd.com/<lb>/ on the profile and directory, and handed to
+ * fetch_letterboxd_profile(). People paste the whole profile URL, which
+ * silently produced letterboxd.com/https://letterboxd.com/jake// and a scraper
+ * that found nothing. Unpick it rather than blaming the member.
+ */
+function normalize_lb($v) {
+    $v = trim((string)$v);
+    if ($v === '') return null;
+    // Scheme optional: people paste "letterboxd.com/jake" as often as the URL.
+    $v = preg_replace('#^(https?://)?(www\.)?letterboxd\.com/#i', '', $v);
+    $v = ltrim($v, '@/');
+    $v = explode('/', $v)[0];            // drop /films, /list/... tails
+    $v = preg_replace('/[^A-Za-z0-9_]/', '', $v);
+    return $v !== '' ? $v : null;
+}
+
 $action = $_GET['action'] ?? '';
 
 if($action==='login') {
@@ -225,11 +243,11 @@ else if($action==="updateprof") {
   if (!$uid) { header('Location: /?error=100'); exit; }
 
   $email = trim((string)($_POST['email'] ?? ''));
-  $name = $_POST['uname'];
-  $phone = $_POST['phone'];
-  $website = $_POST['website'];
-  $lb = $_POST['lb'];
-  $dept = $_POST['dept'];
+  $name     = $_POST['uname'] ?? '';
+  $phone    = trim((string)($_POST['phone'] ?? '')) ?: null;
+  $website  = trim((string)($_POST['website'] ?? '')) ?: null;
+  $lb       = normalize_lb($_POST['lb'] ?? '');
+  $dept     = $_POST['dept'] ?? '0';
   $position = $_POST['position'] ?? null;
 
   // Nothing stopped two accounts sharing an address, and ctx_me() resolves a
@@ -272,15 +290,12 @@ else if($action==="firstcontact") {
   $uid_q = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
   $uid_q->execute([':email' => $_SESSION['username']]);
   $uid = $uid_q->fetchColumn();
-  $name = $_POST['uname'];
-  $phone = $_POST['phone'];
-  $website = $_POST['website'];
-  $lb = $_POST['lb'];
-  $dept = $_POST['dept'];
+  $name     = trim((string)($_POST['uname'] ?? ''));
+  $phone    = trim((string)($_POST['phone'] ?? '')) ?: null;
+  $website  = trim((string)($_POST['website'] ?? '')) ?: null;
+  $lb       = normalize_lb($_POST['lb'] ?? '');
+  $dept     = $_POST['dept'] ?? '0';
   $position = $_POST['position'] ?? null;
-
-  //echo $dept; echo $position; echo $name;
-  //exit;
 
   if($dept == "0" || $name == null || $name == "") {
     ?>
