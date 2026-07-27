@@ -60,6 +60,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
     <article class="reading">
 
       <div class="reading__kicker">
+        <?php if (!empty($post['featured'])): ?>
+        <span class="pill pill--featured">Featured</span>
+        <?php endif; ?>
         <?php if (!empty($post['type'])): ?>
         <span class="pill"><?php echo $e($post['type']); ?></span>
         <?php endif; ?>

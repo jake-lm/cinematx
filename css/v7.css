@@ -1229,6 +1229,26 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.lead__flag,
+.pill--featured,
+.draft-featured {
+  padding: 2px 6px;
+  border: 1px solid var(--red-hi);
+  border-radius: 3px;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--red-hi);
+  font-variant-numeric: tabular-nums;
+  background: none;
+}
+
+.draft-featured {
+  margin-left: var(--s-2);
+}
+
 .lead__title {
   margin: 0 0 var(--s-3);
   font-family: var(--f-display);

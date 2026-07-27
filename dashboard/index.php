@@ -13,7 +13,7 @@ $me = ctx_me($conn);
 // Signing in and onboarding both live at the root now.
 if (!$me || ctx_state($conn) !== 'member') { header('Location: /'); exit; }
 
-$q = $conn->prepare("SELECT id, title, subtitle, type, stamp, edited, active
+$q = $conn->prepare("SELECT id, title, subtitle, type, stamp, edited, active, featured
                      FROM `posts` WHERE uid = :uid ORDER BY COALESCE(edited, stamp) DESC");
 $q->execute([':uid' => $me['id']]);
 $all_posts   = $q->fetchAll(PDO::FETCH_ASSOC);
@@ -120,6 +120,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="draft-info">
                 <span class="draft-title"><?php echo $post['title'] ? $e($post['title']) : '<em>Untitled</em>'; ?></span>
                 <?php if ($post['type']): ?><span class="draft-type"><?php echo $e($post['type']); ?></span><?php endif; ?>
+                <?php // The checkbox only shows the flag for whichever post is
+                      // open in the editor; this shows it down the whole list. ?>
+                <?php if (!empty($post['featured'])): ?><span class="draft-featured">Featured</span><?php endif; ?>
                 <span class="post-status <?php echo $is_live ? 'status-live' : 'status-draft'; ?>"><?php echo $is_live ? 'live' : 'draft'; ?></span>
                 <span class="draft-date"><?php echo date('j M Y', $post['edited'] ?: $post['stamp']); ?></span>
               </div>

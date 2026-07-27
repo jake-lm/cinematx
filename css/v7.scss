@@ -810,6 +810,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .lead__kicker { display: flex; gap: var(--s-3); margin-bottom: var(--s-3); @include label(var(--t-3xs), var(--red-hi)); }
 
+// The featured marker. Outlined rather than filled, in all three places it
+// appears, so it reads as a state the piece is in rather than a second
+// category competing with the type beside it.
+.lead__flag,
+.pill--featured,
+.draft-featured {
+  padding: 2px 6px;
+  border: 1px solid var(--red-hi);
+  border-radius: 3px;
+  @include label(var(--t-3xs), var(--red-hi));
+  background: none;
+}
+
+.draft-featured { margin-left: var(--s-2); }
+
 .lead__title {
   margin: 0 0 var(--s-3);
   font-family: var(--f-display);
