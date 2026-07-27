@@ -1,6 +1,6 @@
 # Cinema, TX — Design Brief & Accumulated Learnings
 
-Living document. Current as of **v6**.
+Living document. Current as of **v7**.
 (`REDESIGN.md` is the v2-era analysis — superseded, kept for history.)
 
 ---
@@ -14,7 +14,8 @@ Living document. Current as of **v6**.
 | v3 | `redesign-v3` | `/v3/` | Brutalist. **Claustrophobic** |
 | v4 | `redesign-v4` | `/v4/` | Contained journal. "Prebuilt WordPress site" |
 | v5 | `redesign-v5` | `/v5/` | Broadsheet, one viewport. **Claustrophobic again** |
-| v6 | `redesign-v6` | `/v6/` | Modern app. **Closest so far** |
+| v6 | `redesign-v6` | `/v6/` | Modern app. Hierarchy solved |
+| v7 | `redesign-v7` | `/v7/` | **The List leads.** Poster grid, view modes |
 
 Every version is preserved. The live site has never been modified.
 
@@ -107,7 +108,8 @@ Settled across sessions. Do not relitigate without a reason.
 **Identity**
 - Accent is **`#922E32`**, reclaimed after being given freedom to drop it.
   On dark it needs a lifted variant (`--red-hi`) for legible text.
-- Dark is the **default**; light is a real option, not an afterthought.
+- **Paper is the default; dark is a real option.** (Reversed at v7 — v6 had
+  this the other way round.)
 - The **theatre is always dark**, in both modes, on tokens that never flip.
 - The **multilingual welcome** stays. Ten languages, ten-second cadence.
   It is the one piece of interface that simply has personality.
@@ -125,10 +127,13 @@ Settled across sessions. Do not relitigate without a reason.
   room, members. Also stated three times.
 
 **Content model**
-- Three co-equal pillars: **the journal, the list, the cinema.** The journal
-  earns the most room, but the others must not be isolated.
+- Weight order is **1 The List · 2 The Journal · 3 The Theatre · 4 The Room**
+  (settled at v7; supersedes the earlier "journal earns the most room").
+  Nothing may be isolated — everything stays represented above the fold.
 - The list is a **social surface, not a timetable**. Member-submitted
   screenings sit in the same chronological stream, visibly attributed.
+- Every screening for the window is **on the front page**. The separate
+  `/list/` page is optional, never mandatory.
 - The **social layer is prominent** — statuses, the room, who's here.
 
 **Depth**
@@ -160,7 +165,46 @@ reproduces the v3 problem exactly.
 **v6** — Hierarchy plus app-compact scale resolves the tension between
 "everything above the fold" and "not overwhelming". This is the direction.
 
+**v7** — The list can lead without becoming a wall, because posters carry
+weight without demanding to be read. Also: check the data before adopting
+another site's mechanic — multi-showtime collapsing is a Screen Slate win that
+does not transfer to a repertory city.
+
 ---
+
+## v7 — weight order
+
+Settled ranking: **1 The List · 2 The Journal · 3 The Theatre · 4 The Room.**
+
+The reason the list leads is **cadence**. Screenings change every day; essays
+change weekly at best. The thing that makes the site a daily habit has to be
+the thing that is different every day. The journal is the reason to stay once
+you arrive, not the reason to arrive.
+
+**Why a list can lead without becoming a wall:** posters carry visual weight
+without demanding to be *read*. A grid of artwork dominates the page while the
+journal stays readable beside it — they dominate on different axes. That is
+what lets a four-level hierarchy sit above the fold without reproducing the
+v3/v5 problem.
+
+Mechanics decided:
+- **View modes** — poster grid (default) and compact rows, persisted.
+- **Venue filter** — chips. Austin has three venues, so *grouping* by venue
+  buys little but *filtering* is genuinely useful (AFS is 65% of listings).
+- **Every screening is in the DOM.** The panel scrolls internally, so nothing
+  hides behind a required navigation and the page still never scrolls. The
+  `/list/` page is optional, never mandatory.
+- **Series parsing.** Venue titles bake the programme into the title
+  (`Discovery Zone: MIRACLE MILE`). Stripping it took poster coverage from
+  89% to **100%** and recovered the series as real metadata. TMDB arbitrates
+  the ambiguity — a prefix is only treated as a series when the raw title
+  failed to match and the cleaned one succeeded, so a genuine colon title like
+  `BLACK IS BEAUTIFUL: THE KWAME BRATHWAITE STORY` is left alone.
+
+Rejected after checking the data: **multi-showtime collapsing.** It is a large
+win for Screen Slate because NYC first-run houses play a film five times a
+day. Austin's venues are repertory — only six titles repeat across a week.
+The mechanic does not pay for itself here.
 
 ## Taste profile
 
