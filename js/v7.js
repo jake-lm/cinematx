@@ -328,6 +328,117 @@
 
   // ══ Theatre ══════════════════════════════════════════════════════════════
 
+  // The sync itself, shared by the overlay on the front page and the standalone
+  // theatre pages. Carried over from theatre_1(): park pre-show, seek to
+  // elapsed, muted autoplay, correct drift beyond 2s every 3s, snap back on
+  // scrub. Written once so the two surfaces can never drift apart.
+
+  function startSync(playerId, stageId) {
+    var showtime = window.CTX_SHOWTIME || 0,
+        dur      = window.CTX_DUR || 0,
+        filename = window.CTX_FILE || '';
+    if (!showtime || !filename || typeof videojs === 'undefined') return;
+
+    var player = videojs(playerId);
+
+    player.ready(function () {
+      var diff = Math.floor(Date.now() / 1000 - showtime);
+      if (diff < 0 || diff >= dur) return;   // pre-show, or over
+
+      // The markup says preload="none" so the front page never pulls a 250MB
+      // film just because the theatre card is on screen. The cost is that the
+      // browser then fetches nothing on its own — loadedmetadata never fires
+      // and everything below waits on an event that will not come. Now that
+      // there is something to play, ask for the metadata.
+      player.preload('auto');
+
+      // stream.php serves HTTP range requests — required for seeking.
+      player.src({ type: 'video/mp4', src: '/motw/stream.php?f=' + encodeURIComponent(filename) });
+
+      function seek() {
+        player.muted(true);
+        player.currentTime(Math.floor(Date.now() / 1000 - showtime));
+        player.one('seeked', function () {
+          var done = function () {
+            setTimeout(function () { if (player.muted()) nudge(player, stageId); }, 500);
+          };
+          // Only some techs return a promise from play().
+          var p = player.play();
+          if (p && p.then) p.then(done).catch(function () { player.muted(false); });
+          else done();
+        });
+      }
+
+      // On a warm cache the metadata can already be in hand, and one() would
+      // then wait for an event that has been and gone.
+      if (player.readyState() >= 1) seek();
+      else player.one('loadedmetadata', seek);
+    });
+
+    // Pre-show: reload when the showtime arrives.
+    if (Date.now() / 1000 < showtime) {
+      var wait = setInterval(function () {
+        if (Date.now() / 1000 >= showtime) { clearInterval(wait); location.reload(); }
+      }, 5000);
+    }
+
+    setInterval(function () {
+      var d = Math.floor(Date.now() / 1000 - showtime);
+      if (d < 0 || d >= dur) return;
+      if (Math.abs(Math.floor(player.currentTime()) - d) > 2) player.currentTime(d);
+    }, 3000);
+
+    var el = document.getElementById(playerId);
+    if (el) ['mouseup', 'touchend'].forEach(function (evt) {
+      el.addEventListener(evt, function () {
+        var d = Math.floor(Date.now() / 1000 - showtime);
+        if (d >= 0 && d < dur) player.currentTime(d);   // the showtime is the showtime
+      });
+    });
+
+    controls(player);
+    return player;
+  }
+
+  function nudge(player, stageId) {
+    var stage = document.getElementById(stageId || 'theatre-stage');
+    if (!stage) return;
+    var b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = 'Click to unmute';
+    b.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:20;';
+    stage.appendChild(b);
+    b.addEventListener('click', function () { player.muted(false); b.remove(); });
+  }
+
+  function controls(player) {
+    var mute = $('#ctrl-mute'), vol = $('#ctrl-vol'), full = $('#ctrl-full');
+    if (mute) mute.addEventListener('click', function () {
+      var m = !player.muted(); player.muted(m);
+      mute.innerHTML = '<i class="fa-solid fa-volume-' + (m ? 'xmark' : 'high') + '"></i>';
+    });
+    if (vol) vol.addEventListener('input', function () {
+      player.volume(parseFloat(vol.value));
+      if (parseFloat(vol.value) > 0 && player.muted()) {
+        player.muted(false);
+        if (mute) mute.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+      }
+    });
+    if (full) full.addEventListener('click', function () {
+      if (player.isFullscreen()) player.exitFullscreen(); else player.requestFullscreen();
+    });
+  }
+
+  // ══ Screening room (/th1/, /th2/) ════════════════════════════════════════
+  // A page rather than an overlay, so playback starts on load.
+
+  function initScreening() {
+    if (!$('#screening-player')) return;
+    startSync('screening-player', 'screening-stage');
+  }
+
+  // ══ Theatre overlay (front page) ═════════════════════════════════════════
+
   function initTheatre() {
     var shell = $('#theatre');
     if (!shell) return;
@@ -335,7 +446,7 @@
 
     function open() {
       shell.classList.add('is-on');
-      if (!started) { started = true; play(); }
+      if (!started) { started = true; startSync('theatre-player', 'theatre-stage'); }
     }
     function close() { shell.classList.remove('is-on'); }
 
@@ -344,84 +455,8 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && shell.classList.contains('is-on')) close();
     });
-
-    function play() {
-      var showtime = window.CTX_SHOWTIME || 0,
-          dur      = window.CTX_DUR || 0,
-          filename = window.CTX_FILE || '';
-      if (!showtime || !filename || typeof videojs === 'undefined') return;
-
-      var player = videojs('theatre-player');
-
-      player.ready(function () {
-        var diff = Math.floor(Date.now() / 1000 - showtime);
-        if (diff < 0 || diff >= dur) return;   // pre-show, or over
-
-        // stream.php serves HTTP range requests — required for seeking.
-        player.src({ type: 'video/mp4', src: '/motw/stream.php?f=' + encodeURIComponent(filename) });
-
-        player.one('loadedmetadata', function () {
-          player.muted(true);
-          player.currentTime(Math.floor(Date.now() / 1000 - showtime));
-          player.one('seeked', function () {
-            player.play().then(function () {
-              setTimeout(function () { if (player.muted()) nudge(player); }, 500);
-            }).catch(function () { player.muted(false); });
-          });
-        });
-      });
-
-      if (Date.now() / 1000 < showtime) {
-        var wait = setInterval(function () {
-          if (Date.now() / 1000 >= showtime) { clearInterval(wait); location.reload(); }
-        }, 5000);
-      }
-
-      setInterval(function () {
-        var d = Math.floor(Date.now() / 1000 - showtime);
-        if (d < 0 || d >= dur) return;
-        if (Math.abs(Math.floor(player.currentTime()) - d) > 2) player.currentTime(d);
-      }, 3000);
-
-      var el = $('#theatre-player');
-      if (el) ['mouseup', 'touchend'].forEach(function (evt) {
-        el.addEventListener(evt, function () {
-          var d = Math.floor(Date.now() / 1000 - showtime);
-          if (d >= 0 && d < dur) player.currentTime(d);   // the showtime is the showtime
-        });
-      });
-
-      controls(player);
-    }
-
-    function nudge(player) {
-      var stage = $('#theatre-stage'); if (!stage) return;
-      var b = document.createElement('button');
-      b.className = 'btn';
-      b.textContent = 'Click to unmute';
-      b.style.cssText = 'position:absolute;bottom:20px;right:20px;z-index:20;';
-      stage.appendChild(b);
-      b.addEventListener('click', function () { player.muted(false); b.remove(); });
-    }
-
-    function controls(player) {
-      var mute = $('#ctrl-mute'), vol = $('#ctrl-vol'), full = $('#ctrl-full');
-      if (mute) mute.addEventListener('click', function () {
-        var m = !player.muted(); player.muted(m);
-        mute.innerHTML = '<i class="fa-solid fa-volume-' + (m ? 'xmark' : 'high') + '"></i>';
-      });
-      if (vol) vol.addEventListener('input', function () {
-        player.volume(parseFloat(vol.value));
-        if (parseFloat(vol.value) > 0 && player.muted()) {
-          player.muted(false);
-          if (mute) mute.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
-        }
-      });
-      if (full) full.addEventListener('click', function () {
-        if (player.isFullscreen()) player.exitFullscreen(); else player.requestFullscreen();
-      });
-    }
   }
+
 
   // ══ Copy link ════════════════════════════════════════════════════════════
   // Replaces the old Instagram share button, which pointed at "#" — Instagram
@@ -521,10 +556,145 @@
     });
   }
 
+  // ══ Hovercard ════════════════════════════════════════════════════════════
+  // Wikipedia's page previews, generalised. Any element carrying data-hover
+  // gets one; the JSON inside names six slots and the card lays out around
+  // whichever are present, so it has no idea what a film is and the next
+  // thing that wants a preview only has to emit the attribute.
+  //
+  // Desktop only, and not by choice of breakpoint — a preview that needs a
+  // hover cannot be reached without a pointer, and on touch the same gesture
+  // is a tap, which should follow the link.
+
+  var HOVER_IN  = 420;   // dwell before showing — a glance passing over is not a request
+  var HOVER_OUT = 160;   // grace on the way out, so the gap to the card is crossable
+
+  function initHovercard() {
+    if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+    var card = null, inT = null, outT = null, anchor = null;
+
+    function build() {
+      if (card) return card;
+      card = document.createElement('div');
+      card.className = 'hovercard';
+      card.addEventListener('mouseenter', function () { clearTimeout(outT); });
+      card.addEventListener('mouseleave', leave);
+      document.body.appendChild(card);
+      return card;
+    }
+
+    function paint(d) {
+      var h = '';
+      if (d.img) h += '<span class="hovercard__art"><img src="' + esc(d.img) + '" alt="" /></span>';
+      h += '<span class="hovercard__in">';
+      if (d.title) h += '<span class="hovercard__title">' + esc(d.title) + '</span>';
+      if (d.meta)  h += '<span class="hovercard__meta">'  + esc(d.meta)  + '</span>';
+      if (d.sub)   h += '<span class="hovercard__sub">'   + esc(d.sub)   + '</span>';
+      if (d.body)  h += '<span class="hovercard__body">'  + esc(d.body)  + '</span>';
+
+      var href = safeHref(d.link && d.link.href);
+      if (d.foot || href) {
+        h += '<span class="hovercard__foot">';
+        h += '<span>' + esc(d.foot || '') + '</span>';
+        if (href) {
+          h += '<a class="hovercard__link" href="' + esc(href) + '" target="_blank" rel="noopener">'
+             + esc((d.link.label || 'More')) + ' <i class="fa-solid fa-arrow-up-right-from-square"></i></a>';
+        }
+        h += '</span>';
+      }
+      h += '</span>';
+      card.innerHTML = h;
+    }
+
+    // This slot becomes an href in markup we build ourselves, so it is the one
+    // field that has to be more than escaped — anything that is not plainly
+    // http(s) is dropped rather than rendered.
+    function safeHref(u) {
+      if (typeof u !== 'string') return null;
+      return /^https?:\/\//i.test(u.trim()) ? u.trim() : null;
+    }
+
+    // Below the anchor and left-aligned by default, flipping on whichever axis
+    // runs out of room. Measured after paint, since the height depends on how
+    // much plot there is.
+    function place(el) {
+      var r  = el.getBoundingClientRect();
+      var cw = card.offsetWidth, ch = card.offsetHeight;
+      var pad = 10;
+
+      var left = r.left;
+      if (left + cw > window.innerWidth - pad) left = r.right - cw;
+      if (left < pad) left = pad;
+
+      var top = r.bottom + 8;
+      if (top + ch > window.innerHeight - pad) {
+        var above = r.top - ch - 8;
+        top = above >= pad ? above : Math.max(pad, window.innerHeight - ch - pad);
+      }
+
+      card.style.left = Math.round(left + window.scrollX) + 'px';
+      card.style.top  = Math.round(top  + window.scrollY) + 'px';
+    }
+
+    function show(el) {
+      var raw = el.getAttribute('data-hover');
+      if (!raw) return;
+      var d;
+      try { d = JSON.parse(raw); } catch (e) { return; }
+
+      anchor = el;
+      build();
+      paint(d);
+      card.classList.add('is-measuring');   // laid out but not yet visible
+      place(el);
+      card.classList.remove('is-measuring');
+      card.classList.add('is-on');
+    }
+
+    function hide() {
+      if (card) { card.classList.remove('is-on'); card.innerHTML = ''; }
+      anchor = null;
+    }
+
+    function leave() {
+      clearTimeout(inT);
+      outT = setTimeout(hide, HOVER_OUT);
+    }
+
+    document.addEventListener('mouseover', function (e) {
+      var el = e.target.closest ? e.target.closest('[data-hover]') : null;
+      if (!el || el === anchor) return;
+      clearTimeout(inT); clearTimeout(outT);
+      inT = setTimeout(function () { show(el); }, HOVER_IN);
+    });
+
+    document.addEventListener('mouseout', function (e) {
+      var el = e.target.closest ? e.target.closest('[data-hover]') : null;
+      if (!el) return;
+      // Moving between children of the same anchor is not leaving it.
+      if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+      if (e.relatedTarget && card && card.contains(e.relatedTarget)) return;
+      leave();
+    });
+
+    // A card pinned to an element that has moved is worse than no card.
+    window.addEventListener('scroll', function () { clearTimeout(inT); hide(); }, true);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { clearTimeout(inT); hide(); } });
+    // A click anywhere dismisses — except inside the card, which now holds a
+    // link. Tearing that out from under the cursor mid-click is both hostile
+    // and a race with the navigation it was supposed to start.
+    document.addEventListener('click', function (e) {
+      if (card && card.contains(e.target)) return;
+      clearTimeout(inT); hide();
+    });
+  }
+
   function boot() {
     initWelcome(); initTheme(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
-    initCopyLink(); initDirectory(); initTheatre();
+    initCopyLink(); initDirectory(); initTheatre(); initScreening();
+    initHovercard();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

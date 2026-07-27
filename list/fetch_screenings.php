@@ -23,10 +23,19 @@ function fetch_all_screenings($conn, $now, $end) {
     $all_films = [];
     foreach ($sources as $src) {
         foreach ($src['films'] as $film) {
-            $film['venue']  = $src['venue'];
-            $film['poster'] = fetch_tmdb_poster($film['title']);
+            $film['venue'] = $src['venue'];
             $film['source'] = 'official';
-            $all_films[]    = $film;
+
+            $tmdb = fetch_tmdb($film['title']);
+            $film['poster']   = $tmdb['poster'];
+            $film['year']     = $tmdb['year'];
+            $film['runtime']  = $tmdb['runtime'];
+            $film['overview'] = $tmdb['overview'];
+            $film['genres']   = $tmdb['genres'];
+            $film['director'] = $tmdb['director'];
+            $film['wiki']     = $tmdb['wiki'];
+
+            $all_films[] = $film;
         }
     }
 
@@ -45,6 +54,14 @@ function fetch_all_screenings($conn, $now, $end) {
             'poster'    => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
             'url'       => '/events/?id=' . $event['id'],
             'source'    => 'user',
+            // Members submit a title and a time, not a filmography. The
+            // renderer omits whatever is null rather than showing a gap.
+            'year'      => null,
+            'runtime'   => null,
+            'overview'  => null,
+            'genres'    => null,
+            'director'  => null,
+            'wiki'      => null,
         ];
     }
 

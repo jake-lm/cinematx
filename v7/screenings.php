@@ -65,21 +65,49 @@ function ctx_enrich(array $films) {
         $raw = (string)($f['title'] ?? '');
         $f['series']        = null;
         $f['display_title'] = $raw;
+        $f['year']          = $f['year']     ?? null;
+        $f['runtime']       = $f['runtime']  ?? null;
+        $f['overview']      = $f['overview'] ?? null;
+        $f['genres']        = $f['genres']   ?? null;
+        $f['director']      = $f['director'] ?? null;
+        $f['wiki']          = $f['wiki']     ?? null;
+
+        // A year printed in the listing itself is the fallback, not the
+        // preference — TMDB knows the film, the venue is describing it.
+        if (!$f['year']) $f['year'] = ctx_year($raw);
 
         if (!empty($f['poster'])) continue;              // raw matched — leave it alone
-        if (!function_exists('fetch_tmdb_poster')) continue;
+        if (!function_exists('fetch_tmdb')) continue;
 
         $clean = ctx_clean_title($raw);
         if ($clean === '' || strcasecmp($clean, $raw) === 0) continue;
 
-        $poster = fetch_tmdb_poster($clean, ctx_year($raw));
-        if ($poster) {
-            $f['poster']        = $poster;
+        $tmdb = fetch_tmdb($clean, ctx_year($raw));
+        if (!empty($tmdb['poster'])) {
+            $f['poster']        = $tmdb['poster'];
             $f['display_title'] = $clean;
             $f['series']        = ctx_series($raw);      // now safe to trust
+            // The cleaned lookup is the one that matched, so its metadata is
+            // the metadata for this film.
+            foreach (['year', 'runtime', 'overview', 'genres', 'director', 'wiki'] as $k) {
+                if (!empty($tmdb[$k])) $f[$k] = $tmdb[$k];
+            }
         }
     }
     return $films;
+}
+
+/**
+ * The quiet metadata cluster under a title: year, runtime, venue.
+ * Anything TMDB had no answer for is simply absent — a listing should never
+ * show a dash standing in for a fact nobody has.
+ */
+function ctx_bits($s, $venue = true) {
+    $bits = [];
+    if (!empty($s['year']))    $bits[] = (string)$s['year'];
+    if (!empty($s['runtime'])) $bits[] = (int)$s['runtime'] . 'm';
+    if ($venue && !empty($s['venue'])) $bits[] = $s['venue'];
+    return $bits;
 }
 
 /** Distinct venues present, for the filter chips. */
@@ -106,6 +134,47 @@ function ctx_venue_short($v) {
     }
     $short = trim(preg_replace('/\s*(Theatre|Theater|Cinema|Film Club)$/i', '', $v));
     return $short !== '' ? $short : $v;                    // Hyperreal Film Club → Hyperreal
+}
+
+/**
+ * The `data-hover` attribute the hovercard reads, as a ready-to-echo string.
+ *
+ * Deliberately generic — six named slots, no notion of what a film is — so the
+ * same primitive can preview a member, a job posting or an essay later without
+ * the JS learning anything new. Empty slots are dropped and the card lays out
+ * around whatever survives.
+ *
+ *   img  small artwork          title  the heading
+ *   meta one quiet line         sub    a second quiet line
+ *   body the paragraph          foot   the bottom rule line
+ *   link {href, label} — sits opposite foot on that same rule
+ */
+function ctx_hover(array $slots) {
+    $slots = array_filter($slots, fn($v) => $v !== null && $v !== '' && $v !== []);
+
+    // A card that only repeats what is already on screen is worse than none,
+    // so the paragraph is what earns it. No plot, no preview.
+    if (empty($slots['body'])) return '';
+
+    // htmlspecialchars rather than ctx_e(): every other function in this file
+    // stands on its own, and one convenience call would tie it to _lib.php.
+    $json = json_encode($slots, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return ' data-hover="' . htmlspecialchars($json, ENT_QUOTES, 'UTF-8') . '"';
+}
+
+/** The screening flavour of the above. */
+function ctx_screening_hover($s) {
+    $sub = array_filter([$s['director'] ?? null, $s['genres'] ?? null]);
+
+    return ctx_hover([
+        'img'   => $s['poster'] ?? null,
+        'title' => $s['display_title'] ?? ($s['title'] ?? null),
+        'meta'  => implode(' · ', ctx_bits($s, false)),
+        'sub'   => implode(' · ', $sub),
+        'body'  => $s['overview'] ?? null,
+        'foot'  => trim(($s['venue'] ?? '') . (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp'])), ' ·'),
+        'link'  => empty($s['wiki']) ? null : ['href' => $s['wiki'], 'label' => 'Wikipedia'],
+    ]);
 }
 
 /** Stable slug used for filter matching in the client. */

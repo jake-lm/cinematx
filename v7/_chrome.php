@@ -27,6 +27,8 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-film"></i></span><span class="txt">Tonight</span></a>
     <a class="rail__link<?php echo $on('list'); ?>" href="/list">
       <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">The List</span></a>
+    <a class="rail__link<?php echo $on('theatre'); ?>" href="/th1">
+      <span class="ico"><i class="fa-solid fa-clapperboard"></i></span><span class="txt">Theatre</span></a>
     <a class="rail__link<?php echo $on('about'); ?>" href="/about">
       <span class="ico"><i class="fa-solid fa-circle-info"></i></span><span class="txt">About</span></a>
 

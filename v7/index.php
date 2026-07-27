@@ -99,7 +99,7 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="shot<?php echo $member ? ' shot--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"<?php echo ctx_screening_hover($s); ?>
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="shot__art">
                 <?php if (!empty($s['poster'])): ?>
@@ -111,7 +111,9 @@ require __DIR__ . '/_chrome.php';
               </span>
               <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
               <span class="shot__venue">
-                <?php if ($member): ?><span class="shot__by">&#9679; By a member</span><?php else: ?><?php echo $e($s['venue']); ?><?php endif; ?>
+                <?php // Abbreviated venue, so year and runtime fit beside it. ?>
+                <?php if ($member): ?><span class="shot__by">&#9679; By a member</span>
+                <?php else: ?><?php echo $e(implode(' · ', array_merge([ctx_venue_short($s['venue'])], ctx_bits($s, false)))); ?><?php endif; ?>
               </span>
             </a>
             <?php endforeach; ?>
@@ -125,14 +127,14 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="line<?php echo $member ? ' line--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"<?php echo ctx_screening_hover($s); ?>
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
               <span>
                 <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
                 <span class="line__sub">
                   <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
-                  <?php echo $e($s['venue']); ?><?php echo $other ? ' · ' . date('D j M', $s['timestamp']) : ''; ?>
+                  <?php echo $e(implode(' · ', ctx_bits($s))); ?><?php echo $other ? ' · ' . date('D j M', $s['timestamp']) : ''; ?>
                 </span>
               </span>
               <span class="line__venue"><?php echo $other ? date('D', $s['timestamp']) : 'Today'; ?></span>

@@ -50,7 +50,8 @@ function ctx_screening($s, $view) {
     $href   = !empty($s['url']) ? $s['url'] : '#';
     $ext    = $member ? '' : ' target="_blank" rel="noopener"';
     $attrs  = 'data-venue="' . $e(ctx_slug($s['venue'])) . '"'
-            . ' data-source="' . ($member ? 'user' : 'venue') . '"';
+            . ' data-source="' . ($member ? 'user' : 'venue') . '"'
+            . ctx_screening_hover($s);
 
     if ($view === 'grid') { ?>
       <a class="shot<?php echo $member ? ' shot--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>
@@ -64,7 +65,10 @@ function ctx_screening($s, $view) {
         </span>
         <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
         <span class="shot__venue">
-          <?php if ($member): ?><span class="shot__by">&#9679; By a member</span><?php else: ?><?php echo $e($s['venue']); ?><?php endif; ?>
+          <?php // Poster cards are ~120px wide, so the venue is abbreviated here
+                // to leave room for the year and runtime beside it. ?>
+          <?php if ($member): ?><span class="shot__by">&#9679; By a member</span>
+          <?php else: ?><?php echo $e(implode(' · ', array_merge([ctx_venue_short($s['venue'])], ctx_bits($s, false)))); ?><?php endif; ?>
         </span>
       </a>
     <?php } else { ?>
@@ -74,7 +78,7 @@ function ctx_screening($s, $view) {
           <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
           <span class="line__sub">
             <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
-            <?php echo $e($s['venue']); ?>
+            <?php echo $e(implode(' · ', ctx_bits($s))); ?>
           </span>
         </span>
         <span class="line__venue"><?php echo date('D', $s['timestamp']); ?></span>

@@ -9,11 +9,14 @@
 //    $ctx_video   bool     load video.js and expose the theatre sync globals
 //    $ctx_theatre array    from ctx_theatre(); required when $ctx_video
 //    $ctx_meta    string   extra <head> markup — Open Graph, canonical, etc.
+//    $ctx_shell   string   extra class on .app — the screening rooms use this
+//                          to take the whole shell dark, chrome included
 // ═══════════════════════════════════════════════════════════════════════════
 
 $ctx_title  = $ctx_title  ?? 'Cinema, TX';
 $ctx_scroll = $ctx_scroll ?? false;
 $ctx_video  = $ctx_video  ?? false;
+$ctx_shell  = $ctx_shell  ?? '';
 $root       = dirname(__DIR__);
 ?>
 <!doctype html>
@@ -42,4 +45,4 @@ $root       = dirname(__DIR__);
 </head>
 <body>
 
-<div class="app<?php echo $ctx_scroll ? ' app--scroll' : ''; ?>" id="app">
+<div class="app<?php echo $ctx_scroll ? ' app--scroll' : ''; ?><?php echo $ctx_shell ? ' ' . $ctx_shell : ''; ?>" id="app">

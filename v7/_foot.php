@@ -6,11 +6,16 @@
 //  in the chrome on every page rather than taking space in the content.
 //
 //  Set before including:
-//    $ctx_video   bool   emit the full-screen theatre
+//    $ctx_video   bool   the page loads video.js and the sync globals
 //    $ctx_theatre array  from ctx_theatre(); required when $ctx_video
+//    $ctx_overlay bool   emit the full-screen theatre overlay (default true).
+//                        /th1/ and /th2/ mount their own player in the canvas,
+//                        so they load video.js but suppress the overlay — two
+//                        players would otherwise fight over the control ids.
 // ═══════════════════════════════════════════════════════════════════════════
 
-$ctx_video = $ctx_video ?? false;
+$ctx_video   = $ctx_video   ?? false;
+$ctx_overlay = $ctx_overlay ?? true;
 $signed    = ctx_me($conn) !== null;
 ?>
 </div><!-- /.app -->
@@ -81,7 +86,7 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
 </aside>
 <?php endif; ?>
 
-<?php if ($ctx_video):
+<?php if ($ctx_video && $ctx_overlay):
   $film    = $ctx_theatre['film']    ?? null;
   $show_ts = $ctx_theatre['show_ts'] ?? 0;
 ?>
@@ -91,7 +96,8 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
     <button class="theatre__close" id="theatre-close">Close</button>
   </div>
   <div class="theatre__stage" id="theatre-stage">
-    <video id="theatre-player" class="video-js" oncontextmenu="return false;" preload="none"
+    <video id="theatre-player" class="video-js" oncontextmenu="return false;"
+           preload="none" muted playsinline
            poster="<?php echo $film ? '/motw/' . ctx_e($film['poster']) . '.png' : ''; ?>"></video>
   </div>
   <div class="theatre__foot">
