@@ -1,11 +1,13 @@
 <?php
-function fetch_hyperreal_films() {
-    $cache_file = __DIR__ . '/cache_hyperreal.json';
-    $cache_ttl  = 6 * 3600;
+require_once __DIR__ . '/cache.php';
 
-    if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {
-        return json_decode(file_get_contents($cache_file), true) ?: [];
-    }
+// The scrape itself. Caching, locking and the stale-beats-empty fallback
+// all live in ctx_cached_scrape(); this just fetches and parses.
+function fetch_hyperreal_films($force = false) {
+    return ctx_cached_scrape('cache_hyperreal.json', 6 * 3600, 'fetch_hyperreal_films_scrape', $force);
+}
+
+function fetch_hyperreal_films_scrape() {
 
     // Determine which month(s) to fetch — if the next 7 days spill into the next month, grab both
     $now    = time();
@@ -90,6 +92,5 @@ function fetch_hyperreal_films() {
         }
     }
 
-    file_put_contents($cache_file, json_encode($films));
     return $films;
 }

@@ -1,11 +1,13 @@
 <?php
-function fetch_afs_films() {
-    $cache_file = __DIR__ . '/cache_afs.json';
-    $cache_ttl  = 6 * 3600;
+require_once __DIR__ . '/cache.php';
 
-    if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {
-        return json_decode(file_get_contents($cache_file), true) ?: [];
-    }
+// The scrape itself. Caching, locking and the stale-beats-empty fallback
+// all live in ctx_cached_scrape(); this just fetches and parses.
+function fetch_afs_films($force = false) {
+    return ctx_cached_scrape('cache_afs.json', 6 * 3600, 'fetch_afs_films_scrape', $force);
+}
+
+function fetch_afs_films_scrape() {
 
     $ch = curl_init('https://www.austinfilm.org/calendar/');
     curl_setopt_array($ch, [
@@ -72,6 +74,5 @@ function fetch_afs_films() {
         }
     }
 
-    file_put_contents($cache_file, json_encode($films));
     return $films;
 }

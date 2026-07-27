@@ -1,11 +1,13 @@
 <?php
-function fetch_paramount_films() {
-    $cache_file = __DIR__ . '/cache_paramount.json';
-    $cache_ttl  = 6 * 3600;
+require_once __DIR__ . '/cache.php';
 
-    if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_ttl) {
-        return json_decode(file_get_contents($cache_file), true) ?: [];
-    }
+// The scrape itself. Caching, locking and the stale-beats-empty fallback
+// all live in ctx_cached_scrape(); this just fetches and parses.
+function fetch_paramount_films($force = false) {
+    return ctx_cached_scrape('cache_paramount.json', 6 * 3600, 'fetch_paramount_films_scrape', $force);
+}
+
+function fetch_paramount_films_scrape() {
 
     $ch = curl_init('https://www.austintheatre.org/events/2026-summer-classic-film-series/');
     curl_setopt_array($ch, [
@@ -74,6 +76,5 @@ function fetch_paramount_films() {
         ];
     }
 
-    file_put_contents($cache_file, json_encode($films));
     return $films;
 }

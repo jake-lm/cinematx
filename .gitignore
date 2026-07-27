@@ -14,3 +14,6 @@ motw/
 
 # Local dev server log
 .devserver.log
+
+# Scrape lock files
+list/*.lock

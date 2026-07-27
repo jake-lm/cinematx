@@ -14,11 +14,13 @@ function filter_screenings($films, $now, $end) {
 
 // Merges official venue listings (scraped) with user-submitted screenings
 // (events table) into one chronological array, filtered to [$now, $end].
-function fetch_all_screenings($conn, $now, $end) {
+// $force re-scrapes regardless of TTL. Only the warm script passes it — page
+// requests must never trigger a forced scrape.
+function fetch_all_screenings($conn, $now, $end, $force = false) {
     $sources = [
-        ['films' => filter_screenings(fetch_paramount_films(), $now, $end), 'venue' => 'Paramount Theatre'],
-        ['films' => filter_screenings(fetch_afs_films(),        $now, $end), 'venue' => 'Austin Film Society'],
-        ['films' => filter_screenings(fetch_hyperreal_films(),  $now, $end), 'venue' => 'Hyperreal Film Club'],
+        ['films' => filter_screenings(fetch_paramount_films($force), $now, $end), 'venue' => 'Paramount Theatre'],
+        ['films' => filter_screenings(fetch_afs_films($force),       $now, $end), 'venue' => 'Austin Film Society'],
+        ['films' => filter_screenings(fetch_hyperreal_films($force), $now, $end), 'venue' => 'Hyperreal Film Club'],
     ];
     $all_films = [];
     foreach ($sources as $src) {
