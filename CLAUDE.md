@@ -83,14 +83,29 @@ Showtimes stored in Unix time, `America/Chicago` timezone. `_admin/showtime.php`
 
 ---
 
+## Security posture (as of 2026-07-27)
+Done, don't re-open:
+- `/_admin/` is gated by `_admin/_guard.php` — session + `users.admin` flag, 404 on denial, CSRF token on every write.
+- Error display is centralised in `database.php` behind `CTX_DEBUG` (config.php). **Never set it true on a public host.** Errors always log.
+- `dashboard/signup.php` (`activateacct`, `updateprof`, `login`) is parameterised; uid always comes from the session, never POST.
+- `function.php` reduced to `addto`/`removefrom`; the injectable search/paging branches and `entries.php` are gone.
+- `motw/stream.php` and `_admin/delete.php` use `basename()` before touching the filesystem.
+
+## Before the production deploy
+- [ ] **Cron the caches.** Scraper caches have a 6h TTL and refill *lazily* — whichever visitor hits a cold cache pays for three venue scrapes plus TMDB inline. A fresh prod with an empty `cache_tmdb.json` makes that first visitor wait on ~110 HTTP round-trips. Needs an out-of-band warm plus a lock file.
+- [ ] **`events/index.php` still on `sass.css`** — and The List links to it for member-submitted screenings, so it's a visible seam mid-design.
+- [ ] **`events` table has never held a real row.** The whole member-submitted path (`.line--member`, "By members" chip, `events/index.php`) is unverified against real data.
+- [ ] **Create `config.php` on prod** — it's gitignored. Needs DB creds, `TMDB_API_KEY`, and `CTX_DEBUG` false.
+- [ ] **Restyle `/_admin/`** — the last surface on the old stylesheet. Design debt behind a login now, not a blocker.
+
 ## Active TODOs
 - [ ] **Social icons (Discord/Instagram)** — added to `header.php` as FA icons in `.menu .social`, visible fix attempted (color added to `.social a`) but user still couldn't see them — may need further investigation
-- [ ] **Sign-in SQL injection** — `dashboard/signup.php` login uses string interpolation; needs parameterized queries. Deferred by user.
-- [ ] **Console.log cleanup** — `[th1]`-prefixed debug logs in `script-jlm.js` should be removed before production
 - [ ] **Firefox admin scroll fix** — deferred
 - [ ] **Mobile `/th1` optimization** — deferred
 - [ ] **Email verification on signup** — deferred
 - [ ] **Discord/Instagram real URLs** — social icon hrefs are currently `#`
+- [ ] **TMDB match override map** — "MIRROR" resolves to *Mirror Mirror* (2012) across poster, runtime and Wikipedia link. A one-word title with nothing to disambiguate on; needs a small manual override table.
+- [ ] **Retire `script.js` / `script-jlm.js`** once `events/` and `_admin/` convert — they hold the old `theatre_1()`, now superseded by `startSync()` in `v7.js`.
 
 ---
 
