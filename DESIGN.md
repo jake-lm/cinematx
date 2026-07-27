@@ -9,15 +9,16 @@ Living document. Current as of **v7**.
 
 | | Branch | URL | Verdict |
 |---|---|---|---|
-| v1 | `legacy-ui`, tag `v1-ui` | `/` | The original. Still live and untouched. |
+| v1 | `legacy-ui`, tag `v1-ui` | — | The original. Retired from `/` at Phase 1. |
 | v2 | `redesign-v2` | `/redesign/` | Too conservative — "a very small step" |
 | v3 | `redesign-v3` | `/v3/` | Brutalist. **Claustrophobic** |
 | v4 | `redesign-v4` | `/v4/` | Contained journal. "Prebuilt WordPress site" |
 | v5 | `redesign-v5` | `/v5/` | Broadsheet, one viewport. **Claustrophobic again** |
 | v6 | `redesign-v6` | `/v6/` | Modern app. Hierarchy solved |
-| v7 | `redesign-v7` | `/v7/` | **The List leads.** Poster grid, view modes |
+| v7 | `redesign-v7` | **`/`** | **The List leads.** Poster grid, view modes. Live at the root. |
 
-Every version is preserved. The live site has never been modified.
+Every version is preserved. v1 ran at `/` until Phase 1 of the conversion; it
+lives on at tag `v1-ui`, branch `legacy-ui`, and in the 2026-07-26 archive.
 
 ---
 
@@ -218,7 +219,7 @@ now; cutover happens **per page** as each is finished.
 |---|---|---|
 | 0 | Shared chrome + shared data includes | **done** |
 | 0.5 | Onboarding states in v7 (`onboard`, `gated`) | **done** |
-| 1 | Swap `/` to v7 | |
+| 1 | Swap `/` to v7 | **done** |
 | 2 | `/list/` — immediately after, same journey | |
 | 3 | `/posts/`, `/about/` | |
 | 4 | `/directory/`, `/users/profile.php` | |

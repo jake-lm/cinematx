@@ -22,11 +22,11 @@ require_once __DIR__ . '/screenings.php';
 $CTX_NOW    = time();
 $CTX_SIGNED = isset($_SESSION['username']);
 
-// Where "home" points during the conversion. The v7 front page lives at /v7/
-// until it takes over the root; flipping this constant is the cutover.
-// Everything else in the chrome already points at the real URLs, because
-// those pages are converted in place.
-define('CTX_HOME', '/v7/');
+// Where "home" points. Flipped from /v7/ to / at the Phase 1 cutover — the
+// root now serves the v7 front page. Kept as a constant because the partials
+// are still under /v7/ until the conversion finishes and that directory is
+// flattened into the project root.
+define('CTX_HOME', '/');
 
 /** Escape for HTML. Every page uses this rather than rolling its own. */
 function ctx_e($s) { return htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8'); }
