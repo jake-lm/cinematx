@@ -73,7 +73,11 @@ $(document).ready(function() {
         if (res.success) {
           setStatus('image saved');
         } else {
-          setStatus('image upload failed', '#b22222');
+          // The endpoint distinguishes not_found, invalid_type, too_large,
+          // move_failed and upload_error. Collapsing all five into one message
+          // made a directory-permissions problem and a published-post problem
+          // look identical from the outside.
+          setStatus('image upload failed' + (res && res.error ? ' (' + res.error + ')' : ''), '#b22222');
           clearImagePreview();
         }
       },

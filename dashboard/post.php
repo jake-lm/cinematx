@@ -101,8 +101,13 @@ else if ($action === 'get') {
 else if ($action === 'upload_image') {
   $post_id = (int)($_POST['post_id'] ?? 0);
 
-  // verify post belongs to this user
-  $check = $conn->prepare("SELECT id, image FROM `posts` WHERE id=:post_id AND uid=:uid AND active=0");
+  // Ownership only. This used to carry AND active=0, copied from the delete
+  // branch where requiring a draft is deliberate — you unpublish before you
+  // destroy. Here it meant a published essay could have its words edited but
+  // not its image, and the failure surfaced as a bare "image upload failed".
+  // The two writes below never had the restriction, which is the giveaway,
+  // and event.php's poster upload gets this right.
+  $check = $conn->prepare("SELECT id, image FROM `posts` WHERE id=:post_id AND uid=:uid");
   $check->execute([':post_id' => $post_id, ':uid' => $uid]);
   $row = $check->fetch(PDO::FETCH_ASSOC);
   if (!$row) {
