@@ -543,6 +543,93 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .empty { padding: var(--s-7) var(--s-4); text-align: center; @include label(var(--t-3xs), var(--text-4)); }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  THE LIST PAGE  (/list/)
+//  Seven days, grouped by day. Scrolls normally, with the controls sticking
+//  so narrowing is always reachable without going back to the top.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.listing { max-width: var(--canvas); margin: 0 auto; }
+
+.listing__head {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  padding: var(--s-5) 0 var(--s-4);
+  margin-bottom: var(--s-5);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.listing__title { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
+
+.listing__h {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 22, 'WONK' 1;
+  letter-spacing: -0.02em;
+}
+
+.listing__sub { @include label(var(--t-3xs), var(--text-3)); }
+
+.listing__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  margin-top: var(--s-4);
+}
+
+.seg__btn[data-when] { width: auto; padding: 0 var(--s-3); @include label(var(--t-3xs), var(--text-3));
+  &.is-on { color: var(--text); } }
+
+.chip--member { border-color: var(--red-wash);
+  &.is-on { background: var(--red); border-color: var(--red); } }
+
+// ── A day ──────────────────────────────────────────────────────────────────
+
+.day { margin-bottom: var(--s-7); &.is-hidden { display: none; } }
+
+.day__label {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+
+.day__name {
+  font-family: var(--f-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  white-space: nowrap;
+}
+
+.day__flag {
+  padding: 2px var(--s-2);
+  background: var(--red);
+  color: #fff;
+  border-radius: 4px;
+  @include label(9px, #fff);
+}
+
+.day__rule  { flex: 1; height: 1px; background: var(--line); }
+.day__count { @include label(var(--t-3xs), var(--text-4)); }
+
+// On this page the grid and rows sit directly on the page ground rather than
+// inside a card, so they carry their own edges.
+.day .grid-view { padding: 0; }
+
+.day .rows-view {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
+  .line:last-child { border-bottom: none; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  SIDE — ranks 2, 3, 4
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -934,4 +1021,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+// Tomorrow reads as a quieter sibling of Today.
+.day__flag--soft {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red-hi);
 }

@@ -87,51 +87,101 @@
   // so nothing is hidden behind a required navigation and the page still
   // never scrolls. Filtering hides rather than re-fetches.
 
-  function initList() {
-    var grid = $('#grid-view');
-    var rows = $('#rows-view');
-    if (!grid || !rows) return;
+  // Drives both the front page and /list/. The front page has no .day
+  // wrappers and no time filter; the list page has both. Same code either way.
+  //
+  //   [data-view]    grid | rows                    — persisted
+  //   [data-narrow]  all | venue:<slug> | source:user
+  //   [data-when]    week | today | tmrw            — list page only
+  //
+  // Each screening is rendered once per view, so counts only tally .shot.
 
-    // ── View ───────────────────────────────────────────────────────────────
-    function applyView(mode) {
-      var isRows = mode === 'rows';
-      grid.classList.toggle('is-off', isRows);
-      rows.classList.toggle('is-on', isRows);
+  function initList() {
+    if (!$$('.grid-view, .rows-view').length) return;
+
+    var listing  = $('#listing');
+    var todayKey = listing && listing.getAttribute('data-today');
+    var tmrwKey  = listing && listing.getAttribute('data-tmrw');
+
+    var state = {
+      view:   store.get('ctx-view') === 'rows' ? 'rows' : 'grid',
+      narrow: 'all',
+      when:   'week'
+    };
+
+    function applyView() {
+      var rows = state.view === 'rows';
+      $$('.grid-view').forEach(function (el) { el.classList.toggle('is-off', rows); });
+      $$('.rows-view').forEach(function (el) { el.classList.toggle('is-on',  rows); });
       $$('[data-view]').forEach(function (b) {
-        b.classList.toggle('is-on', b.getAttribute('data-view') === mode);
+        b.classList.toggle('is-on', b.getAttribute('data-view') === state.view);
       });
-      store.set('ctx-view', mode);
+      store.set('ctx-view', state.view);
     }
 
-    applyView(store.get('ctx-view') === 'rows' ? 'rows' : 'grid');
+    function matches(el) {
+      var n = state.narrow;
+      if (n === 'all') return true;
+      if (n.indexOf('venue:')  === 0) return el.getAttribute('data-venue')  === n.slice(6);
+      if (n.indexOf('source:') === 0) return el.getAttribute('data-source') === n.slice(7);
+      return true;
+    }
 
-    $$('[data-view]').forEach(function (b) {
-      b.addEventListener('click', function () { applyView(b.getAttribute('data-view')); });
-    });
-
-    // ── Venue filter ───────────────────────────────────────────────────────
-    var count = $('#list-count');
-
-    function applyFilter(venue) {
+    function apply() {
       var shown = 0;
-      $$('.shot, .line').forEach(function (el) {
-        var match = venue === 'all' || el.getAttribute('data-venue') === venue;
-        el.classList.toggle('is-hidden', !match);
-        // Each screening appears once in each view, so count one view only.
-        if (match && el.classList.contains('shot')) shown++;
+      var days  = $$('.day');
+
+      if (days.length) {
+        days.forEach(function (day) {
+          var key   = day.getAttribute('data-day');
+          var inDay = state.when === 'week'
+                   || (state.when === 'today' && key === todayKey)
+                   || (state.when === 'tmrw'  && key === tmrwKey);
+          var visible = 0;
+          $$('.shot, .line', day).forEach(function (el) {
+            var ok = inDay && matches(el);
+            el.classList.toggle('is-hidden', !ok);
+            if (ok && el.classList.contains('shot')) visible++;
+          });
+          // A day whose screenings are all filtered out loses its heading too.
+          day.classList.toggle('is-hidden', visible === 0);
+          shown += visible;
+        });
+      } else {
+        $$('.shot, .line').forEach(function (el) {
+          var ok = matches(el);
+          el.classList.toggle('is-hidden', !ok);
+          if (ok && el.classList.contains('shot')) shown++;
+        });
+      }
+
+      $$('[data-narrow]').forEach(function (c) {
+        c.classList.toggle('is-on', c.getAttribute('data-narrow') === state.narrow);
       });
-      $$('[data-venue-filter]').forEach(function (c) {
-        c.classList.toggle('is-on', c.getAttribute('data-venue-filter') === venue);
+      $$('[data-when]').forEach(function (c) {
+        c.classList.toggle('is-on', c.getAttribute('data-when') === state.when);
       });
+
+      var count = $('#list-count');
       if (count) count.textContent = shown;
 
-      var noneGrid = $('#grid-empty'), noneRows = $('#rows-empty');
-      if (noneGrid) noneGrid.style.display = shown ? 'none' : '';
-      if (noneRows) noneRows.style.display = shown ? 'none' : '';
+      ['#grid-empty', '#rows-empty', '#list-empty'].forEach(function (sel) {
+        var el = $(sel);
+        if (el) el.style.display = shown ? 'none' : '';
+      });
     }
 
-    $$('[data-venue-filter]').forEach(function (c) {
-      c.addEventListener('click', function () { applyFilter(c.getAttribute('data-venue-filter')); });
+    applyView();
+    apply();
+
+    $$('[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () { state.view = b.getAttribute('data-view'); applyView(); });
+    });
+    $$('[data-narrow]').forEach(function (b) {
+      b.addEventListener('click', function () { state.narrow = b.getAttribute('data-narrow'); apply(); });
+    });
+    $$('[data-when]').forEach(function (b) {
+      b.addEventListener('click', function () { state.when = b.getAttribute('data-when'); apply(); });
     });
   }
 

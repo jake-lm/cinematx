@@ -220,7 +220,7 @@ now; cutover happens **per page** as each is finished.
 | 0 | Shared chrome + shared data includes | **done** |
 | 0.5 | Onboarding states in v7 (`onboard`, `gated`) | **done** |
 | 1 | Swap `/` to v7 | **done** |
-| 2 | `/list/` — immediately after, same journey | |
+| 2 | `/list/` — immediately after, same journey | **done** |
 | 3 | `/posts/`, `/about/` | |
 | 4 | `/directory/`, `/users/profile.php` | |
 | 5 | `/dashboard/` — markup restyle only | |

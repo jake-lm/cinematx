@@ -77,9 +77,9 @@ require __DIR__ . '/_chrome.php';
           </div>
 
           <div class="chips">
-            <button class="chip is-on" data-venue-filter="all">All<span class="chip__n"><?php echo count($films); ?></span></button>
+            <button class="chip is-on" data-narrow="all">All<span class="chip__n"><?php echo count($films); ?></span></button>
             <?php foreach ($venues as $v): $vs = ctx_slug($v); ?>
-            <button class="chip" data-venue-filter="<?php echo $e($vs); ?>">
+            <button class="chip" data-narrow="venue:<?php echo $e($vs); ?>">
               <?php echo $e(ctx_venue_short($v)); ?>
               <span class="chip__n"><?php echo (int)($counts[$vs] ?? 0); ?></span>
             </button>
@@ -99,7 +99,7 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="shot<?php echo $member ? ' shot--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>"
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="shot__art">
                 <?php if (!empty($s['poster'])): ?>
@@ -125,7 +125,7 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="line<?php echo $member ? ' line--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>"
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
               <span>
