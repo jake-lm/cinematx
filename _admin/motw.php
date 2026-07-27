@@ -1,35 +1,23 @@
 <?php
-error_reporting(1);
-require '../database.php';
+require __DIR__ . '/_guard.php';
+admin_check_csrf();
 
-$f_id = $_POST['film_id2'];
+// This used to branch on `if (!$conn->query(...))`, but query() returns a
+// statement object whether or not it matched any row, so the branch was dead
+// and only the else ran. That path then prepared :motw_on and bound :motw,
+// which PDO rejects — so setting the film of the week has not worked at all.
+// It also exited without redirecting, leaving the admin on a blank page.
+//
+// There is only ever one film of the week, so: clear the flag, then set it.
 
-$sql = $conn->prepare("SELECT * FROM `films` WHERE `id` = $f_id");
-$sql->execute();
-$film = $sql->fetch();
+$f_id = (int)($_POST['film_id2'] ?? 0);
 
-$motw_off = 0;
-$motw_on = 1;
+$film = $conn->prepare("SELECT `id` FROM `films` WHERE `id` = :id LIMIT 1");
+$film->execute([':id' => $f_id]);
+if (!$film->fetch()) { http_response_code(400); exit('No such film.'); }
 
-$qMotw = $conn->query("SELECT * FROM `films` WHERE `motw` = 1");
+$conn->prepare("UPDATE `films` SET `motw` = 0 WHERE `motw` = 1")->execute();
+$conn->prepare("UPDATE `films` SET `motw` = 1 WHERE `id` = :id")->execute([':id' => $f_id]);
 
-if( ! $qMotw) {
-  $stmt = $conn->prepare("UPDATE `films` SET motw=? WHERE id=?");
-  $stmt->execute(array('1',$f_id));
-  echo 'here';
-}
-else {
-
-  $stmt = $conn->prepare("UPDATE `films` SET `motw` = :motw_off WHERE `motw` = :motw_on");
-  $stmt->bindParam(':motw_off', $motw_off);
-  $stmt->bindParam(':motw_on', $motw_on);
-  $stmt->execute();
-
-  $stmt = $conn->prepare("UPDATE `films` SET `motw` = :motw_on WHERE `id` = :f_id");
-  $stmt->bindParam(':motw', $motw_on);
-  $stmt->bindParam(':f_id', $f_id);
-  $stmt->execute();
-  exit();
-
-}
-?>
+header('Location: /_admin');
+exit;

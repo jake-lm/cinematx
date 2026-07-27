@@ -1,6 +1,5 @@
 <?php
-error_reporting(-1);
-require '../database.php';
+require __DIR__ . '/_guard.php';
   $sql = $conn->prepare("SELECT * FROM `films` WHERE `active` = 1 ORDER BY `id` DESC");
   $sql->execute();
   $sql2 = $conn->prepare("SELECT * FROM `films` WHERE `active` = 1 ORDER BY `id` DESC");
@@ -25,9 +24,12 @@ require '../database.php';
   <script src="https://vjs.zencdn.net/7.8.3/video.js"></script>
   <script src="../js/script.js"></script>
   <script src="../js/script-jlm.js"></script>
-  <title>Theatre 1</title>
+  <title>Admin — Cinema, TX</title>
 </head>
-<body id="" onload="theatre_1(<?php echo $film['showtime'].','.$film['duration']; ?>)">
+<?php // Was onload="theatre_1(...)" on an undefined $film, copy-pasted from the
+      // theatre page. It emitted "theatre_1(,)" — a JS syntax error on every
+      // load — and named a `duration` column that does not exist. ?>
+<body>
 
   <!--a href="../"><div class="back-button">&larr;</div></a-->
 
@@ -40,6 +42,7 @@ require '../database.php';
       <div class="admin-panel">
         <span class="panel-label">Upload Film</span>
         <form id="uploadForm" action="/_admin/upload.php" method="post" enctype="multipart/form-data">
+          <?php echo admin_csrf_field(); ?>
           <label>Title</label>
           <input class="admin-input" name="title" type="text" placeholder="Title" />
           <label>Director</label>
@@ -61,6 +64,7 @@ require '../database.php';
       <div class="admin-panel">
         <span class="panel-label">Add Note</span>
         <form action="/_admin/note.php" method="post">
+          <?php echo admin_csrf_field(); ?>
           <label>Film</label>
           <select class="admin-select" name="film_id">
             <?php
@@ -80,6 +84,7 @@ require '../database.php';
       <div class="admin-panel">
         <span class="panel-label">Schedule Showtime</span>
         <form action="/_admin/showtime.php" method="post">
+          <?php echo admin_csrf_field(); ?>
           <label>Film</label>
           <select class="admin-select" name="film_id">
             <?php
@@ -104,6 +109,7 @@ require '../database.php';
       <div class="admin-panel">
         <span class="panel-label">Delete Film</span>
         <form action="/_admin/delete.php" method="post" onsubmit="return confirm('Are you sure you want to delete this film?');">
+          <?php echo admin_csrf_field(); ?>
           <label>Film</label>
           <select class="admin-select" name="film_id">
             <?php

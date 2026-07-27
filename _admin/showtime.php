@@ -1,17 +1,20 @@
 <?php
-error_reporting(E_ALL);
-require '../database.php';
+require __DIR__ . '/_guard.php';
+admin_check_csrf();
 
-$f_id = $_POST['film_id'];
-$showtime = $_POST['showtime'];
-$theatre = $_POST['theatre'];
-//echo $showtime;
-$showtime = DateTime::createFromFormat('Y-m-d\TH:i', $showtime, new DateTimeZone('America/Chicago'));
+$f_id     = (int)($_POST['film_id'] ?? 0);
+$theatre  = (int)($_POST['theatre'] ?? 0);
+
+// createFromFormat returns false on a malformed value, and calling
+// ->getTimestamp() on that is a fatal.
+$showtime = DateTime::createFromFormat('Y-m-d\TH:i', $_POST['showtime'] ?? '', new DateTimeZone('America/Chicago'));
+if (!$showtime) { http_response_code(400); exit('Bad showtime.'); }
 $showtime = $showtime->getTimestamp();
 
-$sql = $conn->prepare("SELECT * FROM `films` WHERE `id` = $f_id");
-$sql->execute();
-$film=$sql->fetch();
+$sql = $conn->prepare("SELECT * FROM `films` WHERE `id` = :id");
+$sql->execute([':id' => $f_id]);
+$film = $sql->fetch();
+if (!$film) { http_response_code(400); exit('No such film.'); }
 
 $endtime = $showtime + $film['dur'];
 $stmt = $conn->prepare("INSERT INTO `showtimes` (f_id, showtime, endtime, theatre)

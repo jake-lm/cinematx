@@ -1,6 +1,6 @@
 <?php
-error_reporting(-1);
-require '../database.php';
+require __DIR__ . '/_guard.php';
+admin_check_csrf();
 
     $f_id = $_POST['film_id'];
     $note = $_POST['note'];

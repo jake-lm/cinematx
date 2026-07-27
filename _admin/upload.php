@@ -1,6 +1,6 @@
 <?php
-error_reporting(-1);
-require '../database.php';
+require __DIR__ . '/_guard.php';
+admin_check_csrf();
 
 require 'getid3/getid3.php';
 
@@ -11,10 +11,12 @@ require 'getid3/getid3.php';
     $now = time();
     $motw = 0;
 
+    // This becomes a filesystem path, so it has to be a filename and nothing
+    // else. Stripping spaces and apostrophes left slashes and dots intact —
+    // a title of "../../x" wrote outside /motw entirely.
     function stripTitle($input_t) {
-      $input_t = str_replace(' ', '', $input_t);
-      $input_t = str_replace("'", "", $input_t);
-      return $input_t;
+      $input_t = preg_replace('/[^A-Za-z0-9]/', '', (string)$input_t);
+      return $input_t !== '' ? substr($input_t, 0, 60) : 'untitled';
     }
     $filename = stripTitle($title);
     $director = stripTitle($director);
@@ -22,9 +24,15 @@ require 'getid3/getid3.php';
 
     $poster = $filename;
 
-    $file_tmp =$_FILES['film']['tmp_name'];
+    $file_tmp   = $_FILES['film']['tmp_name']   ?? '';
+    $poster_tmp = $_FILES['poster']['tmp_name'] ?? '';
 
-    $poster_tmp =$_FILES['poster']['tmp_name'];
+    // getID3 on a missing upload produces a confusing failure several lines
+    // down rather than here, where the cause is obvious.
+    if (!is_uploaded_file($file_tmp) || !is_uploaded_file($poster_tmp)) {
+      http_response_code(400);
+      exit('Both a film and a poster are required.');
+    }
 
     $getID3 = new getID3;
     $file = $getID3->analyze($file_tmp);
