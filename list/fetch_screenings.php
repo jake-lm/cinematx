@@ -44,6 +44,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             $film['overview'] = $tmdb['overview'];
             $film['genres']   = $tmdb['genres'];
             $film['director'] = $tmdb['director'];
+            $film['cast']     = $tmdb['cast'];
             $film['wiki']     = $tmdb['wiki'];
 
             $all_films[] = $film;
@@ -73,6 +74,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             'overview'  => null,
             'genres'    => null,
             'director'  => null,
+            'cast'      => null,
             'wiki'      => null,
         ];
     }

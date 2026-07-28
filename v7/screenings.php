@@ -78,6 +78,7 @@ function ctx_enrich(array $films) {
         $f['overview']      = $f['overview'] ?? null;
         $f['genres']        = $f['genres']   ?? null;
         $f['director']      = $f['director'] ?? null;
+        $f['cast']          = $f['cast']     ?? null;
         $f['wiki']          = $f['wiki']     ?? null;
         $f['location']      = $f['location'] ?? null;
 
@@ -98,7 +99,7 @@ function ctx_enrich(array $films) {
             $f['series']        = ctx_series($raw);      // now safe to trust
             // The cleaned lookup is the one that matched, so its metadata is
             // the metadata for this film.
-            foreach (['year', 'runtime', 'overview', 'genres', 'director', 'wiki'] as $k) {
+            foreach (['year', 'runtime', 'overview', 'genres', 'director', 'cast', 'wiki'] as $k) {
                 if (!empty($tmdb[$k])) $f[$k] = $tmdb[$k];
             }
         }
@@ -399,6 +400,106 @@ function ctx_time_lines(array $showings, $now) {
         $lines[] = date('g:ia', $s['t']) . (($multi || $other) ? ', ' . date('D', $s['t']) : '');
     }
     return $lines;
+}
+
+/**
+ * The front page's third view: one big card per film, synopsis and every
+ * showtime visible at once rather than behind a hover or a tap. A folded
+ * venue (Alamo, Fathom) gets its own shape rather than being forced into the
+ * per-film layout — the whole reason it folds is that it is a schedule, not
+ * one film, so "in depth" for it means unfolding the schedule inline instead
+ * of pretending it is a single poster.
+ */
+function ctx_deep_card($s, $now) {
+    if (!empty($s['is_group'])) { echo ctx_deep_fold($s); return; }
+
+    $e      = 'ctx_e';
+    $member = ($s['source'] ?? '') === 'user';
+    $href   = !empty($s['url']) ? $s['url'] : '/list';
+    $times  = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']], $now);
+
+    $bits = [];
+    if (!empty($s['year']))     $bits[] = (string)$s['year'];
+    if (!empty($s['runtime']))  $bits[] = (int)$s['runtime'] . 'm';
+    if (!empty($s['director'])) $bits[] = $s['director'];
+    if (!empty($s['genres']))   $bits[] = $s['genres'];
+    ?>
+    <div class="deep<?php echo $member ? ' deep--member' : ''; ?>"
+       data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
+       data-count="<?php echo count($times); ?>">
+      <span class="deep__art">
+        <?php if (!empty($s['poster'])): ?>
+        <img src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
+        <?php else: ?><span class="shot__blank"><?php echo $e($s['display_title']); ?></span><?php endif; ?>
+      </span>
+      <span class="deep__body">
+        <span class="deep__head">
+          <span class="deep__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
+          <?php if ($member): ?><span class="shot__by">&#9679; By a member</span><?php endif; ?>
+        </span>
+        <?php if ($bits): ?><span class="deep__bits"><?php echo $e(implode(' · ', $bits)); ?></span><?php endif; ?>
+        <span class="deep__venue"><?php echo $e($s['venue'] . (empty($s['location']) ? '' : ', ' . $s['location'])); ?></span>
+        <?php if (!empty($s['overview'])): ?><span class="deep__overview"><?php echo $e($s['overview']); ?></span><?php endif; ?>
+        <?php if (!empty($s['cast'])): ?>
+        <span class="deep__cast"><span class="deep__cast-label">Features</span> <?php echo $e($s['cast']); ?></span>
+        <?php endif; ?>
+        <span class="deep__foot">
+          <span class="deep__times">
+            <?php foreach ($times as $t): ?><span class="deep__time"><?php echo $e($t); ?></span><?php endforeach; ?>
+          </span>
+          <?php if (!empty($s['wiki'])): ?>
+          <a class="deep__wiki" href="<?php echo $e($s['wiki']); ?>" target="_blank" rel="noopener">Wikipedia <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+          <?php endif; ?>
+        </span>
+      </span>
+      <?php // A single full-card link would swallow the Wikipedia link inside
+            // it — anchors cannot nest. This sits behind everything and under
+            // the Wikipedia link's own stacking context, so the card is a
+            // click target everywhere except the one spot with its own. ?>
+      <a class="deep__stretch" href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>
+         aria-label="<?php echo $e($s['display_title']); ?>"></a>
+    </div>
+    <?php
+}
+
+/** The folded-venue shape of the card above: the schedule ctx_group_sheet()
+ *  otherwise hides behind a tap, shown inline instead. */
+function ctx_deep_fold(array $s) {
+    $e = 'ctx_e';
+    ob_start(); ?>
+    <div class="deep deep--fold" data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="venue"
+         data-count="<?php echo (int)$s['n_showings']; ?>">
+      <span class="deep__stack fold__stack">
+        <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
+        <img class="fold__face fold__face--<?php echo count($s['posters']) - $i; ?>" src="<?php echo $e($p); ?>" alt="" />
+        <?php endforeach; ?>
+      </span>
+      <div class="deep__body">
+        <div class="deep__head">
+          <span class="deep__title"><?php echo $e($s['venue']); ?></span>
+        </div>
+        <span class="deep__meta"><?php echo $e($s['day_label']); ?> &middot;
+          <?php echo (int)$s['n_films']; ?> film<?php echo $s['n_films'] === 1 ? '' : 's'; ?> &middot;
+          <?php echo (int)$s['n_showings']; ?> showing<?php echo $s['n_showings'] === 1 ? '' : 's'; ?></span>
+        <div class="deep__films">
+          <?php foreach ($s['films'] as $f): ?>
+          <a class="fold__film" href="<?php echo $e($f['url'] ?: '#'); ?>" target="_blank" rel="noopener">
+            <span class="fold__art">
+              <?php if (!empty($f['poster'])): ?><img src="<?php echo $e($f['poster']); ?>" alt="" loading="lazy" /><?php endif; ?>
+            </span>
+            <span class="fold__meta">
+              <span class="fold__title"><?php echo $e($f['display_title'] ?? $f['title']); ?></span>
+              <?php $bits = ctx_bits($f, false); if ($bits): ?>
+              <span class="fold__bits"><?php echo $e(implode(' · ', $bits)); ?></span>
+              <?php endif; ?>
+              <span class="fold__times"><?php echo $e(ctx_showings_label($f['showings'])); ?></span>
+            </span>
+          </a>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <?php return ob_get_clean();
 }
 
 /** Distinct venues present, for the filter chips. */

@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 4;
+const TMDB_CACHE_V = 5;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -34,6 +34,7 @@ const TMDB_EMPTY = [
     'overview' => null,
     'genres'   => null,
     'director' => null,
+    'cast'     => null,
     'wiki'     => null,
 ];
 
@@ -150,6 +151,13 @@ function fetch_tmdb($title, $year = null) {
                 if (($c['job'] ?? '') === 'Director' && !empty($c['name'])) $dirs[] = $c['name'];
             }
             if ($dirs) $out['director'] = implode(' & ', array_slice($dirs, 0, 2));
+
+            // TMDB already returns cast in billing order, so the first three
+            // are the top-billed rather than an arbitrary three.
+            if (!empty($detail['credits']['cast'])) {
+                $names = array_column($detail['credits']['cast'], 'name');
+                $out['cast'] = implode(', ', array_slice($names, 0, 3)) ?: null;
+            }
 
             $out['wiki'] = wikidata_article($detail['external_ids']['wikidata_id'] ?? null);
         }

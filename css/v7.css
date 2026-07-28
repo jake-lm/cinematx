@@ -2456,6 +2456,220 @@ button, input, select, textarea {
   color: var(--text-2);
 }
 
+.depth-view {
+  display: none;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4);
+}
+
+.depth-view.is-on {
+  display: flex;
+}
+
+.deep {
+  position: relative;
+  display: flex;
+  gap: var(--s-4);
+  padding: var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color var(--t-fast) var(--ease);
+}
+.deep.is-hidden {
+  display: none;
+}
+.deep:hover {
+  border-color: var(--red);
+}
+.deep:hover .deep__title {
+  color: var(--red-hi);
+}
+
+.deep--fold:hover {
+  border-color: var(--line);
+}
+
+.deep--fold:hover .deep__title {
+  color: var(--text);
+}
+
+.deep__stretch {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.deep__art {
+  flex: none;
+  width: 130px;
+  aspect-ratio: 2/3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.deep__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deep__stack {
+  flex: none;
+  width: 130px;
+  aspect-ratio: 2/3;
+  position: relative;
+  margin-right: var(--s-3);
+}
+.deep__stack .fold__face--3 {
+  transform: translate(4px, -2px) rotate(2deg);
+}
+.deep__stack .fold__face--2 {
+  transform: translate(2px, -1px) rotate(1deg);
+}
+
+.deep__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.deep__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.deep__title {
+  font-family: var(--f-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  line-height: 1.2;
+  transition: color var(--t-fast) var(--ease);
+}
+
+.deep__bits {
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.deep__venue {
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--red-hi);
+  font-variant-numeric: tabular-nums;
+}
+
+.deep__meta {
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.deep__overview {
+  font-family: var(--f-read);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.deep__cast {
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.deep__cast-label {
+  color: var(--text-4);
+  margin-right: 4px;
+}
+
+.deep__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: var(--s-1);
+}
+
+.deep__times {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.deep__time {
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 3px var(--s-3);
+}
+
+.deep__wiki {
+  position: relative;
+  z-index: 2;
+  margin-left: auto;
+  flex: none;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--red-hi);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.deep__wiki i {
+  font-size: 0.82em;
+  opacity: 0.7;
+}
+
+.deep__films {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--s-1);
+}
+
+.deep__films .fold__film:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
 .stats {
   margin-top: var(--s-7);
   padding-top: var(--s-5);

@@ -114,16 +114,21 @@
     var todayKey = listing && listing.getAttribute('data-today');
     var tmrwKey  = listing && listing.getAttribute('data-tmrw');
 
+    // Depth only exists on the front page. A value stored there must not be
+    // restored on /list/, which has no .depth-view to show — it would just
+    // turn grid off with nothing to replace it.
+    var hasDepth = !!$('.depth-view');
+    var stored   = store.get('ctx-view');
     var state = {
-      view:   store.get('ctx-view') === 'rows' ? 'rows' : 'grid',
+      view: stored === 'rows' ? 'rows' : (stored === 'depth' && hasDepth ? 'depth' : 'grid'),
       narrow: 'all',
       when:   'week'
     };
 
     function applyView() {
-      var rows = state.view === 'rows';
-      $$('.grid-view').forEach(function (el) { el.classList.toggle('is-off', rows); });
-      $$('.rows-view').forEach(function (el) { el.classList.toggle('is-on',  rows); });
+      $$('.grid-view').forEach(function (el) { el.classList.toggle('is-off', state.view !== 'grid'); });
+      $$('.rows-view').forEach(function (el) { el.classList.toggle('is-on', state.view === 'rows'); });
+      $$('.depth-view').forEach(function (el) { el.classList.toggle('is-on', state.view === 'depth'); });
       $$('[data-view]').forEach(function (b) {
         b.classList.toggle('is-on', b.getAttribute('data-view') === state.view);
       });
@@ -166,7 +171,10 @@
                    || (state.when === 'today' && key === todayKey)
                    || (state.when === 'tmrw'  && key === tmrwKey);
           var visible = 0;
-          $$('.shot, .line', day).forEach(function (el) {
+          // .deep only exists on the front page, which has no .day wrappers,
+          // so this branch never actually sees one — listed for symmetry with
+          // the flat branch below.
+          $$('.shot, .line, .deep', day).forEach(function (el) {
             var ok = inDay && matches(el);
             el.classList.toggle('is-hidden', !ok);
             if (ok && el.classList.contains('shot')) visible += weight(el);
@@ -176,7 +184,11 @@
           shown += visible;
         });
       } else {
-        $$('.shot, .line').forEach(function (el) {
+        // .shot alone still drives the count — it is rendered once per
+        // screening regardless of which view is on screen, so .deep (the
+        // depth view's rendering of the same data) must stay hidden-only
+        // here or every screening would be counted twice.
+        $$('.shot, .line, .deep').forEach(function (el) {
           var ok = matches(el);
           el.classList.toggle('is-hidden', !ok);
           if (ok && el.classList.contains('shot')) shown += weight(el);
@@ -204,7 +216,7 @@
                           || 'next seven days';
       }
 
-      ['#grid-empty', '#rows-empty', '#list-empty'].forEach(function (sel) {
+      ['#grid-empty', '#rows-empty', '#depth-empty', '#list-empty'].forEach(function (sel) {
         var el = $(sel);
         if (el) el.style.display = shown ? 'none' : '';
       });

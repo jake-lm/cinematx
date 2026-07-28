@@ -93,6 +93,7 @@ require __DIR__ . '/_chrome.php';
 
         <div class="controls">
           <div class="seg">
+            <button class="seg__btn" data-view="depth" title="In depth"><i class="fa-solid fa-square"></i></button>
             <button class="seg__btn is-on" data-view="grid" title="Posters"><i class="fa-solid fa-grip"></i></button>
             <button class="seg__btn" data-view="rows" title="List"><i class="fa-solid fa-list"></i></button>
           </div>
@@ -173,6 +174,11 @@ require __DIR__ . '/_chrome.php';
             </a>
             <?php endforeach; ?>
             <p class="empty" id="rows-empty" style="display:none;">Nothing at that venue</p>
+          </div>
+
+          <div class="depth-view" id="depth-view">
+            <?php foreach ($films as $s) ctx_deep_card($s, $now); ?>
+            <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
           </div>
 
           <?php endif; ?>
