@@ -90,14 +90,30 @@ function ctx_state($conn) {
  * over so the page never shows a near-empty list late at night.
  * Returns ['screenings' => [...], 'label' => 'Tonight'|'Tonight & tomorrow'].
  */
+/**
+ * Tonight and tomorrow.
+ *
+ * This used to fetch today only and widen to tomorrow when today had fewer
+ * than five screenings. The intent was sound — do not pad a one-screen module
+ * with tomorrow when tonight is already full — but it tied the front page's
+ * time horizon to the number of sources we had integrated, which are unrelated
+ * things. Adding Alamo took today from 5 to 18, the widening stopped firing,
+ * and tomorrow silently disappeared along with half the heading. Every further
+ * venue would have made it less likely to ever come back.
+ *
+ * The window is fixed now and the label describes what came back rather than
+ * what was asked for: "Tonight" only when tomorrow genuinely has nothing.
+ * Folding is what makes the fixed window affordable — 33 screenings render as
+ * about ten tiles.
+ */
 function ctx_tonight($conn, $now) {
-    $films = fetch_all_screenings($conn, $now, strtotime('tomorrow', $now) - 1);
-    $label = 'Tonight';
-    if (count($films) < 5) {
-        $wider = fetch_all_screenings($conn, $now, $now + 172800);
-        if (count($wider) > count($films)) { $films = $wider; $label = 'Tonight & tomorrow'; }
-    }
-    return ['screenings' => ctx_enrich($films), 'label' => $label];
+    $end_of_today = strtotime('tomorrow', $now) - 1;
+    $films = ctx_enrich(fetch_all_screenings($conn, $now, $now + 172800));
+
+    $tomorrow = 0;
+    foreach ($films as $f) if ($f['timestamp'] > $end_of_today) $tomorrow++;
+
+    return ['screenings' => $films, 'label' => $tomorrow ? 'Tonight & tomorrow' : 'Tonight'];
 }
 
 /** Screening counts keyed by venue slug, for the filter chips. */

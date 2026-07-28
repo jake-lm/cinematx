@@ -508,7 +508,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(to top, rgba(10,9,7,0.88), rgba(10,9,7,0));
   @include label(var(--t-2xs), #fff);
   text-align: center;
+
+  // One line per showing. The gradient already darkens upward, so extra lines
+  // land on ground dark enough to read without a box of their own.
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
+
+.shot__t { display: block; }
 
 .shot__title {
   margin-top: var(--s-2);

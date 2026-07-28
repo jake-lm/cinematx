@@ -333,6 +333,59 @@ function ctx_fold_children($s, $view) {
     }
 }
 
+/**
+ * Collapse repeat showings of the same film at the same venue into one entry,
+ * so it renders as an alamo stack rather than as two near-identical cards.
+ *
+ * The front page covers tonight and tomorrow, so a film running both nights
+ * appeared twice with only the time to tell the cards apart. Entries already
+ * folded by ctx_fold_venue() pass through untouched — a venue card is not a
+ * film and must not be merged with one.
+ */
+function ctx_fold_repeats(array $entries) {
+    $out = [];
+    $at  = [];
+
+    foreach ($entries as $f) {
+        if (!empty($f['is_group'])) { $out[] = $f; continue; }
+
+        $key = ($f['display_title'] ?? $f['title']) . '|' . ($f['venue'] ?? '');
+        if (!isset($at[$key])) {
+            $f['showings'] = [];
+            $at[$key] = count($out);
+            $out[] = $f;
+        }
+        $out[$at[$key]]['showings'][] = ['t' => $f['timestamp'], 'loc' => $f['location'] ?? ''];
+    }
+
+    // A card announces itself by its earliest showing, and merging moved
+    // entries out of order, so both need settling again.
+    foreach ($out as &$f) {
+        if (empty($f['showings'])) continue;
+        usort($f['showings'], fn($a, $b) => $a['t'] <=> $b['t']);
+        $f['timestamp'] = $f['showings'][0]['t'];
+    }
+    unset($f);
+
+    usort($out, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    return $out;
+}
+
+/**
+ * The lines on a poster overlay: "4:30pm, Tue" per showing.
+ * The weekday is always named on a stack — the whole point is that the
+ * showings are on different days — and omitted for a lone showing today.
+ */
+function ctx_time_lines(array $showings, $now) {
+    $multi = count($showings) > 1;
+    $lines = [];
+    foreach ($showings as $s) {
+        $other = date('j M', $s['t']) !== date('j M', $now);
+        $lines[] = date('g:ia', $s['t']) . (($multi || $other) ? ', ' . date('D', $s['t']) : '');
+    }
+    return $lines;
+}
+
 /** Distinct venues present, for the filter chips. */
 function ctx_venues(array $films) {
     $v = [];
