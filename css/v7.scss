@@ -525,6 +525,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 600;
   line-height: 1.2;
   color: var(--text);
+  // Venues disagree: AFS and Hyperreal send all-caps, Alamo, Paramount and
+  // Fathom send mixed case, so The List read as though half of it was
+  // shouting. Settled in CSS rather than by rewriting the titles, so the
+  // original still goes to TMDB and into the hover card.
+  text-transform: uppercase;
+  letter-spacing: 0.01em;   // caps set tight at this size close up
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
   transition: color var(--t-fast) var(--ease);
@@ -579,6 +585,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .line__time  { @include label(var(--t-2xs), var(--red-hi)); }
 .line__title { font-size: var(--t-md); font-family: var(--f-display); font-weight: 600;
+              text-transform: uppercase; letter-spacing: 0.01em;
                line-height: 1.2; color: var(--text);
                transition: color var(--t-fast) var(--ease); }
 .line__sub   { display: block; margin-top: 2px; @include label(var(--t-3xs), var(--text-3)); }
@@ -1455,7 +1462,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .fold__meta  { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .fold__title { font-family: var(--f-display); font-size: var(--t-sm); font-weight: 600;
-               color: var(--text); line-height: 1.2; }
+               color: var(--text); line-height: 1.2;
+               text-transform: uppercase; letter-spacing: 0.01em; }
 .fold__bits  { @include label(var(--t-3xs), var(--text-4)); }
 .fold__times { font-family: var(--f-read); font-size: var(--t-xs); line-height: 1.5;
                color: var(--text-2); }
