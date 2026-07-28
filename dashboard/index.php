@@ -255,6 +255,14 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <label class="field__label" for="d-role">Role</label>
                 <select class="field__input" id="d-role" name="dept">
                   <option value="0">Select your role</option>
+                  <?php // The role list changes over time — "Filmmaker" split into
+                        // more specific ones — and a member who hasn't re-picked
+                        // yet still has the old value stored. Show it rather than
+                        // silently falling back to "Select your role", which would
+                        // save as dept=0 the moment they hit save without noticing. ?>
+                  <?php if (!empty($me['dept']) && !in_array($me['dept'], $roles, true)): ?>
+                  <option value="<?php echo $e($me['dept']); ?>" selected><?php echo $e($me['dept']); ?></option>
+                  <?php endif; ?>
                   <?php foreach ($roles as $r): ?>
                   <option value="<?php echo $e($r); ?>"<?php echo $me['dept'] === $r ? ' selected' : ''; ?>><?php echo $e($r); ?></option>
                   <?php endforeach; ?>

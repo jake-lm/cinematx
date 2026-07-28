@@ -16,7 +16,6 @@ $signed     = $me !== null;
 // Member-only links are gated on full membership, not merely on being signed
 // in — someone mid-onboarding or awaiting an access code cannot use them.
 $full       = ctx_state($conn) === 'member';
-$dir        = ctx_members($conn, 7);
 $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 ?>
 <aside class="rail">
@@ -50,20 +49,6 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-user"></i></span><span class="txt">Profile</span></a>
     <?php endif; ?>
   </nav>
-
-  <div class="rail__foot">
-    <div class="faces">
-      <?php foreach ($dir['members'] as $m): ?>
-      <a class="face" href="/users/profile.php?id=<?php echo (int)$m['id']; ?>" title="<?php echo ctx_e($m['name']); ?>">
-        <?php if (!empty($m['photo'])): ?><img src="/uploads/profiles/<?php echo ctx_e($m['photo']); ?>" alt="" />
-        <?php else: ?><?php echo ctx_e(mb_substr($m['name'], 0, 1)); ?><?php endif; ?>
-      </a>
-      <?php endforeach; ?>
-      <?php $rest = $dir['count'] - count($dir['members']); if ($rest > 0): ?>
-      <a class="face" href="/directory" title="All members">+<?php echo $rest; ?></a>
-      <?php endif; ?>
-    </div>
-  </div>
 </aside>
 
 <header class="bar">

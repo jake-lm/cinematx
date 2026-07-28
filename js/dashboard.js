@@ -256,12 +256,15 @@ $(document).ready(function() {
 
         $('#post-title').val(res.post.title);
         $('#post-subtitle').val(res.post.subtitle || '');
-        $('#post-type').val(res.post.type || '');
+        // .trigger('change') here isn't for anything of ours — it's what
+        // tells the custom select's button to redraw its label, since
+        // .val() alone never fires a change event.
+        $('#post-type').val(res.post.type || '').trigger('change');
         $('#post-content').val(res.post.content);
         $('#post-photo-cred-1').val(res.post.photo_cred || '');
         $('#post-photo-cred-2').val(res.post.photo_cred2 || '');
         $('#post-photo-cred-3').val(res.post.photo_cred3 || '');
-        $('#post-image-mode').val(res.post.image_mode || 'cycle');
+        $('#post-image-mode').val(res.post.image_mode || 'cycle').trigger('change');
 
         postId     = parseInt(id);
         autosaveOn = true;
@@ -360,8 +363,8 @@ $(document).ready(function() {
         if (postId === id) {
           postId = null; autosaveOn = false; clearTimeout(saveTimer);
           $('#post-title, #post-subtitle, #post-content, #post-photo-cred-1, #post-photo-cred-2, #post-photo-cred-3').val('');
-          $('#post-type').val('');
-          $('#post-image-mode').val('cycle');
+          $('#post-type').val('').trigger('change');
+          $('#post-image-mode').val('cycle').trigger('change');
           $('#post-featured').prop('checked', false);
           $('#post-publish').prop('disabled', true).text('Publish');
           $('#post-save').prop('disabled', false).text('Save Draft');

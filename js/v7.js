@@ -78,6 +78,189 @@
     });
   }
 
+  // ══ Custom select ════════════════════════════════════════════════════════
+  // Progressive enhancement over every real <select> on the site. The select
+  // stays in the DOM — hidden, not removed, not display:none — so it is still
+  // the thing that holds the value: form submission, FormData and any
+  // existing $(...).val() all keep working untouched. Picking an option sets
+  // select.value and fires a real 'change' event, so anything already
+  // listening for that (autosave triggers, etc.) still runs exactly as
+  // before. The open menu is one shared element appended to <body> and
+  // positioned like the hovercard, rather than nested where the select lives —
+  // nested would get clipped by the first scrolling ancestor (a sheet body, a
+  // card), which a menu that can open near the bottom of one very much does.
+
+  function initCustomSelect() {
+    var selects = $$('select');
+    if (!selects.length) return;
+
+    var menu = document.createElement('ul');
+    menu.className = 'xselect__menu';
+    menu.setAttribute('role', 'listbox');
+    document.body.appendChild(menu);
+
+    var openEntry = null, opts = [], activeIndex = -1;
+
+    function place(btn) {
+      var r = btn.getBoundingClientRect();
+      menu.style.width = r.width + 'px';
+      var top = r.bottom + 4;
+      // Flips upward only when there is genuinely more room there — a menu
+      // that flips just because it is tall reads as broken, not smart.
+      if (top + 260 > window.innerHeight - 8 && r.top > 260) top = r.top - 264;
+      menu.style.left = Math.round(r.left + window.scrollX) + 'px';
+      menu.style.top  = Math.round(top + window.scrollY) + 'px';
+    }
+
+    function closeMenu() {
+      if (!openEntry) return;
+      menu.classList.remove('is-on');
+      openEntry.btn.setAttribute('aria-expanded', 'false');
+      openEntry.wrap.classList.remove('is-open');
+      openEntry = null;
+      opts = [];
+      activeIndex = -1;
+    }
+
+    function setActive(i) {
+      if (opts[activeIndex]) opts[activeIndex].classList.remove('is-active');
+      if (!opts.length) return;
+      activeIndex = ((i % opts.length) + opts.length) % opts.length;
+      opts[activeIndex].classList.add('is-active');
+      opts[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+
+    function openMenu(entry) {
+      if (entry.btn.disabled) return;
+      if (openEntry === entry) { closeMenu(); return; }
+      closeMenu();
+      openEntry = entry;
+
+      menu.innerHTML = '';
+      opts = $$('option', entry.select).map(function (o) {
+        var on = o.value === entry.select.value;
+        var li = document.createElement('li');
+        li.className = 'xselect__opt' + (on ? ' is-on' : '');
+        li.setAttribute('role', 'option');
+        li.setAttribute('aria-selected', on ? 'true' : 'false');
+        li.textContent = o.textContent;
+        li.dataset.value = o.value;
+        menu.appendChild(li);
+        return li;
+      });
+
+      place(entry.btn);
+      menu.classList.add('is-on');
+      entry.btn.setAttribute('aria-expanded', 'true');
+      entry.wrap.classList.add('is-open');
+      var idx = opts.findIndex(function (li) { return li.dataset.value === entry.select.value; });
+      setActive(idx >= 0 ? idx : 0);
+    }
+
+    function choose(i) {
+      if (!openEntry) return;
+      var entry = openEntry, li = opts[i];
+      if (!li) return;
+      entry.select.value = li.dataset.value;
+      entry.select.dispatchEvent(new Event('change', { bubbles: true }));
+      closeMenu();
+      entry.btn.focus();
+    }
+
+    function syncLabel(entry) {
+      var current = entry.select.options[entry.select.selectedIndex];
+      entry.label.textContent = current ? current.textContent : '';
+    }
+
+    selects.forEach(function (select) {
+      if (select.dataset.xselect) return;
+      select.dataset.xselect = '1';
+
+      var wrap = document.createElement('div');
+      wrap.className = 'xselect';
+      select.parentNode.insertBefore(wrap, select);
+
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'xselect__btn';
+      btn.setAttribute('aria-haspopup', 'listbox');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.disabled = select.disabled;
+
+      var label = document.createElement('span');
+      label.className = 'xselect__label';
+      btn.appendChild(label);
+
+      var caret = document.createElement('i');
+      caret.className = 'fa-solid fa-chevron-down xselect__caret';
+      btn.appendChild(caret);
+
+      // Programmatically reachable still (a validation failure can focus it),
+      // just no longer a stop on the way there — the button is that now.
+      select.tabIndex = -1;
+      select.setAttribute('aria-hidden', 'true');
+
+      wrap.appendChild(select);
+      wrap.appendChild(btn);
+
+      var entry = { select: select, wrap: wrap, btn: btn, label: label };
+      syncLabel(entry);
+
+      // The one thing this never has to special-case: whatever else changes
+      // the select's value — us, or a script setting .val() and triggering
+      // change — this is the single place the label redraws from.
+      select.addEventListener('change', function () { syncLabel(entry); });
+
+      btn.addEventListener('click', function () {
+        if (openEntry === entry) closeMenu(); else openMenu(entry);
+      });
+
+      btn.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (openEntry !== entry) { openMenu(entry); return; }
+          setActive(activeIndex + (e.key === 'ArrowDown' ? 1 : -1));
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (openEntry === entry) choose(activeIndex); else openMenu(entry);
+        } else if (e.key === 'Escape' && openEntry === entry) {
+          closeMenu();
+        }
+      });
+    });
+
+    menu.addEventListener('click', function (e) {
+      var li = e.target.closest ? e.target.closest('.xselect__opt') : null;
+      if (li) choose(opts.indexOf(li));
+    });
+
+    // Mouse and keyboard share one highlight rather than two competing
+    // states — hovering an option moves the same .is-active setActive()
+    // already draws for the arrow keys, so whichever you used last is
+    // consistently what Enter would pick.
+    menu.addEventListener('mouseover', function (e) {
+      var li = e.target.closest ? e.target.closest('.xselect__opt') : null;
+      if (li) setActive(opts.indexOf(li));
+    });
+
+    // Mirrors the hovercard: closing on scroll rather than repositioning is
+    // the simpler correct behaviour, and outside clicks close it same as any
+    // other open panel on the page. Scrolling the menu's own option list is
+    // not "scroll" in that sense, though — a long list (every film, in the
+    // admin panel) is exactly why it scrolls internally in the first place.
+    document.addEventListener('click', function (e) {
+      if (!openEntry) return;
+      if (e.target.closest && (e.target.closest('.xselect__menu') || e.target.closest('.xselect'))) return;
+      closeMenu();
+    });
+    window.addEventListener('scroll', function (e) {
+      if (openEntry && menu.contains(e.target)) return;
+      closeMenu();
+    }, true);
+    window.addEventListener('resize', closeMenu);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && openEntry) closeMenu(); });
+  }
+
   // ══ Theme ════════════════════════════════════════════════════════════════
   // Paper is the default; the stylesheet only overrides on [data-theme=dark],
   // so this must agree and never consult prefers-color-scheme.
@@ -369,6 +552,44 @@
   function initJoin() {
     var form = $('#join-form');
     if (!form) return;
+
+    // Live email availability — debounced so typing doesn't hit the server on
+    // every keystroke, only once it pauses on something that looks complete.
+    // The border is the whole signal, no text underneath.
+    var emailInput = $('#j-email', form);
+    var emailTimer = null;
+    if (emailInput) {
+      emailInput.addEventListener('input', function () {
+        clearTimeout(emailTimer);
+        var value = emailInput.value.trim();
+        emailInput.classList.remove('field__input--ok', 'field__input--bad');
+        if (!value) return;
+        emailTimer = setTimeout(function () {
+          post('/dashboard/signup.php?action=check_email', { email: value })
+            .then(function (res) {
+              var ok = !!(res && res.valid && res.available);
+              emailInput.classList.toggle('field__input--ok', ok);
+              emailInput.classList.toggle('field__input--bad', !ok);
+            })
+            .catch(function () {});
+        }, 400);
+      });
+    }
+
+    // Live password match — no round trip needed, so every keystroke checks.
+    var pw = $('#j-pw', form), pw2 = $('#j-pw2', form);
+    if (pw && pw2) {
+      var checkMatch = function () {
+        pw2.classList.remove('field__input--ok', 'field__input--bad');
+        if (!pw2.value) return;
+        var ok = pw.value === pw2.value;
+        pw2.classList.toggle('field__input--ok', ok);
+        pw2.classList.toggle('field__input--bad', !ok);
+      };
+      pw.addEventListener('input', checkMatch);
+      pw2.addEventListener('input', checkMatch);
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var btn = form.querySelector('[type=submit]'), err = $('#join-error'), label = btn.value;
@@ -558,6 +779,70 @@
         try { document.execCommand('copy'); mark(); } catch (e) {}
         t.remove();
       }
+    });
+  }
+
+  // ══ Profile — face upload ════════════════════════════════════════════════
+  // Only markup on your own profile page carries #who-face-input, so this is
+  // a no-op everywhere else. Reuses the same endpoint the dashboard's Account
+  // tab already uploads through — this is just a second door to it, not a
+  // second implementation.
+
+  function initProfileFaceUpload() {
+    var input = $('#who-face-input');
+    var face  = $('#who-face');
+    if (!input || !face) return;
+
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = face.querySelector('img');
+        if (!img) {
+          img = document.createElement('img');
+          face.insertBefore(img, face.firstChild);
+          var letter = face.querySelector('.who__face-letter');
+          if (letter) letter.remove();
+        }
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+
+      var fd = new FormData();
+      fd.append('photo', file);
+      fetch('/dashboard/profile.php?action=upload_photo', {
+        method: 'POST', body: fd, credentials: 'same-origin'
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) { if (!res || !res.success) location.reload(); })
+        .catch(function () { location.reload(); });
+    });
+  }
+
+  // ══ Profile — Letterboxd connect ════════════════════════════════════════
+  // Favourites and recent watches need a fresh scrape to show up, which only
+  // happens on page load — so success here reloads rather than trying to
+  // splice the Letterboxd card together client-side.
+
+  function initLetterboxdConnect() {
+    var input = $('#lb-input'), save = $('#lb-save');
+    if (!input || !save) return;
+
+    save.addEventListener('click', function () {
+      var value = input.value.trim();
+      if (!value) return;
+      save.disabled = true;
+      var label = save.textContent;
+      save.textContent = '…';
+
+      post('/dashboard/signup.php?action=update_lb', { lb: value })
+        .then(function (res) {
+          if (res && res.success) location.reload();
+          else { save.disabled = false; save.textContent = label; }
+        })
+        .catch(function () { save.disabled = false; save.textContent = label; });
     });
   }
 
@@ -764,7 +1049,8 @@
     initWelcome(); initTheme(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
-    initHovercard(); initImageCycle();
+    initHovercard(); initImageCycle(); initCustomSelect();
+    initProfileFaceUpload(); initLetterboxdConnect();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

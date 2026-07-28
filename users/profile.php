@@ -26,15 +26,6 @@ $q = $conn->prepare(
 $q->execute([':uid' => $profile_id]);
 $writing = $q->fetchAll(PDO::FETCH_ASSOC);
 
-// Their notes in the lobby.
-$q = $conn->prepare(
-  "SELECT p.id, p.uid, p.content, p.stamp FROM posts p
-   WHERE p.active = 1 AND p.uid = :uid AND p.type = 'post'
-   ORDER BY p.stamp DESC LIMIT 6"
-);
-$q->execute([':uid' => $profile_id]);
-$notes = $q->fetchAll(PDO::FETCH_ASSOC);
-
 // Letterboxd — cached by the scraper, so this is cheap on repeat views.
 $lb        = !empty($who['lb']) ? fetch_letterboxd_profile($who['lb']) : ['favorites' => [], 'recent' => []];
 $favorites = $lb['favorites'] ?? [];
@@ -56,10 +47,16 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
       <!-- ── Who ─────────────────────────────────────────────────────── -->
       <header class="who">
-        <div class="who__face">
+        <div class="who__face"<?php echo $is_me ? ' id="who-face"' : ''; ?>>
           <?php if (!empty($who['photo'])): ?>
           <img src="/uploads/profiles/<?php echo $e($who['photo']); ?>" alt="<?php echo $e($who['name']); ?>" />
-          <?php else: ?><?php echo $e(mb_substr($who['name'], 0, 1)); ?><?php endif; ?>
+          <?php else: ?><span class="who__face-letter"><?php echo $e(mb_substr($who['name'], 0, 1)); ?></span><?php endif; ?>
+          <?php if ($is_me): ?>
+          <label class="who__face-edit" for="who-face-input" title="Change photo">
+            <i class="fa-solid fa-camera"></i>
+          </label>
+          <input type="file" id="who-face-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+          <?php endif; ?>
         </div>
 
         <div class="who__body">
@@ -83,7 +80,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <a class="ilink" href="<?php echo $e($who['website']); ?>" target="_blank" rel="noopener" title="Website"><i class="fa-solid fa-link"></i></a>
             <?php endif; ?>
             <?php if ($is_me): ?>
-            <a class="btn btn--quiet" href="/dashboard">Edit profile</a>
+            <a class="btn btn--quiet" href="/dashboard#account">Edit profile</a>
             <?php endif; ?>
           </div>
         </div>
@@ -118,20 +115,6 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <p class="empty">Nothing published yet.</p>
           <?php endif; ?>
 
-          <?php if ($notes): ?>
-          <div class="day__label" style="margin-top:var(--s-7);">
-            <span class="day__name">From the lobby</span>
-            <span class="day__rule"></span>
-          </div>
-          <div class="profile__notes">
-            <?php foreach ($notes as $n): ?>
-            <div class="note">
-              <div class="note__text"><?php echo nl2br($e($n['content'])); ?></div>
-              <div class="note__meta"><span><?php echo date('j M Y', $n['stamp']); ?></span></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
         </section>
 
         <!-- ── Letterboxd ────────────────────────────────────────────── -->
@@ -174,11 +157,21 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <?php endif; ?>
             </div>
           </section>
+          <?php elseif ($is_me && empty($who['lb'])): ?>
+          <section class="card">
+            <div class="card__head"><span class="card__title">Letterboxd</span></div>
+            <div class="card__body">
+              <div class="lb-connect">
+                <input type="text" id="lb-input" class="field__input" placeholder="username" autocomplete="off" />
+                <button class="btn" id="lb-save">Save</button>
+              </div>
+            </div>
+          </section>
           <?php elseif ($is_me): ?>
           <section class="card">
             <div class="card__head"><span class="card__title">Letterboxd</span></div>
             <div class="card__body">
-              <p class="pitch">Add your Letterboxd username in the dashboard and your favourites and recent watches show up here.</p>
+              <p class="pitch">Nothing came back from Letterboxd for <?php echo $e($who['lb']); ?> yet — double check the username in the dashboard.</p>
             </div>
           </section>
           <?php endif; ?>

@@ -281,12 +281,6 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.rail__foot {
-  flex: none;
-  padding: var(--s-3);
-  border-top: 1px solid var(--line);
-}
-
 .app.is-collapsed .rail__word, .app.is-collapsed .rail__link .txt, .app.is-collapsed .rail__group {
   display: none;
 }
@@ -300,15 +294,6 @@ button, input, select, textarea {
 .app.is-collapsed .rail__link {
   justify-content: center;
   padding: 0;
-}
-.app.is-collapsed .faces {
-  justify-content: center;
-}
-.app.is-collapsed .face:nth-child(n+4) {
-  display: none;
-}
-.app.is-collapsed .rail__foot {
-  padding: var(--s-3) var(--s-2);
 }
 
 .bar {
@@ -1656,7 +1641,6 @@ button, input, select, textarea {
   font-size: var(--t-sm);
   line-height: 1.5;
   color: var(--text-2);
-  border-bottom: 1px solid var(--line);
 }
 .pitch em {
   font-style: italic;
@@ -1833,6 +1817,20 @@ button, input, select, textarea {
   border-color: var(--red-hi);
 }
 
+.field__input--ok {
+  border-color: #5a9e6f;
+}
+.field__input--ok:focus {
+  border-color: #5a9e6f;
+}
+
+.field__input--bad {
+  border-color: var(--red-hi);
+}
+.field__input--bad:focus {
+  border-color: var(--red-hi);
+}
+
 .alert {
   padding: var(--s-2) var(--s-3);
   margin-bottom: var(--s-3);
@@ -1846,6 +1844,96 @@ button, input, select, textarea {
   text-transform: uppercase;
   color: #fff;
   font-variant-numeric: tabular-nums;
+}
+
+.xselect {
+  position: relative;
+}
+.xselect select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.xselect__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: var(--t-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease);
+}
+.xselect__btn:hover {
+  border-color: var(--line-2);
+}
+.xselect__btn:focus-visible {
+  border-color: var(--red-hi);
+  outline: none;
+}
+.xselect__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.xselect__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xselect__caret {
+  flex: none;
+  font-size: 0.75em;
+  color: var(--text-4);
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.xselect.is-open .xselect__caret {
+  transform: rotate(180deg);
+}
+
+.xselect__menu {
+  position: absolute;
+  z-index: 720;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: none;
+}
+.xselect__menu.is-on {
+  display: block;
+}
+
+.xselect__opt {
+  padding: var(--s-2) var(--s-3);
+  border-radius: 5px;
+  font-size: var(--t-sm);
+  color: var(--text);
+  cursor: pointer;
+}
+.xselect__opt.is-active {
+  background: var(--surface-2);
+}
+.xselect__opt.is-on {
+  color: var(--red-hi);
+  font-weight: 600;
 }
 
 .scrim {
@@ -3191,7 +3279,7 @@ button, input, select, textarea {
     height: auto;
     top: auto;
   }
-  .rail__top, .rail__foot {
+  .rail__top {
     display: none;
   }
   .rail__nav {
@@ -3440,6 +3528,7 @@ button, input, select, textarea {
 }
 
 .who__face {
+  position: relative;
   width: 84px;
   height: 84px;
   flex: none;
@@ -3459,6 +3548,35 @@ button, input, select, textarea {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.who__face-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 18, 15, 0.55);
+  color: #fff;
+  font-size: var(--t-md);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.who__face:hover .who__face-edit {
+  opacity: 1;
+}
+
+.lb-connect {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-4);
+}
+
+.lb-connect .field__input {
+  width: 50%;
+  flex: none;
+  padding: var(--s-3);
 }
 
 .who__name {
@@ -3516,13 +3634,6 @@ button, input, select, textarea {
 }
 .profile__main .rows-view .line:last-child {
   border-bottom: none;
-}
-
-.profile__notes {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--surface);
 }
 
 .lb {

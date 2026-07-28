@@ -1,3 +1,3 @@
 <?php
-$roles = ['Filmmaker', 'Critic', 'Enthusiast', 'Member'];
+$roles = ['Director', 'Producer', 'Cinematographer', 'Editor', 'Actor', 'Writer', 'Critic', 'Enthusiast', 'Member'];
 ?>

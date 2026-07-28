@@ -82,7 +82,42 @@ function normalize_lb($v) {
 
 $action = $_GET['action'] ?? '';
 
-if($action==='login') {
+if ($action === 'update_lb') {
+  // A single-field sibling to updateprof — that endpoint rewrites every
+  // profile column at once, so posting just `lb` to it would blank out the
+  // member's real name, phone, website and role. This one touches nothing
+  // else, and like every other write here, whose row it touches comes from
+  // the session, never from POST.
+  header('Content-Type: application/json');
+  if (!isset($_SESSION['username'])) { echo json_encode(['success' => false]); exit; }
+
+  $uid_q = $conn->prepare("SELECT `id` FROM `users` WHERE `email` = :email");
+  $uid_q->execute([':email' => $_SESSION['username']]);
+  $uid = $uid_q->fetchColumn();
+  if (!$uid) { echo json_encode(['success' => false]); exit; }
+
+  $lb = normalize_lb($_POST['lb'] ?? '');
+  $conn->prepare("UPDATE `users` SET `lb` = :lb WHERE `id` = :uid")->execute([':lb' => $lb, ':uid' => $uid]);
+  echo json_encode(['success' => true, 'lb' => $lb]);
+  exit;
+}
+else if ($action === 'check_email') {
+  // Read-only and reveals nothing the signup form doesn't already disclose
+  // via error 104 on submit — this just answers sooner, while typing.
+  header('Content-Type: application/json');
+  $email = trim((string)($_POST['email'] ?? ''));
+
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    echo json_encode(['valid' => false]);
+    exit;
+  }
+
+  $q = $conn->prepare("SELECT id FROM `users` WHERE `email` = :email LIMIT 1");
+  $q->execute([':email' => $email]);
+  echo json_encode(['valid' => true, 'available' => !$q->fetchColumn()]);
+  exit;
+}
+else if($action==='login') {
 	$user = trim((string)($_POST['email'] ?? ''));
 	$pass = (string)($_POST['pw'] ?? '');
 

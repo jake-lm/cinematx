@@ -51,11 +51,11 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
       <form id="join-form">
         <input type="hidden" name="ajax" value="1" />
         <div class="field"><label class="field__label" for="j-email">Email</label>
-          <input class="field__input" id="j-email" type="email" name="email" /></div>
+          <input class="field__input" id="j-email" type="email" name="email" autocomplete="email" /></div>
         <div class="field"><label class="field__label" for="j-pw">Password</label>
-          <input class="field__input" id="j-pw" type="password" name="pw" /></div>
+          <input class="field__input" id="j-pw" type="password" name="pw" placeholder="8+ characters" autocomplete="new-password" /></div>
         <div class="field"><label class="field__label" for="j-pw2">Confirm password</label>
-          <input class="field__input" id="j-pw2" type="password" name="pw2" /></div>
+          <input class="field__input" id="j-pw2" type="password" name="pw2" autocomplete="new-password" /></div>
         <div class="field"><label class="field__label" for="j-code">Access code</label>
           <input class="field__input" id="j-code" type="text" name="code" placeholder="Ask around." /></div>
         <input class="btn btn--block" type="submit" value="Sign up" />
