@@ -28,11 +28,14 @@ $(document).ready(function() {
 
   function postData() {
     return {
-      title:      $('#post-title').val().trim(),
-      subtitle:   $('#post-subtitle').val().trim(),
-      content:    $('#post-content').val().trim(),
-      type:       $('#post-type').val(),
-      photo_cred: $('#post-photo-cred').val().trim()
+      title:       $('#post-title').val().trim(),
+      subtitle:    $('#post-subtitle').val().trim(),
+      content:     $('#post-content').val().trim(),
+      type:        $('#post-type').val(),
+      photo_cred:  $('#post-photo-cred-1').val().trim(),
+      photo_cred2: $('#post-photo-cred-2').val().trim(),
+      photo_cred3: $('#post-photo-cred-3').val().trim(),
+      image_mode:  $('#post-image-mode').val()
     };
   }
 
@@ -41,28 +44,31 @@ $(document).ready(function() {
   }
 
   // ── Image upload ───────────────────────────────────────────────────────────
+  // Three independent slots (1 hero, 2 and 3 for the inline/cycle spread),
+  // same endpoint as before with a slot number now telling it which column.
 
-  function enableImageInput() {
-    $('#post-image').prop('disabled', false);
-    $('#post-image-label').addClass('enabled');
-    $('#post-image-hint').text('');
+  function enableImageInput(n) {
+    $('#post-image-' + n).prop('disabled', false);
+    $('#post-image-label-' + n).addClass('enabled');
+    $('#post-image-hint-' + n).text('');
   }
 
-  function showImagePreview(src) {
-    $('#post-image-thumb').attr('src', src);
-    $('#post-image-preview').show();
+  function showImagePreview(n, src) {
+    $('#post-image-thumb-' + n).attr('src', src);
+    $('#post-image-preview-' + n).show();
   }
 
-  function clearImagePreview() {
-    $('#post-image-thumb').attr('src', '');
-    $('#post-image-preview').hide();
-    $('#post-image').val('');
+  function clearImagePreview(n) {
+    $('#post-image-thumb-' + n).attr('src', '');
+    $('#post-image-preview-' + n).hide();
+    $('#post-image-' + n).val('');
   }
 
-  function uploadImage(file) {
+  function uploadImage(n, file) {
     if (!postId || !file) return;
     var fd = new FormData();
     fd.append('post_id', postId);
+    fd.append('slot', n);
     fd.append('image', file);
     setStatus('uploading image...');
     $.ajax({
@@ -78,34 +84,36 @@ $(document).ready(function() {
           // made a directory-permissions problem and a published-post problem
           // look identical from the outside.
           setStatus('image upload failed' + (res && res.error ? ' (' + res.error + ')' : ''), '#b22222');
-          clearImagePreview();
+          clearImagePreview(n);
         }
       },
       error: function() {
         setStatus('image upload failed', '#b22222');
-        clearImagePreview();
+        clearImagePreview(n);
       }
     });
   }
 
-  $('#post-image').on('change', function() {
-    var file = this.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function(e) { showImagePreview(e.target.result); };
-    reader.readAsDataURL(file);
-    uploadImage(file);
-  });
+  [1, 2, 3].forEach(function (n) {
+    $('#post-image-' + n).on('change', function() {
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) { showImagePreview(n, e.target.result); };
+      reader.readAsDataURL(file);
+      uploadImage(n, file);
+    });
 
-  $('#post-image-remove').on('click', function() {
-    clearImagePreview();
-    // clear image in DB via update with empty image flag
-    if (postId) {
-      $.ajax({
-        type: 'POST', url: '/dashboard/post.php?action=upload_image&remove=1',
-        data: { post_id: postId }, dataType: 'json'
-      });
-    }
+    $('#post-image-remove-' + n).on('click', function() {
+      clearImagePreview(n);
+      // clear image in DB via update with empty image flag
+      if (postId) {
+        $.ajax({
+          type: 'POST', url: '/dashboard/post.php?action=upload_image&remove=1&slot=' + n,
+          data: { post_id: postId }, dataType: 'json'
+        });
+      }
+    });
   });
 
   // ── Profile photo upload (Account tab) ──────────────────────────────────────
@@ -163,7 +171,7 @@ $(document).ready(function() {
           if (res.success) {
             postId = res.post_id;
             autosaveOn = true;
-            enableImageInput();
+            [1, 2, 3].forEach(enableImageInput);
             $('#post-publish').prop('disabled', false);
             $('#post-save').text('Save Draft');
             setStatus('draft saved');
@@ -250,18 +258,24 @@ $(document).ready(function() {
         $('#post-subtitle').val(res.post.subtitle || '');
         $('#post-type').val(res.post.type || '');
         $('#post-content').val(res.post.content);
-        $('#post-photo-cred').val(res.post.photo_cred || '');
+        $('#post-photo-cred-1').val(res.post.photo_cred || '');
+        $('#post-photo-cred-2').val(res.post.photo_cred2 || '');
+        $('#post-photo-cred-3').val(res.post.photo_cred3 || '');
+        $('#post-image-mode').val(res.post.image_mode || 'cycle');
 
         postId     = parseInt(id);
         autosaveOn = true;
         clearTimeout(saveTimer);
 
-        enableImageInput();
-        if (res.post.image) {
-          showImagePreview('/uploads/posts/' + res.post.image);
-        } else {
-          clearImagePreview();
-        }
+        var images = [res.post.image, res.post.image2, res.post.image3];
+        [1, 2, 3].forEach(function (n) {
+          enableImageInput(n);
+          if (images[n - 1]) {
+            showImagePreview(n, '/uploads/posts/' + images[n - 1]);
+          } else {
+            clearImagePreview(n);
+          }
+        });
 
         $('#post-featured').prop('checked', parseInt(res.post.featured) === 1);
         $('#post-save').prop('disabled', false).text('Save Draft');
@@ -345,15 +359,18 @@ $(document).ready(function() {
         });
         if (postId === id) {
           postId = null; autosaveOn = false; clearTimeout(saveTimer);
-          $('#post-title, #post-subtitle, #post-content, #post-photo-cred').val('');
+          $('#post-title, #post-subtitle, #post-content, #post-photo-cred-1, #post-photo-cred-2, #post-photo-cred-3').val('');
           $('#post-type').val('');
+          $('#post-image-mode').val('cycle');
           $('#post-featured').prop('checked', false);
           $('#post-publish').prop('disabled', true).text('Publish');
           $('#post-save').prop('disabled', false).text('Save Draft');
-          clearImagePreview();
-          $('#post-image').prop('disabled', true);
-          $('#post-image-label').removeClass('enabled');
-          $('#post-image-hint').text('Save a draft first');
+          [1, 2, 3].forEach(function (n) {
+            clearImagePreview(n);
+            $('#post-image-' + n).prop('disabled', true);
+            $('#post-image-label-' + n).removeClass('enabled');
+            $('#post-image-hint-' + n).text('Save a draft first');
+          });
           setStatus('');
         }
       }

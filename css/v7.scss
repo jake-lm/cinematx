@@ -656,6 +656,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
   figcaption { margin-top: var(--s-2); @include label(9px, var(--text-4)); }
 }
 
+// Same crossfade as the homepage lead, sized for the article's own hero
+// rather than the compact card. Ties break by source order, so these rules
+// coming after the base ones is what lets them override img/figcaption
+// there without a fight over specificity.
+.reading__figure--cycle {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+
+  img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover; border-radius: 0;
+    opacity: 0;
+    transition: opacity 900ms var(--ease);
+    &.is-on { opacity: 1; }
+  }
+  figcaption {
+    position: absolute; left: 0; right: 0; bottom: 0; margin-top: 0;
+    padding: var(--s-2) var(--s-3);
+    background: linear-gradient(to top, rgba(10,9,7,0.75), rgba(10,9,7,0));
+    color: #fff;
+    opacity: 0;
+    transition: opacity 900ms var(--ease);
+    &.is-on { opacity: 1; }
+  }
+}
+
 .reading__body {
   font-size: var(--t-md);
   line-height: 1.78;
@@ -821,6 +850,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
   img { display: block; width: 100%; height: 132px; object-fit: cover;
         transition: opacity var(--t-fast) var(--ease); }
   &:hover img { opacity: 0.9; }
+}
+
+// Two or three images crossfading in the same box. The single-image path
+// above is untouched — this only ever renders when there is a second image
+// to fade to, so nothing about today's single-image posts changes.
+.lead__art--cycle {
+  position: relative;
+  height: 132px;
+  img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover;
+    opacity: 0;
+    transition: opacity 900ms var(--ease);
+    &.is-on { opacity: 1; }
+  }
 }
 
 .lead__kicker { display: flex; gap: var(--s-3); margin-bottom: var(--s-3); @include label(var(--t-3xs), var(--red-hi)); }
@@ -2180,6 +2224,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .write-photo-cred { font-size: var(--t-sm); color: var(--text-2); }
 
 .write-image-wrap { margin-top: var(--s-5); }
+
+.write-image-slot {
+  padding-top: var(--s-4);
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--line);
+  &:first-child { padding-top: 0; margin-top: 0; border-top: none; }
+}
+
 .write-image-row  { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 
 .write-image-btn {
@@ -2217,6 +2269,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: #fff; font-size: var(--t-xs); cursor: pointer;
   &:hover { background: var(--red); }
 }
+
+.write-image-mode-row { margin-top: var(--s-5); }
+.write-image-mode-label { @include label(var(--t-3xs), var(--text-3)); }
 
 .write-footer {
   display: flex; align-items: center; gap: var(--s-4);

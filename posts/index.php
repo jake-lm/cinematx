@@ -83,16 +83,51 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <span>Cinema, TX</span>
       </div>
 
-      <?php if (!empty($post['image'])): ?>
+      <?php
+        $post_images = ctx_post_images($post);
+        // Inline only means something once there is more than one image to
+        // spread — with just the hero, cycle and inline render identically,
+        // so there is no reason to make the paragraph-splitting path do the
+        // work when the single-figure path already gets there.
+        $inline = ($post['image_mode'] ?? 'cycle') === 'inline' && count($post_images) > 1;
+      ?>
+
+      <?php if (!$inline && count($post_images) === 1): $img = $post_images[0]; ?>
       <figure class="reading__figure">
-        <img src="/uploads/posts/<?php echo $e($post['image']); ?>" alt="<?php echo $e($post['title']); ?>" />
-        <?php if (!empty($post['photo_cred'])): ?>
-        <figcaption><?php echo $e($post['photo_cred']); ?></figcaption>
+        <img src="/uploads/posts/<?php echo $e($img['file']); ?>" alt="<?php echo $e($post['title']); ?>" />
+        <?php if (!empty($img['cred'])): ?>
+        <figcaption><?php echo $e($img['cred']); ?></figcaption>
         <?php endif; ?>
+      </figure>
+      <?php elseif (!$inline && $post_images): ?>
+      <figure class="reading__figure reading__figure--cycle">
+        <?php foreach ($post_images as $i => $img): ?>
+        <img class="<?php echo $i === 0 ? 'is-on' : ''; ?>" src="/uploads/posts/<?php echo $e($img['file']); ?>" alt="<?php echo $e($post['title']); ?>" />
+        <?php endforeach; ?>
+        <?php foreach ($post_images as $i => $img): if (!empty($img['cred'])): ?>
+        <figcaption class="<?php echo $i === 0 ? 'is-on' : ''; ?>"><?php echo $e($img['cred']); ?></figcaption>
+        <?php endif; endforeach; ?>
       </figure>
       <?php endif; ?>
 
+      <?php if ($inline):
+        $paragraphs = ctx_post_paragraphs($post['content']);
+        $positions  = ctx_post_image_positions(count($paragraphs), count($post_images));
+      ?>
+      <div class="reading__body prose">
+        <?php foreach ($paragraphs as $n => $para): $num = $n + 1; ?>
+        <p><?php echo nl2br($e($para)); ?></p>
+        <?php foreach ($positions as $img_i => $pos): if ($pos === $num): $img = $post_images[$img_i]; ?>
+        <figure class="reading__figure reading__figure--inline">
+          <img src="/uploads/posts/<?php echo $e($img['file']); ?>" alt="<?php echo $e($post['title']); ?>" />
+          <?php if (!empty($img['cred'])): ?><figcaption><?php echo $e($img['cred']); ?></figcaption><?php endif; ?>
+        </figure>
+        <?php endif; endforeach; ?>
+        <?php endforeach; ?>
+      </div>
+      <?php else: ?>
       <div class="reading__body prose"><?php echo nl2br($e($post['content'])); ?></div>
+      <?php endif; ?>
 
       <?php
       // The old page's share buttons all pointed at "#". These are real: X and

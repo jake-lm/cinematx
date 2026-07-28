@@ -82,18 +82,34 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <textarea id="post-content" class="write-content" placeholder="Write something…"></textarea>
 
             <div class="write-image-wrap">
-              <div class="write-image-row">
-                <label class="write-image-btn" id="post-image-label">
-                  <i class="fa-solid fa-image"></i> Main image
-                  <input type="file" id="post-image" accept="image/jpeg,image/png,image/webp,image/gif" disabled />
-                </label>
-                <span class="write-image-hint" id="post-image-hint">Save a draft first</span>
+              <?php $image_labels = [1 => 'Image 1 — hero', 2 => 'Image 2', 3 => 'Image 3']; ?>
+              <?php foreach ($image_labels as $n => $label): ?>
+              <div class="write-image-slot">
+                <div class="write-image-row">
+                  <label class="write-image-btn" id="post-image-label-<?php echo $n; ?>">
+                    <i class="fa-solid fa-image"></i> <?php echo $e($label); ?>
+                    <input type="file" id="post-image-<?php echo $n; ?>" accept="image/jpeg,image/png,image/webp,image/gif" disabled />
+                  </label>
+                  <span class="write-image-hint" id="post-image-hint-<?php echo $n; ?>">Save a draft first</span>
+                </div>
+                <div class="write-image-preview" id="post-image-preview-<?php echo $n; ?>" style="display:none;">
+                  <img id="post-image-thumb-<?php echo $n; ?>" src="" alt="preview" />
+                  <button class="write-image-remove" id="post-image-remove-<?php echo $n; ?>" title="Remove image">&#x2715;</button>
+                </div>
+                <input type="text" id="post-photo-cred-<?php echo $n; ?>" class="write-photo-cred" placeholder="Photo credit — optional" autocomplete="off" />
               </div>
-              <div class="write-image-preview" id="post-image-preview" style="display:none;">
-                <img id="post-image-thumb" src="" alt="preview" />
-                <button class="write-image-remove" id="post-image-remove" title="Remove image">&#x2715;</button>
+              <?php endforeach; ?>
+
+              <?php // Only matters with more than one image, but showing it
+                    // unconditionally means it is already set correctly the
+                    // moment a second image goes in. ?>
+              <div class="write-row write-image-mode-row">
+                <span class="write-image-mode-label">Multiple images</span>
+                <select id="post-image-mode" class="write-type">
+                  <option value="cycle">Cycle in the header</option>
+                  <option value="inline">Spread between paragraphs</option>
+                </select>
               </div>
-              <input type="text" id="post-photo-cred" class="write-photo-cred" placeholder="Photo credit — optional" autocomplete="off" />
             </div>
 
             <div class="write-footer">

@@ -56,6 +56,28 @@
     }, 10000);
   }
 
+  // ══ Image cycle ══════════════════════════════════════════════════════════
+  // The Journal lead card and an article's own hero share this — both are a
+  // box of stacked <img> (and, on the article page, <figcaption>) elements
+  // with the current one carrying .is-on. Only ever rendered server-side when
+  // there is a second image to fade to, so this never runs for a lone photo.
+
+  function initImageCycle() {
+    $$('.lead__art--cycle, .reading__figure--cycle').forEach(function (box) {
+      var imgs = $$('img', box);
+      if (imgs.length < 2) return;
+      var caps = $$('figcaption', box);
+      var i = 0;
+      setInterval(function () {
+        imgs[i].classList.remove('is-on');
+        if (caps[i]) caps[i].classList.remove('is-on');
+        i = (i + 1) % imgs.length;
+        imgs[i].classList.add('is-on');
+        if (caps[i]) caps[i].classList.add('is-on');
+      }, 4000);
+    });
+  }
+
   // ══ Theme ════════════════════════════════════════════════════════════════
   // Paper is the default; the stylesheet only overrides on [data-theme=dark],
   // so this must agree and never consult prefers-color-scheme.
@@ -742,7 +764,7 @@
     initWelcome(); initTheme(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
-    initHovercard();
+    initHovercard(); initImageCycle();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -193,17 +193,25 @@ require __DIR__ . '/_chrome.php';
           </div>
           <div class="card__body">
             <?php if ($lead): ?>
-            <?php $lead_url = ctx_post_url($lead['id'], $lead['title']); ?>
+            <?php
+              $lead_url    = ctx_post_url($lead['id'], $lead['title']);
+              $lead_images = ctx_post_images($lead);
+            ?>
             <article class="lead">
               <?php // The image earns its place by replacing the truncated
                     // excerpt below, not by sitting on top of it — this card
                     // already overflows its box. A picture teases a piece
-                    // better than four clipped lines of it anyway. ?>
-              <?php if (!empty($lead['image'])): ?>
-              <a class="lead__art" href="<?php echo $e($lead_url); ?>">
+                    // better than four clipped lines of it anyway.
+                    // Two or three images fade between each other for the same
+                    // reason the alamo stack exists — motion earns a glance a
+                    // static card would not get. ?>
+              <?php if ($lead_images): ?>
+              <a class="lead__art<?php echo count($lead_images) > 1 ? ' lead__art--cycle' : ''; ?>" href="<?php echo $e($lead_url); ?>">
                 <?php // Not lazy: this sits near the top of the front page, so deferring
                     // it only delays the one image the page actually leads with. ?>
-                <img src="/uploads/posts/<?php echo $e($lead['image']); ?>" alt="" />
+                <?php foreach ($lead_images as $i => $img): ?>
+                <img class="<?php echo $i === 0 ? 'is-on' : ''; ?>" src="/uploads/posts/<?php echo $e($img['file']); ?>" alt="" />
+                <?php endforeach; ?>
               </a>
               <?php endif; ?>
               <div class="lead__kicker">
@@ -219,7 +227,7 @@ require __DIR__ . '/_chrome.php';
                 <a href="/users/profile.php?id=<?php echo (int)$lead['uid']; ?>"><?php echo $e($lead['author_name']); ?></a>
                 <?php endif; ?>
               </div>
-              <?php if (empty($lead['image'])): ?>
+              <?php if (!$lead_images): ?>
               <div class="lead__wrap">
                 <div class="lead__body"><?php echo nl2br($e($lead['content'])); ?></div>
                 <div class="lead__fade"></div>

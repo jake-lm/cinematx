@@ -965,6 +965,42 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.reading__figure--cycle {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.reading__figure--cycle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+.reading__figure--cycle img.is-on {
+  opacity: 1;
+}
+.reading__figure--cycle figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin-top: 0;
+  padding: var(--s-2) var(--s-3);
+  background: linear-gradient(to top, rgba(10, 9, 7, 0.75), rgba(10, 9, 7, 0));
+  color: #fff;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+.reading__figure--cycle figcaption.is-on {
+  opacity: 1;
+}
+
 .reading__body {
   font-size: var(--t-md);
   line-height: 1.78;
@@ -1225,6 +1261,23 @@ button, input, select, textarea {
 }
 .lead__art:hover img {
   opacity: 0.9;
+}
+
+.lead__art--cycle {
+  position: relative;
+  height: 132px;
+}
+.lead__art--cycle img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+.lead__art--cycle img.is-on {
+  opacity: 1;
 }
 
 .lead__kicker {
@@ -3717,6 +3770,17 @@ button, input, select, textarea {
   margin-top: var(--s-5);
 }
 
+.write-image-slot {
+  padding-top: var(--s-4);
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+.write-image-slot:first-child {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
 .write-image-row {
   display: flex;
   align-items: center;
@@ -3791,6 +3855,20 @@ button, input, select, textarea {
 }
 .write-image-remove:hover {
   background: var(--red);
+}
+
+.write-image-mode-row {
+  margin-top: var(--s-5);
+}
+
+.write-image-mode-label {
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .write-footer {

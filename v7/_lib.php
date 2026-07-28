@@ -53,6 +53,45 @@ function ctx_post_url($id, $title) {
     return '/posts/' . $slug . '-' . (int)$id;
 }
 
+/**
+ * A post's images, in slot order, each with whatever credit belongs to it.
+ * Slots are independent — an author can fill 1 and 3 and leave 2 empty — so
+ * this compacts them rather than leaving gaps a caller would have to check
+ * `!empty()` around a second time.
+ */
+function ctx_post_images(array $post) {
+    $out = [];
+    foreach ([['image', 'photo_cred'], ['image2', 'photo_cred2'], ['image3', 'photo_cred3']] as [$ik, $ck]) {
+        if (!empty($post[$ik])) $out[] = ['file' => $post[$ik], 'cred' => $post[$ck] ?? null];
+    }
+    return $out;
+}
+
+/** Blank-line-separated blocks — the paragraph unit inline images are spaced against. */
+function ctx_post_paragraphs($content) {
+    $content = trim((string)$content);
+    if ($content === '') return [];
+    return array_values(array_filter(array_map('trim', preg_split('/\n\s*\n+/', $content))));
+}
+
+/**
+ * Which paragraph each image follows, evenly spread rather than piled at the
+ * top or bottom. Six paragraphs and three images means one every two; nine
+ * and three means one every three — the interval is paragraphs divided by
+ * images, and an image lands after every interval-th paragraph.
+ *
+ * Returns one 1-based paragraph number per image, in image order. A shorter
+ * article than it has images clamps every position to the last paragraph
+ * rather than pointing past the end.
+ */
+function ctx_post_image_positions($paragraph_count, $image_count) {
+    if ($image_count <= 0 || $paragraph_count <= 0) return [];
+    $interval = max(1, (int)floor($paragraph_count / $image_count));
+    $positions = [];
+    for ($i = 1; $i <= $image_count; $i++) $positions[] = min($i * $interval, $paragraph_count);
+    return $positions;
+}
+
 // ── The signed-in member ───────────────────────────────────────────────────
 
 function ctx_me($conn) {

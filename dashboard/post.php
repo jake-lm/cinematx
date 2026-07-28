@@ -21,49 +21,64 @@ if (!$uid) {
 $action = $_GET['action'] ?? '';
 
 if ($action === 'create') {
-  $title      = $_POST['title']      ?? '';
-  $subtitle   = $_POST['subtitle']   ?? null;
-  $content    = $_POST['content']    ?? '';
-  $type       = $_POST['type']       ?? null;
-  $photo_cred = $_POST['photo_cred'] ?? null;
-  $stamp      = time();
+  $title       = $_POST['title']       ?? '';
+  $subtitle    = $_POST['subtitle']    ?? null;
+  $content     = $_POST['content']     ?? '';
+  $type        = $_POST['type']        ?? null;
+  $photo_cred  = $_POST['photo_cred']  ?? null;
+  $photo_cred2 = $_POST['photo_cred2'] ?? null;
+  $photo_cred3 = $_POST['photo_cred3'] ?? null;
+  // Anything else reads as the default rather than silently rejecting a post.
+  $image_mode  = ($_POST['image_mode'] ?? '') === 'inline' ? 'inline' : 'cycle';
+  $stamp       = time();
 
-  $stmt = $conn->prepare("INSERT INTO `posts` (uid, title, subtitle, content, type, photo_cred, stamp, active)
-                          VALUES (:uid, :title, :subtitle, :content, :type, :photo_cred, :stamp, 0)");
+  $stmt = $conn->prepare("INSERT INTO `posts`
+                          (uid, title, subtitle, content, type, photo_cred, photo_cred2, photo_cred3, image_mode, stamp, active)
+                          VALUES (:uid, :title, :subtitle, :content, :type, :photo_cred, :photo_cred2, :photo_cred3, :image_mode, :stamp, 0)");
   $stmt->execute([
-    ':uid'        => $uid,
-    ':title'      => $title,
-    ':subtitle'   => $subtitle ?: null,
-    ':content'    => $content,
-    ':type'       => $type ?: null,
-    ':photo_cred' => $photo_cred ?: null,
-    ':stamp'      => $stamp,
+    ':uid'         => $uid,
+    ':title'       => $title,
+    ':subtitle'    => $subtitle ?: null,
+    ':content'     => $content,
+    ':type'        => $type ?: null,
+    ':photo_cred'  => $photo_cred ?: null,
+    ':photo_cred2' => $photo_cred2 ?: null,
+    ':photo_cred3' => $photo_cred3 ?: null,
+    ':image_mode'  => $image_mode,
+    ':stamp'       => $stamp,
   ]);
 
   echo json_encode(['success' => true, 'post_id' => (int)$conn->lastInsertId()]);
 }
 else if ($action === 'update') {
-  $post_id    = (int)($_POST['post_id'] ?? 0);
-  $title      = $_POST['title']      ?? '';
-  $subtitle   = $_POST['subtitle']   ?? null;
-  $content    = $_POST['content']    ?? '';
-  $type       = $_POST['type']       ?? null;
-  $photo_cred = $_POST['photo_cred'] ?? null;
-  $edited     = time();
+  $post_id     = (int)($_POST['post_id'] ?? 0);
+  $title       = $_POST['title']       ?? '';
+  $subtitle    = $_POST['subtitle']    ?? null;
+  $content     = $_POST['content']     ?? '';
+  $type        = $_POST['type']        ?? null;
+  $photo_cred  = $_POST['photo_cred']  ?? null;
+  $photo_cred2 = $_POST['photo_cred2'] ?? null;
+  $photo_cred3 = $_POST['photo_cred3'] ?? null;
+  $image_mode  = ($_POST['image_mode'] ?? '') === 'inline' ? 'inline' : 'cycle';
+  $edited      = time();
 
   $stmt = $conn->prepare("UPDATE `posts`
                           SET title=:title, subtitle=:subtitle, content=:content,
-                              type=:type, photo_cred=:photo_cred, edited=:edited
+                              type=:type, photo_cred=:photo_cred, photo_cred2=:photo_cred2,
+                              photo_cred3=:photo_cred3, image_mode=:image_mode, edited=:edited
                           WHERE id=:post_id AND uid=:uid");
   $stmt->execute([
-    ':title'      => $title,
-    ':subtitle'   => $subtitle ?: null,
-    ':content'    => $content,
-    ':type'       => $type ?: null,
-    ':photo_cred' => $photo_cred ?: null,
-    ':edited'     => $edited,
-    ':post_id'    => $post_id,
-    ':uid'        => $uid,
+    ':title'       => $title,
+    ':subtitle'    => $subtitle ?: null,
+    ':content'     => $content,
+    ':type'        => $type ?: null,
+    ':photo_cred'  => $photo_cred ?: null,
+    ':photo_cred2' => $photo_cred2 ?: null,
+    ':photo_cred3' => $photo_cred3 ?: null,
+    ':image_mode'  => $image_mode,
+    ':edited'      => $edited,
+    ':post_id'     => $post_id,
+    ':uid'         => $uid,
   ]);
 
   echo json_encode(['success' => true]);
@@ -87,7 +102,9 @@ else if ($action === 'unpublish') {
 else if ($action === 'get') {
   $post_id = (int)($_GET['post_id'] ?? 0);
 
-  $stmt = $conn->prepare("SELECT id, title, subtitle, content, type, image, photo_cred, active, featured, stamp, edited
+  $stmt = $conn->prepare("SELECT id, title, subtitle, content, type,
+                          image, image2, image3, photo_cred, photo_cred2, photo_cred3, image_mode,
+                          active, featured, stamp, edited
                           FROM `posts` WHERE id=:post_id AND uid=:uid");
   $stmt->execute([':post_id' => $post_id, ':uid' => $uid]);
   $post = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -101,13 +118,20 @@ else if ($action === 'get') {
 else if ($action === 'upload_image') {
   $post_id = (int)($_POST['post_id'] ?? 0);
 
+  // Which of the three image columns this request targets. Whitelisted
+  // rather than trusted, since it ends up interpolated into SQL — PDO can
+  // parameterise a value but not a column name.
+  $slots  = ['1' => 'image', '2' => 'image2', '3' => 'image3'];
+  $slot   = $slots[$_POST['slot'] ?? $_GET['slot'] ?? '1'] ?? null;
+  if (!$slot) { echo json_encode(['success' => false, 'error' => 'bad_slot']); exit; }
+
   // Ownership only. This used to carry AND active=0, copied from the delete
   // branch where requiring a draft is deliberate — you unpublish before you
   // destroy. Here it meant a published essay could have its words edited but
   // not its image, and the failure surfaced as a bare "image upload failed".
   // The two writes below never had the restriction, which is the giveaway,
   // and event.php's poster upload gets this right.
-  $check = $conn->prepare("SELECT id, image FROM `posts` WHERE id=:post_id AND uid=:uid");
+  $check = $conn->prepare("SELECT id, `$slot` AS current FROM `posts` WHERE id=:post_id AND uid=:uid");
   $check->execute([':post_id' => $post_id, ':uid' => $uid]);
   $row = $check->fetch(PDO::FETCH_ASSOC);
   if (!$row) {
@@ -116,11 +140,11 @@ else if ($action === 'upload_image') {
 
   // remove-only request (no file)
   if (isset($_GET['remove']) && $_GET['remove'] === '1') {
-    if (!empty($row['image'])) {
-      $old = __DIR__ . '/../uploads/posts/' . $row['image'];
+    if (!empty($row['current'])) {
+      $old = __DIR__ . '/../uploads/posts/' . $row['current'];
       if (file_exists($old)) unlink($old);
     }
-    $stmt = $conn->prepare("UPDATE `posts` SET image=NULL WHERE id=:post_id AND uid=:uid");
+    $stmt = $conn->prepare("UPDATE `posts` SET `$slot`=NULL WHERE id=:post_id AND uid=:uid");
     $stmt->execute([':post_id' => $post_id, ':uid' => $uid]);
     echo json_encode(['success' => true]); exit;
   }
@@ -144,12 +168,12 @@ else if ($action === 'upload_image') {
 
   $ext_map = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
   $ext      = $ext_map[$mime];
-  $filename = $post_id . '_' . time() . '.' . $ext;
+  $filename = $post_id . '_' . $slot . '_' . time() . '.' . $ext;
   $dest     = __DIR__ . '/../uploads/posts/' . $filename;
 
   // delete old image if one exists
-  if (!empty($row['image'])) {
-    $old = __DIR__ . '/../uploads/posts/' . $row['image'];
+  if (!empty($row['current'])) {
+    $old = __DIR__ . '/../uploads/posts/' . $row['current'];
     if (file_exists($old)) unlink($old);
   }
 
@@ -157,7 +181,7 @@ else if ($action === 'upload_image') {
     echo json_encode(['success' => false, 'error' => 'move_failed']); exit;
   }
 
-  $stmt = $conn->prepare("UPDATE `posts` SET image=:image WHERE id=:post_id AND uid=:uid");
+  $stmt = $conn->prepare("UPDATE `posts` SET `$slot`=:image WHERE id=:post_id AND uid=:uid");
   $stmt->execute([':image' => $filename, ':post_id' => $post_id, ':uid' => $uid]);
 
   echo json_encode(['success' => true, 'filename' => $filename]);
