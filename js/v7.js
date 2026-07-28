@@ -74,7 +74,7 @@
         i = (i + 1) % imgs.length;
         imgs[i].classList.add('is-on');
         if (caps[i]) caps[i].classList.add('is-on');
-      }, 4000);
+      }, 10000);
     });
   }
 
