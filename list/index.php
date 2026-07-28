@@ -17,9 +17,23 @@ $end = $now + 7 * 86400;
 
 $films = ctx_enrich(fetch_all_screenings($conn, $now, $end));
 
+// Chips and the header count screenings. Folding happens after, so a venue
+// that collapses into one card still reports how much it is actually showing.
+$venues     = ctx_venues($films);
+$counts     = ctx_venue_counts($films);
+$by_member  = count(array_filter($films, fn($f) => ($f['source'] ?? '') === 'user'));
+$n_screenings = count($films);
+
+// Alamo runs five cinemas and books the same film across them; a day of it is
+// a schedule rather than a listing. See ctx_fold_venue().
+$entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
+
+// Every folded card opens a panel; they are collected as we render.
+$ctx_extra_sheets = '';
+
 // Group by calendar day, preserving chronological order.
 $days = [];
-foreach ($films as $f) {
+foreach ($entries as $f) {
     $dt  = (new DateTime('@' . $f['timestamp']))->setTimezone($tz);
     $key = $dt->format('Ymd');
     if (!isset($days[$key])) {
@@ -31,10 +45,6 @@ foreach ($films as $f) {
 $today_key = (new DateTime('today', $tz))->format('Ymd');
 $tmrw_key  = (new DateTime('tomorrow', $tz))->format('Ymd');
 
-$venues    = ctx_venues($films);
-$counts    = ctx_venue_counts($films);
-$by_member = count(array_filter($films, fn($f) => ($f['source'] ?? '') === 'user'));
-
 // Shell
 $ctx_title  = 'The List — Cinema, TX';
 $ctx_active = 'list';
@@ -43,15 +53,23 @@ $ctx_video  = false;
 
 $e = 'ctx_e';
 
-/** One screening, rendered for whichever view. */
+/** One screening — or one folded venue-day — rendered for whichever view. */
 function ctx_screening($s, $view) {
     $e      = 'ctx_e';
     $member = ($s['source'] ?? '') === 'user';
+    $group  = !empty($s['is_group']);
     $href   = !empty($s['url']) ? $s['url'] : '#';
-    $ext    = $member ? '' : ' target="_blank" rel="noopener"';
+    $ext    = ($member || $group) ? '' : ' target="_blank" rel="noopener"';
+
+    // data-count is what the header adds up. A folded card stands for all its
+    // showings, so counting elements would understate the page and disagree
+    // with the venue chips beside it.
     $attrs  = 'data-venue="' . $e(ctx_slug($s['venue'])) . '"'
             . ' data-source="' . ($member ? 'user' : 'venue') . '"'
-            . ctx_screening_hover($s);
+            . ' data-count="' . ($group ? (int)$s['n_showings'] : 1) . '"'
+            . ($group ? ' data-open="' . $e($s['group_id']) . '"' : ctx_screening_hover($s));
+
+    if ($group) { ctx_fold_card($s, $view); return; }
 
     if ($view === 'grid') { ?>
       <a class="shot<?php echo $member ? ' shot--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>
@@ -100,8 +118,8 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <?php // The scope word is driven by the Week/Today/Tomorrow control,
                 // not baked in — it used to keep saying "next seven days" while
                 // the number beside it changed to today's. ?>
-          <span class="listing__sub"><span id="list-count"><?php echo count($films); ?></span>
-            <span id="list-noun"><?php echo count($films) === 1 ? 'screening' : 'screenings'; ?></span>
+          <span class="listing__sub"><span id="list-count"><?php echo $n_screenings; ?></span>
+            <span id="list-noun"><?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?></span>
             &middot; <span id="list-scope">next seven days</span></span>
         </div>
 
@@ -120,7 +138,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <!-- Venue and member-submitted collapse into one narrowing control,
                so the page asks for two decisions rather than three. -->
           <div class="chips">
-            <button class="chip is-on" data-narrow="all">All<span class="chip__n"><?php echo count($films); ?></span></button>
+            <button class="chip is-on" data-narrow="all">All<span class="chip__n"><?php echo $n_screenings; ?></span></button>
             <?php foreach ($venues as $v): $vs = ctx_slug($v); ?>
             <button class="chip" data-narrow="venue:<?php echo $e($vs); ?>">
               <?php echo $e(ctx_venue_short($v)); ?><span class="chip__n"><?php echo (int)($counts[$vs] ?? 0); ?></span>
@@ -148,7 +166,10 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </div>
 
         <div class="grid-view">
-          <?php foreach ($day['films'] as $s) ctx_screening($s, 'grid'); ?>
+          <?php foreach ($day['films'] as $s) {
+                  if (!empty($s['is_group'])) $ctx_extra_sheets .= ctx_group_sheet($s);
+                  ctx_screening($s, 'grid');
+                } ?>
         </div>
         <div class="rows-view">
           <?php foreach ($day['films'] as $s) ctx_screening($s, 'rows'); ?>

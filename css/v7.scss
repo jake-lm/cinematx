@@ -1383,6 +1383,76 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  FOLDED VENUE CARDS
+//  A chain that books one film across five cinemas produces a schedule, not a
+//  listing. One card stands for a day of it and opens a panel.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// The stack. Three faces, offset and rotated a touch, so it reads as a pile of
+// films at a glance rather than a single card with a heavy border.
+.fold__stack {
+  position: relative;
+  overflow: visible;
+  background: none;
+}
+
+.fold__face {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  transition: transform var(--t-slow) var(--ease);
+}
+.fold__face--3 { transform: translate(10px, -6px) rotate(4deg);  z-index: 1; }
+.fold__face--2 { transform: translate(5px, -3px)  rotate(2deg);  z-index: 2; }
+.fold__face--1 { transform: none;                                z-index: 3; }
+
+.shot--fold {
+  &:hover {
+    .fold__face--3 { transform: translate(15px, -9px) rotate(6deg); }
+    .fold__face--2 { transform: translate(8px, -5px)  rotate(3deg); }
+  }
+  // The stack leans out of its box, so the row needs headroom for it.
+  .shot__art { margin-top: 8px; }
+  .shot__time { z-index: 4; }
+}
+
+.line--fold {
+  background: var(--surface-2);
+  box-shadow: inset 2px 0 0 0 var(--red-hi);
+}
+
+// ── The panel ──────────────────────────────────────────────────────────────
+
+.fold__when  { @include label(var(--t-3xs), var(--red-hi)); }
+.fold__count { margin: var(--s-1) 0 var(--s-5); @include label(var(--t-3xs), var(--text-4)); }
+
+.fold__film {
+  display: flex;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+  text-decoration: none;
+  &:hover .fold__title { color: var(--red-hi); }
+}
+
+.fold__art {
+  flex: none; width: 52px;
+  border-radius: 4px; overflow: hidden;
+  background: var(--surface-3);
+  align-self: flex-start;
+  img { display: block; width: 100%; height: auto; }
+}
+
+.fold__meta  { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fold__title { font-family: var(--f-display); font-size: var(--t-sm); font-weight: 600;
+               color: var(--text); line-height: 1.2; }
+.fold__bits  { @include label(var(--t-3xs), var(--text-4)); }
+.fold__times { font-family: var(--f-read); font-size: var(--t-xs); line-height: 1.5;
+               color: var(--text-2); }
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  ADMIN — VISITORS
 //  Reading, not operating, so it sits below the panels and is laid out to be
 //  scanned rather than filled in.

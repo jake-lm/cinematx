@@ -29,9 +29,21 @@ if ($state === 'onboard' || $state === 'gated') {
 
 $tonight = ctx_tonight($conn, $now);
 $films   = $tonight['screenings'];
+
+// Chips and the header count screenings, so all of this is computed before
+// folding — otherwise Alamo's chip reports the number of cards it collapsed
+// into (2) rather than what it is showing (23), and the chips stop summing to
+// the total beside them.
+$n_screenings = count($films);
+$venues       = ctx_venues($films);
+$counts       = ctx_venue_counts($films);
+
+// A compact front-page module has even less room for a chain's schedule than
+// The List does. Two days, so the threshold is lower.
+$films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
+$ctx_extra_sheets = '';
+foreach ($films as $s) if (!empty($s['is_group'])) $ctx_extra_sheets .= ctx_group_sheet($s);
 $label   = $tonight['label'];
-$venues  = ctx_venues($films);
-$counts  = ctx_venue_counts($films);
 
 $theatre = ctx_theatre($conn, $now);
 $film    = $theatre['film'];
@@ -69,8 +81,8 @@ require __DIR__ . '/_chrome.php';
         <div class="card__head">
           <span class="card__n">01</span>
           <span class="card__title"><?php echo $e($label); ?> in Austin</span>
-          <a class="card__more" href="/list"><span id="list-count"><?php echo count($films); ?></span>
-                <span id="list-noun"><?php echo count($films) === 1 ? 'screening' : 'screenings'; ?></span> &rarr;</a>
+          <a class="card__more" href="/list"><span id="list-count"><?php echo $n_screenings; ?></span>
+                <span id="list-noun"><?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?></span> &rarr;</a>
         </div>
 
         <div class="controls">
@@ -80,7 +92,7 @@ require __DIR__ . '/_chrome.php';
           </div>
 
           <div class="chips">
-            <button class="chip is-on" data-narrow="all">All<span class="chip__n"><?php echo count($films); ?></span></button>
+            <button class="chip is-on" data-narrow="all">All<span class="chip__n"><?php echo $n_screenings; ?></span></button>
             <?php foreach ($venues as $v): $vs = ctx_slug($v); ?>
             <button class="chip" data-narrow="venue:<?php echo $e($vs); ?>">
               <?php echo $e(ctx_venue_short($v)); ?>
@@ -97,6 +109,7 @@ require __DIR__ . '/_chrome.php';
 
           <div class="grid-view" id="grid-view">
             <?php foreach ($films as $s):
+              if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); continue; }
               $member = ($s['source'] ?? '') === 'user';
               $href   = !empty($s['url']) ? $s['url'] : '/list';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
@@ -125,6 +138,7 @@ require __DIR__ . '/_chrome.php';
 
           <div class="rows-view" id="rows-view">
             <?php foreach ($films as $s):
+              if (!empty($s['is_group'])) { ctx_fold_card($s, 'rows'); continue; }
               $member = ($s['source'] ?? '') === 'user';
               $href   = !empty($s['url']) ? $s['url'] : '/list';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);

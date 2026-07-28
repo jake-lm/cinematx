@@ -100,7 +100,9 @@
   //   [data-narrow]  all | venue:<slug> | source:user
   //   [data-when]    week | today | tmrw            — list page only
   //
-  // Each screening is rendered once per view, so counts only tally .shot.
+  // Each screening is rendered once per view, so counts only tally .shot —
+  // and by data-count rather than by element, because a folded venue card
+  // stands for all of its showings.
 
   function initList() {
     // Gate on the toggle, not on the views. The profile page reuses .rows-view
@@ -128,6 +130,13 @@
       store.set('ctx-view', state.view);
     }
 
+    // How many screenings an element stands for: one, unless it is a folded
+    // venue card. Keeps the header agreeing with the venue chips, which count
+    // screenings and are rendered before any folding happens.
+    function weight(el) {
+      return parseInt(el.getAttribute('data-count'), 10) || 1;
+    }
+
     function matches(el) {
       var n = state.narrow;
       if (n === 'all') return true;
@@ -150,7 +159,7 @@
           $$('.shot, .line', day).forEach(function (el) {
             var ok = inDay && matches(el);
             el.classList.toggle('is-hidden', !ok);
-            if (ok && el.classList.contains('shot')) visible++;
+            if (ok && el.classList.contains('shot')) visible += weight(el);
           });
           // A day whose screenings are all filtered out loses its heading too.
           day.classList.toggle('is-hidden', visible === 0);
@@ -160,7 +169,7 @@
         $$('.shot, .line').forEach(function (el) {
           var ok = matches(el);
           el.classList.toggle('is-hidden', !ok);
-          if (ok && el.classList.contains('shot')) shown++;
+          if (ok && el.classList.contains('shot')) shown += weight(el);
         });
       }
 

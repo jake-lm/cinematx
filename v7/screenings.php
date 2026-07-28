@@ -116,6 +116,160 @@ function ctx_bits($s, $venue = true) {
     return $bits;
 }
 
+/**
+ * Fold one venue's screenings for a day into a single entry.
+ *
+ * Alamo is a five-location chain: it books the same film at the same minute in
+ * several cinemas, so one Tuesday produced thirteen rows against six films
+ * while Hyperreal produced one row per screening. Forcing both into the same
+ * shape was the mistake — a chain's day is a schedule, not a listing.
+ *
+ * The rule is behavioural, not a name: any venue passed here that has $min or
+ * more screenings in a day is folded. Below that a card would be a box drawn
+ * around a single item, so those days stay ordinary rows — which is what
+ * Friday, Saturday and Sunday look like.
+ *
+ * Returns the same flat list with the folded screenings replaced by one entry
+ * carrying is_group, sorted back into chronological order by its earliest
+ * showing so it sits where it belongs rather than pinned to the top.
+ */
+function ctx_fold_venue(array $films, $venue, $min = 3) {
+    $tz = new DateTimeZone('America/Chicago');
+    $out = [];
+    $days = [];
+
+    foreach ($films as $f) {
+        if (($f['venue'] ?? '') !== $venue) { $out[] = $f; continue; }
+        $days[(new DateTime('@' . $f['timestamp']))->setTimezone($tz)->format('Ymd')][] = $f;
+    }
+
+    foreach ($days as $day => $group) {
+        if (count($group) < $min) { foreach ($group as $f) $out[] = $f; continue; }
+        usort($group, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+
+        // Within the day, one line per film, its showings gathered under it.
+        $byFilm = [];
+        foreach ($group as $f) {
+            $k = $f['display_title'] ?? $f['title'];
+            if (!isset($byFilm[$k])) { $byFilm[$k] = $f; $byFilm[$k]['showings'] = []; }
+            $byFilm[$k]['showings'][] = ['t' => $f['timestamp'], 'loc' => $f['location'] ?? ''];
+        }
+
+        // Two or three faces for the stacked tile; skip films with no artwork
+        // so the stack never shows a blank card.
+        $posters = [];
+        foreach ($byFilm as $f) {
+            if (!empty($f['poster']) && count($posters) < 3) $posters[] = $f['poster'];
+        }
+
+        $out[] = [
+            'is_group'      => true,
+            'group_id'      => ctx_slug($venue) . '-' . $day,
+            'venue'         => $venue,
+            'location'      => null,
+            'source'        => 'official',
+            'timestamp'     => $group[0]['timestamp'],
+            'title'         => $venue,
+            'display_title' => $venue,
+            'series'        => null,
+            'url'           => '#',
+            'films'         => array_values($byFilm),
+            'n_films'       => count($byFilm),
+            'n_showings'    => count($group),
+            'posters'       => $posters,
+            'day_label'     => (new DateTime('@' . $group[0]['timestamp']))->setTimezone($tz)->format('l j F'),
+        ];
+    }
+
+    usort($out, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    return $out;
+}
+
+/** The showings of one film inside a folded card: "10:45am Lakeline · 4:10pm Mueller". */
+function ctx_showings_label(array $showings) {
+    $parts = [];
+    foreach ($showings as $s) {
+        $parts[] = date('g:ia', $s['t']) . ($s['loc'] !== '' ? ' ' . $s['loc'] : '');
+    }
+    return implode(' · ', $parts);
+}
+
+/**
+ * The panel a folded card opens. Markup only — the sheet, scrim, Escape and
+ * click-outside behaviour already exist for the account panel, and
+ * initOverlays() resolves data-open="x" to #sheet-x, so this needs no
+ * JavaScript of its own.
+ */
+function ctx_group_sheet(array $e) {
+    $h = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    ob_start(); ?>
+<aside class="sheet sheet--side" id="sheet-<?php echo $h($e['group_id']); ?>">
+  <div class="sheet__head">
+    <span class="sheet__title"><?php echo $h($e['venue']); ?></span>
+    <button class="ibtn sheet__x" data-close title="Close"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="sheet__body">
+    <div class="fold__when"><?php echo $h($e['day_label']); ?></div>
+    <div class="fold__count"><?php echo (int)$e['n_films']; ?> film<?php echo $e['n_films'] === 1 ? '' : 's'; ?>
+      &middot; <?php echo (int)$e['n_showings']; ?> showing<?php echo $e['n_showings'] === 1 ? '' : 's'; ?></div>
+
+    <?php foreach ($e['films'] as $f): ?>
+    <a class="fold__film" href="<?php echo $h($f['url'] ?: '#'); ?>" target="_blank" rel="noopener">
+      <span class="fold__art">
+        <?php if (!empty($f['poster'])): ?><img src="<?php echo $h($f['poster']); ?>" alt="" loading="lazy" /><?php endif; ?>
+      </span>
+      <span class="fold__meta">
+        <span class="fold__title"><?php echo $h($f['display_title'] ?? $f['title']); ?></span>
+        <?php $bits = ctx_bits($f, false); if ($bits): ?>
+        <span class="fold__bits"><?php echo $h(implode(' · ', $bits)); ?></span>
+        <?php endif; ?>
+        <span class="fold__times"><?php echo $h(ctx_showings_label($f['showings'])); ?></span>
+      </span>
+    </a>
+    <?php endforeach; ?>
+  </div>
+</aside>
+<?php return ob_get_clean();
+}
+
+/**
+ * The card a folded venue-day renders as, in either view. Shared by /list/ and
+ * the front page so the two cannot drift — the tile and the row are only
+ * different triggers for the same panel.
+ */
+function ctx_fold_card($s, $view) {
+    $e     = 'ctx_e';
+    $label = $s['n_films'] . ' film' . ($s['n_films'] === 1 ? '' : 's');
+    $sub   = $s['n_showings'] . ' showing' . ($s['n_showings'] === 1 ? '' : 's');
+    $attrs = 'data-venue="' . $e(ctx_slug($s['venue'])) . '" data-source="venue"'
+           . ' data-count="' . (int)$s['n_showings'] . '"'
+           . ' data-open="' . $e($s['group_id']) . '"';
+
+    if ($view === 'grid') { ?>
+      <a class="shot shot--fold" <?php echo $attrs; ?> href="#">
+        <span class="shot__art fold__stack">
+          <?php // Two or three faces, back to front, so the offset reads as a
+                // pile of films rather than one card with a heavy border. ?>
+          <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
+          <img class="fold__face fold__face--<?php echo count($s['posters']) - $i; ?>" src="<?php echo $e($p); ?>" alt="" />
+          <?php endforeach; ?>
+          <span class="shot__time"><?php echo $e($label); ?></span>
+        </span>
+        <span class="shot__title"><?php echo $e(ctx_venue_short($s['venue'])); ?><span class="shot__series"><?php echo $e($sub); ?></span></span>
+        <span class="shot__venue"><?php echo date('D j M', $s['timestamp']); ?> &middot; tap for times</span>
+      </a>
+    <?php } else { ?>
+      <a class="line line--fold" <?php echo $attrs; ?> href="#">
+        <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
+        <span>
+          <span class="line__title"><?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span></span>
+          <span class="line__sub"><?php echo $e($sub); ?> across five cinemas &middot; tap for times</span>
+        </span>
+        <span class="line__venue"><?php echo date('D', $s['timestamp']); ?></span>
+      </a>
+    <?php }
+}
+
 /** Distinct venues present, for the filter chips. */
 function ctx_venues(array $films) {
     $v = [];
