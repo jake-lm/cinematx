@@ -198,11 +198,24 @@ function ctx_fold_titles(array $films, $show = 3) {
     return implode(', ', $head) . ($rest > 0 ? ' + ' . $rest . ' more' : '');
 }
 
-/** The showings of one film inside a folded card: "10:45am Lakeline · 4:10pm Mueller". */
+/**
+ * The showings of one film: "10:45am Lakeline · 4:10pm Mueller".
+ *
+ * The weekday appears only when the showings actually span more than one date.
+ * Inside an Alamo day card they never do, and printing it there would be
+ * noise; on a front-page card that merges Tuesday and Wednesday, leaving it
+ * out made "4:30pm · 4:15pm" look like a sorting bug.
+ */
 function ctx_showings_label(array $showings) {
+    $dates = [];
+    foreach ($showings as $s) $dates[date('Ymd', $s['t'])] = true;
+    $spans = count($dates) > 1;
+
     $parts = [];
     foreach ($showings as $s) {
-        $parts[] = date('g:ia', $s['t']) . ($s['loc'] !== '' ? ' ' . $s['loc'] : '');
+        $parts[] = ($spans ? date('D ', $s['t']) : '')
+                 . date('g:ia', $s['t'])
+                 . ($s['loc'] !== '' ? ' ' . $s['loc'] : '');
     }
     return implode(' · ', $parts);
 }
@@ -333,6 +346,60 @@ function ctx_fold_children($s, $view) {
     }
 }
 
+/**
+ * Collapse repeat showings of the same film at the same venue into one entry.
+ *
+ * The front page covers tonight and tomorrow, so a film running both nights
+ * appeared twice with nothing but the time to tell the cards apart — two
+ * Spirited Aways side by side reads as a mistake rather than as a choice of
+ * evenings.
+ *
+ * Entries already folded by ctx_fold_venue() pass through untouched; a venue
+ * card is not a film and must not be merged with one.
+ */
+function ctx_fold_repeats(array $entries) {
+    $out = [];
+    $seen = [];
+
+    foreach ($entries as $f) {
+        if (!empty($f['is_group'])) { $out[] = $f; continue; }
+
+        $key = ($f['display_title'] ?? $f['title']) . '|' . ($f['venue'] ?? '');
+        if (!isset($seen[$key])) {
+            $f['showings'] = [];
+            $seen[$key] = count($out);
+            $out[] = $f;
+        }
+        $out[$seen[$key]]['showings'][] = ['t' => $f['timestamp'], 'loc' => $f['location'] ?? ''];
+    }
+
+    // The card announces itself by its earliest showing, and sorting has to
+    // happen again because merging moved entries out of chronological order.
+    foreach ($out as &$f) {
+        if (empty($f['showings'])) continue;
+        usort($f['showings'], fn($a, $b) => $a['t'] <=> $b['t']);
+        $f['timestamp'] = $f['showings'][0]['t'];
+    }
+    unset($f);
+
+    usort($out, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    return $out;
+}
+
+/**
+ * The time badge on a poster: one line per showing, with the weekday when the
+ * card spans more than one.
+ */
+function ctx_time_lines(array $showings, $now) {
+    $multi = count($showings) > 1;
+    $lines = [];
+    foreach ($showings as $s) {
+        $other = date('j M', $s['t']) !== date('j M', $now);
+        $lines[] = date('g:ia', $s['t']) . (($multi || $other) ? ' ' . date('D', $s['t']) : '');
+    }
+    return $lines;
+}
+
 /** Distinct venues present, for the filter chips. */
 function ctx_venues(array $films) {
     $v = [];
@@ -395,9 +462,13 @@ function ctx_screening_hover($s) {
         'meta'  => implode(' · ', ctx_bits($s, false)),
         'sub'   => implode(' · ', $sub),
         'body'  => $s['overview'] ?? null,
+        // A card standing for several showings should list them, not just its
+        // earliest — that is the whole reason it was merged.
         'foot'  => trim(($s['venue'] ?? '')
                       . (empty($s['location']) ? '' : ', ' . $s['location'])
-                      . (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp'])), ' ·'),
+                      . (!empty($s['showings']) && count($s['showings']) > 1
+                          ? ' · ' . ctx_showings_label($s['showings'])
+                          : (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp']))), ' ·'),
         'link'  => empty($s['wiki']) ? null : ['href' => $s['wiki'], 'label' => 'Wikipedia'],
     ]);
 }

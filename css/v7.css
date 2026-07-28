@@ -708,6 +708,13 @@ button, input, select, textarea {
   color: #fff;
   font-variant-numeric: tabular-nums;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.shot__t {
+  display: block;
 }
 
 .shot__title {
