@@ -185,6 +185,19 @@ function ctx_fold_venue(array $films, $venue, $min = 3) {
     return $out;
 }
 
+/**
+ * A few of the titles inside a folded card: "Rashomon, Arco, Casualties of War
+ * + 3 more". Naming them beats counting them — "6 films" tells you the size of
+ * the thing, not whether you want it.
+ */
+function ctx_fold_titles(array $films, $show = 3) {
+    $names = [];
+    foreach ($films as $f) $names[] = $f['display_title'] ?? $f['title'];
+    $head = array_slice($names, 0, $show);
+    $rest = count($names) - count($head);
+    return implode(', ', $head) . ($rest > 0 ? ' + ' . $rest . ' more' : '');
+}
+
 /** The showings of one film inside a folded card: "10:45am Lakeline · 4:10pm Mueller". */
 function ctx_showings_label(array $showings) {
     $parts = [];
@@ -241,8 +254,13 @@ function ctx_fold_card($s, $view) {
     $e     = 'ctx_e';
     $label = $s['n_films'] . ' film' . ($s['n_films'] === 1 ? '' : 's');
     $sub   = $s['n_showings'] . ' showing' . ($s['n_showings'] === 1 ? '' : 's');
+    // data-fold marks the collapsed card; its children carry data-unfold with
+    // the same value. Narrowing to this venue swaps which of the two is shown —
+    // once you have asked for Alamo, a card whose headline is "Alamo" tells you
+    // nothing you did not just say.
     $attrs = 'data-venue="' . $e(ctx_slug($s['venue'])) . '" data-source="venue"'
            . ' data-count="' . (int)$s['n_showings'] . '"'
+           . ' data-fold="' . $e(ctx_slug($s['venue'])) . '"'
            . ' data-open="' . $e($s['group_id']) . '"';
 
     if ($view === 'grid') { ?>
@@ -263,11 +281,56 @@ function ctx_fold_card($s, $view) {
         <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
         <span>
           <span class="line__title"><?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span></span>
-          <span class="line__sub"><?php echo $e($sub); ?> across five cinemas &middot; tap for times</span>
+          <span class="line__sub"><?php echo $e(ctx_fold_titles($s['films'])); ?></span>
         </span>
         <span class="line__venue"><?php echo date('D', $s['timestamp']); ?></span>
       </a>
     <?php }
+}
+
+/**
+ * What a folded card becomes when its venue is the one being filtered to: one
+ * entry per film for that day, carrying all of its times and cinemas. Rendered
+ * alongside the collapsed card and hidden until needed, so the swap is a class
+ * toggle rather than a fetch.
+ *
+ * Per film rather than per showing — unfolding Alamo to all 39 of its
+ * screenings would put back the flood this was built to remove.
+ */
+function ctx_fold_children($s, $view) {
+    $e   = 'ctx_e';
+    $key = ctx_slug($s['venue']);
+
+    foreach ($s['films'] as $f) {
+        $attrs = 'data-venue="' . $e($key) . '" data-source="venue"'
+               . ' data-count="' . count($f['showings']) . '"'
+               . ' data-unfold="' . $e($key) . '"'
+               . ctx_screening_hover($f);
+        $times = ctx_showings_label($f['showings']);
+        $href  = !empty($f['url']) ? $f['url'] : '#';
+
+        if ($view === 'grid') { ?>
+      <a class="shot is-hidden" <?php echo $attrs; ?> href="<?php echo $e($href); ?>" target="_blank" rel="noopener">
+        <span class="shot__art">
+          <?php if (!empty($f['poster'])): ?>
+          <img src="<?php echo $e($f['poster']); ?>" alt="<?php echo $e($f['display_title']); ?>" loading="lazy" />
+          <?php else: ?><span class="shot__blank"><?php echo $e($f['display_title']); ?></span><?php endif; ?>
+          <span class="shot__time"><?php echo count($f['showings']); ?> &times;</span>
+        </span>
+        <span class="shot__title"><?php echo $e($f['display_title']); ?></span>
+        <span class="shot__venue"><?php echo $e($times); ?></span>
+      </a>
+        <?php } else { ?>
+      <a class="line is-hidden" <?php echo $attrs; ?> href="<?php echo $e($href); ?>" target="_blank" rel="noopener">
+        <span class="line__time"><?php echo date('g:ia', $f['showings'][0]['t']); ?></span>
+        <span>
+          <span class="line__title"><?php echo $e($f['display_title']); ?></span>
+          <span class="line__sub"><?php echo $e(implode(' · ', ctx_bits($f, false))); ?> &middot; <?php echo $e($times); ?></span>
+        </span>
+        <span class="line__venue"><?php echo date('D', $f['showings'][0]['t']); ?></span>
+      </a>
+        <?php }
+    }
 }
 
 /** Distinct venues present, for the filter chips. */

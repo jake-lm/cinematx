@@ -139,8 +139,18 @@
 
     function matches(el) {
       var n = state.narrow;
+
+      // A venue that folds renders twice: the collapsed card, and the films it
+      // contains. Narrowing to that venue shows the films and hides the card —
+      // once you have asked for Alamo, a card headed "Alamo" says nothing.
+      var fold   = el.getAttribute('data-fold');
+      var unfold = el.getAttribute('data-unfold');
+      var asked  = n.indexOf('venue:') === 0 ? n.slice(6) : null;
+      if (fold   && fold   === asked) return false;
+      if (unfold && unfold !== asked) return false;
+
       if (n === 'all') return true;
-      if (n.indexOf('venue:')  === 0) return el.getAttribute('data-venue')  === n.slice(6);
+      if (n.indexOf('venue:')  === 0) return el.getAttribute('data-venue')  === asked;
       if (n.indexOf('source:') === 0) return el.getAttribute('data-source') === n.slice(7);
       return true;
     }

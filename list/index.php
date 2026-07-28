@@ -69,7 +69,7 @@ function ctx_screening($s, $view) {
             . ' data-count="' . ($group ? (int)$s['n_showings'] : 1) . '"'
             . ($group ? ' data-open="' . $e($s['group_id']) . '"' : ctx_screening_hover($s));
 
-    if ($group) { ctx_fold_card($s, $view); return; }
+    if ($group) { ctx_fold_card($s, $view); ctx_fold_children($s, $view); return; }
 
     if ($view === 'grid') { ?>
       <a class="shot<?php echo $member ? ' shot--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>

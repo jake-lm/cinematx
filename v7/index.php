@@ -109,7 +109,7 @@ require __DIR__ . '/_chrome.php';
 
           <div class="grid-view" id="grid-view">
             <?php foreach ($films as $s):
-              if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); continue; }
+              if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); ctx_fold_children($s, 'grid'); continue; }
               $member = ($s['source'] ?? '') === 'user';
               $href   = !empty($s['url']) ? $s['url'] : '/list';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
@@ -138,7 +138,7 @@ require __DIR__ . '/_chrome.php';
 
           <div class="rows-view" id="rows-view">
             <?php foreach ($films as $s):
-              if (!empty($s['is_group'])) { ctx_fold_card($s, 'rows'); continue; }
+              if (!empty($s['is_group'])) { ctx_fold_card($s, 'rows'); ctx_fold_children($s, 'rows'); continue; }
               $member = ($s['source'] ?? '') === 'user';
               $href   = !empty($s['url']) ? $s['url'] : '/list';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
