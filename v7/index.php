@@ -41,10 +41,6 @@ $counts       = ctx_venue_counts($films);
 // A compact front-page module has even less room for a chain's schedule than
 // The List does. Two days, so the threshold is lower.
 $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
-
-// Then the same film at the same venue on both nights — two Spirited Aways
-// side by side read as a mistake rather than a choice of evenings.
-$films = ctx_fold_repeats($films);
 $ctx_extra_sheets = '';
 foreach ($films as $s) if (!empty($s['is_group'])) $ctx_extra_sheets .= ctx_group_sheet($s);
 $label   = $tonight['label'];
@@ -119,8 +115,7 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="shot<?php echo $member ? ' shot--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
-               data-count="<?php echo count($s['showings'] ?? [1]); ?>"<?php echo ctx_screening_hover($s); ?>
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"<?php echo ctx_screening_hover($s); ?>
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="shot__art">
                 <?php if (!empty($s['poster'])): ?>
@@ -128,7 +123,7 @@ require __DIR__ . '/_chrome.php';
                 <?php else: ?>
                 <span class="shot__blank"><?php echo $e($s['display_title']); ?></span>
                 <?php endif; ?>
-                <span class="shot__time"><?php foreach (ctx_time_lines($s['showings'], $now) as $l): ?><span class="shot__t"><?php echo $e($l); ?></span><?php endforeach; ?></span>
+                <span class="shot__time"><?php echo date('g:ia', $s['timestamp']); ?><?php echo $other ? ' · ' . date('D', $s['timestamp']) : ''; ?></span>
               </span>
               <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
               <span class="shot__venue">
@@ -149,16 +144,14 @@ require __DIR__ . '/_chrome.php';
               $other  = date('j M', $s['timestamp']) !== date('j M', $now);
             ?>
             <a class="line<?php echo $member ? ' line--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
-               data-count="<?php echo count($s['showings'] ?? [1]); ?>"<?php echo ctx_screening_hover($s); ?>
+               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"<?php echo ctx_screening_hover($s); ?>
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
               <span>
                 <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
                 <span class="line__sub">
                   <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
-                  <?php echo $e(implode(' · ', ctx_bits($s))); ?>
-                  &middot; <?php echo $e(implode(' · ', ctx_time_lines($s['showings'], $now))); ?>
+                  <?php echo $e(implode(' · ', ctx_bits($s))); ?><?php echo $other ? ' · ' . date('D j M', $s['timestamp']) : ''; ?>
                 </span>
               </span>
               <span class="line__venue"><?php echo $other ? date('D', $s['timestamp']) : 'Today'; ?></span>
