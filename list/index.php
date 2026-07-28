@@ -27,6 +27,9 @@ $n_screenings = count($films);
 // Alamo runs five cinemas and books the same film across them; a day of it is
 // a schedule rather than a listing. See ctx_fold_venue().
 $entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
+// Fathom books one title into every chain at once, so a single release is six
+// rows at the same minute — the same shape, folded the same way.
+$entries = ctx_fold_venue($entries, 'Fathom Events', 3);
 
 // Every folded card opens a panel; they are collected as we render.
 $ctx_extra_sheets = '';

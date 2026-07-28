@@ -27,7 +27,7 @@ conversion is complete. Don't edit it.
 | `v7/_head.php` `_chrome.php` `_foot.php` | The shell — set `$ctx_title`, `$ctx_scroll`, `$ctx_video`, `$ctx_overlay`, `$ctx_shell`, `$ctx_meta`, `$ctx_scripts` before including |
 | `v7/_screening.php` | Shared body of `/th1/` and `/th2/`; they set `$ctx_screen` and include it |
 | `v7/screenings.php` | Title cleaning, series parsing, `ctx_bits()`, `ctx_hover()` |
-| `list/tmdb.php` | TMDB lookup — poster, year, runtime, plot, genres, director, Wikipedia link. Versioned cache (`TMDB_CACHE_V`) |
+| `list/tmdb.php` | TMDB lookup — poster, year, runtime, plot, genres, director, Wikipedia link. Versioned cache (`TMDB_CACHE_V`). `tmdb_best()` prefers an exact normalised title match over TMDB's relevance order |
 | `list/cache.php` | `ctx_cached_scrape()` — TTL, locking, stale-beats-empty |
 | `bin/warm-cache.php` | Cron entry point. CLI only |
 | `_admin/_guard.php` | Admin auth + CSRF. Included first by every `_admin/` file |
@@ -111,7 +111,6 @@ rules) and running `php bin/warm-cache.php` once before announcing the site.
 - [ ] **Mobile `/th1` optimization** — deferred
 - [ ] **Email verification on signup** — deferred
 - [ ] **Discord/Instagram real URLs** — social icon hrefs are currently `#`
-- [ ] **TMDB match override map** — "MIRROR" resolves to *Mirror Mirror* (2012) across poster, runtime and Wikipedia link. A one-word title with nothing to disambiguate on; needs a small manual override table.
 - [ ] **Retire `script.js` / `script-jlm.js`** — nothing loads them any more; the v7 conversion is complete and `startSync()` in `v7.js` supersedes `theatre_1()`. Safe to delete once you're happy.
 - [ ] **Rewrite `dashboard.js` / `quick-create.js`** in vanilla — ~1,200 lines of jQuery, the last of the old front-end.
 - [ ] **Drop `films.motw`** — dead column, still written as 0 on upload.

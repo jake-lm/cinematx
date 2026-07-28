@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 3;
+const TMDB_CACHE_V = 4;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -47,6 +47,40 @@ const TMDB_FORMATS = '/\s+(?:in|on)?\s*(?:3-?D|IMAX|4K(?:\s+restorations?)?|70\s
 function tmdb_query($title) {
     $q = trim(preg_replace(TMDB_FORMATS, '', trim((string)$title)));
     return $q !== '' ? $q : trim((string)$title);
+}
+
+/**
+ * Pick the right film from a search response.
+ *
+ * TMDB orders by its own relevance, which is usually right and occasionally
+ * badly wrong: "Willy Wonka and the Chocolate Factory" returned the 2017 Tom
+ * and Jerry crossover ahead of the 1971 film, because the distributor writes
+ * "and" where TMDB has "&". "MIRROR" returned Mirror Mirror (2012) ahead of
+ * Tarkovsky.
+ *
+ * So: if any result's title matches the query exactly once punctuation and
+ * ampersands are normalised away, prefer those, most popular first. Otherwise
+ * keep TMDB's own ordering — a query with no exact match is one where its
+ * relevance ranking is the best signal available, and sorting everything by
+ * popularity would hand obscure searches to whatever blockbuster shares a word.
+ */
+function tmdb_best(array $results, $query) {
+    if (!$results) return null;
+
+    $norm = function ($s) {
+        $s = strtolower(str_replace('&', ' and ', (string)$s));
+        return trim(preg_replace('/\s+/', ' ', preg_replace('/[^a-z0-9]+/', ' ', $s)));
+    };
+    $q = $norm($query);
+
+    $exact = [];
+    foreach ($results as $r) {
+        if ($norm($r['title'] ?? '') === $q) $exact[] = $r;
+    }
+    if (!$exact) return $results[0];
+
+    usort($exact, fn($a, $b) => ($b['popularity'] ?? 0) <=> ($a['popularity'] ?? 0));
+    return $exact[0];
 }
 
 function tmdb_get($url) {
@@ -86,7 +120,7 @@ function fetch_tmdb($title, $year = null) {
     );
     if ($search === null) return TMDB_EMPTY;   // transient failure — don't cache, retry next time
 
-    $hit = $search['results'][0] ?? null;
+    $hit = tmdb_best($search['results'] ?? [], $title);
     $out = TMDB_EMPTY;
 
     if ($hit) {

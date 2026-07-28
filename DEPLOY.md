@@ -169,8 +169,5 @@ curl -s https://yourdomain/ | grep -c 'Warning\|Fatal error'         # 0
 
 - **`films.motw` is dead.** Nothing reads it. It's still written as `0` on
   upload and can be dropped when the schema is next touched.
-- **`"MIRROR"` resolves to the wrong film** — TMDB matches *Mirror Mirror*
-  (2012) for a one-word title with nothing to disambiguate on. Affects its
-  poster, runtime and Wikipedia link together. Needs a manual override map.
 - **`dashboard.js` and `quick-create.js`** are still jQuery, ~1,200 lines. They
   work; they're the last of the old front-end.

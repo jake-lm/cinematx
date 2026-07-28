@@ -20,6 +20,13 @@
 // Phrases venues use to bolt extra billing onto a title.
 const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented\s+by|in\s+person|with\s+director|w\/)\s+.*$/i';
 
+// Re-release billing: "… 55th Anniversary", "… 20th Anniversary - Studio
+// Ghibli Fest 2026". Distributors put the occasion in the title and TMDB then
+// finds nothing, so Willy Wonka, Point Break and both Ghibli titles arrived
+// with no poster, year or plot. The leading ordinal is required, so a film
+// actually called "The Anniversary" is untouched.
+const CTX_ANNIVERSARY = '/\s+\d{1,3}(?:st|nd|rd|th)\s+anniversary\b.*$/i';
+
 /** The series/programme a screening belongs to, if the title carries one. */
 function ctx_series($raw) {
     $raw = trim((string)$raw);
@@ -37,6 +44,7 @@ function ctx_series($raw) {
 function ctx_clean_title($raw) {
     $t = trim((string)$raw);
     $t = preg_replace(CTX_CONNECTIVES, '', $t);              // "… ft. X"
+    $t = preg_replace(CTX_ANNIVERSARY, '', $t);              // "… 35th Anniversary…"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title"
         if (!preg_match('/^\d+$/', trim($m[1]))) $t = $m[2];
@@ -155,12 +163,19 @@ function ctx_fold_venue(array $films, $venue, $min = 3) {
             $byFilm[$k]['showings'][] = ['t' => $f['timestamp'], 'loc' => $f['location'] ?? ''];
         }
 
-        // Two or three faces for the stacked tile; skip films with no artwork
-        // so the stack never shows a blank card.
+        // Faces for the tile, skipping films with no artwork so the stack never
+        // shows a blank card. Depth follows the number of showings, not the
+        // number of films — Fathom books one title into six cinemas at once, so
+        // its card has a single poster and would otherwise render flat, looking
+        // like an ordinary screening rather than seven of them. Where there are
+        // fewer posters than showings the artwork repeats, which is what the
+        // front page already does for a film running two nights.
+        $art = [];
+        foreach ($byFilm as $f) if (!empty($f['poster'])) $art[] = $f['poster'];
+
+        $depth   = min(3, max(count($art), count($group)));
         $posters = [];
-        foreach ($byFilm as $f) {
-            if (!empty($f['poster']) && count($posters) < 3) $posters[] = $f['poster'];
-        }
+        for ($i = 0; $i < $depth && $art; $i++) $posters[] = $art[$i % count($art)];
 
         $out[] = [
             'is_group'      => true,
@@ -408,7 +423,7 @@ function ctx_venue_short($v) {
         foreach (preg_split('/\s+/', $v) as $w) $initials .= mb_strtoupper(mb_substr($w, 0, 1));
         return $initials;                                  // Austin Film Society → AFS
     }
-    $short = trim(preg_replace('/\s*(Theatre|Theater|Cinema|Film Club|Drafthouse)$/i', '', $v));
+    $short = trim(preg_replace('/\s*(Theatre|Theater|Cinema|Film Club|Drafthouse|Events)$/i', '', $v));
     return $short !== '' ? $short : $v;                    // Hyperreal Film Club → Hyperreal
 }
 

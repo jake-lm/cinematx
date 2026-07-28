@@ -41,6 +41,7 @@ $counts       = ctx_venue_counts($films);
 // A compact front-page module has even less room for a chain's schedule than
 // The List does. Two days, so the threshold is lower.
 $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
+$films = ctx_fold_venue($films, 'Fathom Events', 2);
 
 // Then a single film with more than one showing across the two days — an
 // alamo stack of its own, so two Spirited Aways read as one film on two

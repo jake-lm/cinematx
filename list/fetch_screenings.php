@@ -3,6 +3,7 @@ require_once __DIR__ . '/scraper_paramount.php';
 require_once __DIR__ . '/scraper_afs.php';
 require_once __DIR__ . '/scraper_hyperreal.php';
 require_once __DIR__ . '/scraper_alamo.php';
+require_once __DIR__ . '/scraper_fathom.php';
 require_once __DIR__ . '/tmdb.php';
 
 function filter_screenings($films, $now, $end) {
@@ -25,6 +26,9 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         // Five Austin locations under one venue name, so the filter bar gets
         // one chip rather than five. Which location is carried per screening.
         ['films' => filter_screenings(fetch_alamo_films($force),     $now, $end), 'venue' => 'Alamo Drafthouse'],
+        // A distributor, not a cinema — one booking lands in six chains at
+        // once, so it folds the same way Alamo does.
+        ['films' => filter_screenings(fetch_fathom_films($force),    $now, $end), 'venue' => 'Fathom Events'],
     ];
     $all_films = [];
     foreach ($sources as $src) {
