@@ -975,7 +975,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .prog { font-style: italic; color: var(--dark-3rd); }
 }
 
-// ── 04 · The Lobby — rank 4 ────────────────────────────────────────────────
+// ── Quick posts — compose / notes (profile page) ───────────────────────────
+// No longer rank 4 on the front page — The Directory replaced it there — but
+// a member's own profile still shows and composes these.
 
 .compose { padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--line); }
 
@@ -1063,6 +1065,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // The member count stays informative for a guest without pretending to lead
 // somewhere they can reach.
 .card__more--flat { color: var(--text-4); cursor: default; }
+
+// ── 04 · The Directory — rank 4 ─────────────────────────────────────────────
+// The full directory's member__face / member__body / member__name / member__role
+// reused here — same face, a plainer row. .member itself is a bordered grid
+// tile, wrong shape for a stack inside a card body, so this is a row of its
+// own rather than a modifier on it.
+
+.dir-row {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease);
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--surface-2); }
+  &:hover .member__name { color: var(--red-hi); }
+}
 
 // ── Members ────────────────────────────────────────────────────────────────
 

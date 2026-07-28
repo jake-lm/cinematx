@@ -191,21 +191,10 @@ function ctx_journal($conn, $more = 4) {
     return ['lead' => $lead, 'items' => $q->fetchAll(PDO::FETCH_ASSOC)];
 }
 
-// ── 04 · The Lobby ─────────────────────────────────────────────────────────
-
-function ctx_lobby($conn, $limit = 10) {
-    $q = $conn->prepare("SELECT p.id, p.uid, p.content, p.stamp, u.name AS author_name
-        FROM posts p LEFT JOIN users u ON p.uid = u.id
-        WHERE p.active = 1 AND p.type = 'post'
-        ORDER BY p.stamp DESC LIMIT " . (int)$limit);
-    $q->execute();
-    return $q->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// ── 05 · Members ───────────────────────────────────────────────────────────
+// ── 04 · The Directory ─────────────────────────────────────────────────────
 
 function ctx_members($conn, $limit = 7) {
-    $q = $conn->prepare("SELECT id, name, photo FROM `users`
+    $q = $conn->prepare("SELECT id, name, photo, dept FROM `users`
         WHERE `active` = 1 AND `name` != '' ORDER BY `id` DESC LIMIT " . (int)$limit);
     $q->execute();
     return [

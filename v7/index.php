@@ -1,7 +1,7 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — front page
-//  Weight order: 1 The List · 2 The Journal · 3 The Theatre · 4 The Lobby
+//  Weight order: 1 The List · 2 The Journal · 3 The Theatre · 4 The Directory
 //  The only surface locked to a single screen.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_lib.php';
@@ -9,7 +9,6 @@ require __DIR__ . '/_lib.php';
 $now     = $CTX_NOW;
 $state   = ctx_state($conn);
 $signed  = $state !== 'guest';
-$me      = ctx_me($conn);
 
 // Someone mid-signup or awaiting an access code gets the gate, not the front
 // page. Four states, not two — see ctx_state().
@@ -61,9 +60,6 @@ $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
 
-// The Lobby is members-only, so a guest's page never fetches it — the notes
-// are absent from the HTML rather than merely hidden by CSS.
-$notes   = $signed ? ctx_lobby($conn, 10) : [];
 $dir     = ctx_members($conn, 7);
 
 // Shell configuration
@@ -272,11 +268,11 @@ require __DIR__ . '/_chrome.php';
           <?php endif; ?>
         </section>
 
-        <!-- 04 · The Lobby -->
+        <!-- 04 · The Directory -->
         <section class="card">
           <div class="card__head">
             <span class="card__n">04</span>
-            <span class="card__title">The Lobby</span>
+            <span class="card__title">The Directory</span>
             <?php // /directory redirects guests to the front page, so it is a
                   // dead end for them — show the count without the link. ?>
             <?php if ($signed): ?>
@@ -287,40 +283,31 @@ require __DIR__ . '/_chrome.php';
           </div>
           <div class="card__body">
             <?php if ($signed): ?>
-            <div class="compose">
-              <textarea class="compose__area" id="compose-area" placeholder="What did you see?" maxlength="600"></textarea>
-              <div class="compose__foot">
-                <button class="btn" id="compose-send" disabled>Post</button>
-                <span class="compose__count" id="compose-count">0/600</span>
-              </div>
-            </div>
+            <?php foreach ($dir['members'] as $m): ?>
+            <a class="dir-row" href="/users/profile.php?id=<?php echo (int)$m['id']; ?>">
+              <span class="member__face">
+                <?php if (!empty($m['photo'])): ?>
+                <img src="/uploads/profiles/<?php echo $e($m['photo']); ?>" alt="" />
+                <?php else: ?><?php echo $e(mb_substr($m['name'], 0, 1)); ?><?php endif; ?>
+              </span>
+              <span class="member__body">
+                <span class="member__name"><?php echo $e($m['name']); ?></span>
+                <?php if (!empty($m['dept'])): ?><span class="member__role"><?php echo $e($m['dept']); ?></span><?php endif; ?>
+              </span>
+            </a>
+            <?php endforeach; ?>
             <?php else: ?>
             <?php // Say what is behind the door and open it, rather than
                   // showing an empty panel and leaving them to guess. ?>
             <div class="shut">
-              <p class="shut__lede">The Lobby is for members.</p>
+              <p class="shut__lede">The Directory is for members.</p>
               <p class="shut__text">
-                What everyone's watching, and <em>screenings members
-                put on themselves</em>.
+                Everyone behind Cinema, TX — <em>who they are,
+                and how to reach them</em>.
               </p>
               <button class="btn shut__cta" data-open="account">Become a member</button>
             </div>
             <?php endif; ?>
-
-            <div id="notes">
-              <?php foreach ($notes as $n): ?>
-              <div class="note" data-post-id="<?php echo (int)$n['id']; ?>">
-                <?php if ($me && $n['uid'] == $me['id']): ?>
-                <button class="note__del" data-post-id="<?php echo (int)$n['id']; ?>" title="Delete">&times;</button>
-                <?php endif; ?>
-                <div class="note__text"><?php echo nl2br($e($n['content'])); ?></div>
-                <div class="note__meta">
-                  <a href="/users/profile.php?id=<?php echo (int)$n['uid']; ?>"><?php echo $e($n['author_name'] ?: 'Member'); ?></a>
-                  <span><?php echo date('j M', $n['stamp']); ?></span>
-                </div>
-              </div>
-              <?php endforeach; ?>
-            </div>
           </div>
         </section>
 
