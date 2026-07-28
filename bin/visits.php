@@ -10,6 +10,10 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 
 require dirname(__DIR__) . '/v7/visits.php';
 
+// Same clock the counter writes with, so the dates printed here name the same
+// days as the files behind them.
+date_default_timezone_set(CTX_VISITS_TZ);
+
 $days  = max(1, (int)($argv[1] ?? 14));
 $stats = ctx_visit_stats($days);
 

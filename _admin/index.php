@@ -54,9 +54,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
       <div class="reading__kicker"><span>Signed in as <?php echo $e($admin_user['name'] ?: 'admin'); ?></span></div>
       <h1 class="reading__title">Admin</h1>
-      <?php $v = ctx_visit_stats(7); ?>
-      <div class="reading__by"><?php echo count($films); ?> films &middot; <?php echo count($booked); ?> upcoming showtimes
-        &middot; <?php echo $v['total']; ?> visitors<?php echo $v['today'] ? ', ' . $v['today'] . ' today' : ''; ?></div>
+      <div class="reading__by"><?php echo count($films); ?> films &middot; <?php echo count($booked); ?> upcoming showtimes</div>
 
       <div class="admin-grid">
 
@@ -146,6 +144,74 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </section>
 
       </div>
+
+      <?php
+      // Below the operations, because it is something to read rather than
+      // something to do.
+      $v    = ctx_visit_stats(14);
+      $peak = max(1, max($v['recent']));
+      ?>
+      <section class="stats">
+        <div class="stats__head">
+          <span class="card__n">05</span>
+          <span class="card__title">Visitors</span>
+          <?php if ($v['since']): ?>
+          <span class="stats__since">since <?php echo date('j M Y', $v['since']); ?></span>
+          <?php endif; ?>
+        </div>
+
+        <div class="stats__figures">
+          <?php foreach (['Today' => $v['today'], 'This week' => $v['week'],
+                          'This month' => $v['month'], 'All time' => $v['total']] as $label => $n): ?>
+          <div class="figure">
+            <span class="figure__n"><?php echo $n; ?></span>
+            <span class="figure__label"><?php echo $label; ?></span>
+          </div>
+          <?php endforeach; ?>
+        </div>
+
+        <?php if ($v['total']): ?>
+        <div class="stats__cols">
+
+          <div class="stats__col">
+            <div class="stats__sub">Where they are</div>
+            <?php // The bands are the question — a list of cities does not tell
+                  // you whether this is reaching Austin. ?>
+            <?php foreach ($v['bands'] as $band => $n): if (!$n) continue; ?>
+            <div class="band">
+              <span class="band__label"><?php echo $e($band); ?></span>
+              <span class="band__bar"><span style="width:<?php echo round($n / $v['total'] * 100); ?>%"></span></span>
+              <span class="band__n"><?php echo $n; ?></span>
+            </div>
+            <?php endforeach; ?>
+          </div>
+
+          <div class="stats__col">
+            <div class="stats__sub">Places</div>
+            <?php foreach ($v['places'] as $place => $n): ?>
+            <div class="place">
+              <span class="place__label"><?php echo $e($place); ?></span>
+              <span class="place__n"><?php echo $n; ?></span>
+            </div>
+            <?php endforeach; ?>
+          </div>
+
+        </div>
+
+        <div class="stats__sub">Last fourteen days</div>
+        <div class="spark">
+          <?php foreach (array_reverse($v['recent'], true) as $day => $n): ?>
+          <div class="spark__day" title="<?php echo date('D j M', strtotime($day)); ?> — <?php echo $n; ?>">
+            <span class="spark__bar" style="height:<?php echo max(2, round($n / $peak * 100)); ?>%"></span>
+            <span class="spark__tick"><?php echo date('j', strtotime($day)); ?></span>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <p class="admin-note">Nobody counted yet. Bots are excluded, so this stays at zero until a real browser arrives.</p>
+        <?php endif; ?>
+      </section>
+
     </div>
   </main>
 

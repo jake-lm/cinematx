@@ -1383,6 +1383,79 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  ADMIN — VISITORS
+//  Reading, not operating, so it sits below the panels and is laid out to be
+//  scanned rather than filled in.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.stats {
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+.stats__head  { display: flex; align-items: baseline; gap: var(--s-3); margin-bottom: var(--s-5); }
+.stats__since { margin-left: auto; @include label(var(--t-3xs), var(--text-4)); }
+.stats__sub   { padding-bottom: var(--s-2); margin-bottom: var(--s-3);
+                border-bottom: 1px solid var(--line); @include label(var(--t-3xs), var(--text-3)); }
+
+.stats__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s-4);
+  margin-bottom: var(--s-6);
+}
+
+.figure {
+  padding: var(--s-4);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.figure__n     { display: block; font-family: var(--f-display); font-size: var(--t-xl);
+                 font-weight: 600; line-height: 1; color: var(--text); }
+.figure__label { display: block; margin-top: var(--s-2); @include label(var(--t-3xs), var(--text-3)); }
+
+.stats__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--s-6);
+  margin-bottom: var(--s-6);
+}
+
+.band {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  @include label(var(--t-3xs), var(--text-3));
+}
+.band__bar {
+  height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden;
+  span { display: block; height: 100%; background: var(--red-hi); }
+}
+.band__n { text-align: right; color: var(--text); }
+
+.place {
+  display: flex; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-xs); color: var(--text-2);
+}
+.place__n { color: var(--text-4); }
+
+// Fourteen bars. Deliberately unlabelled beyond the day number — at these
+// volumes the shape is the whole message.
+.spark { display: flex; align-items: flex-end; gap: 3px; height: 90px; }
+.spark__day {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-end; height: 100%;
+}
+.spark__bar  { width: 100%; background: var(--red-wash); border-radius: 2px 2px 0 0;
+               border-top: 2px solid var(--red-hi); }
+.spark__tick { margin-top: var(--s-2); @include label(9px, var(--text-4)); }
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  EVENT PARTICULARS  (/events/)
 //  A member-submitted screening is mostly facts, so they get a table rather
 //  than prose pretending to be a paragraph.
