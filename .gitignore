@@ -20,3 +20,7 @@ list/*.lock
 
 # Visitor counts
 data/
+
+# Scrape caches — written at runtime by the warmer, so tracking them
+# means every deploy collides with the cron. warm-cache.php rebuilds them.
+list/cache_*.json
