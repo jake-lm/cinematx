@@ -6,8 +6,8 @@
 //  render, so requests for CSS, JS and images never reach it and cannot pad
 //  the numbers.
 //
-//  What is stored is a salted SHA-256 of the IP and user-agent — never the
-//  address itself. The salt is 32 random bytes generated once and kept at
+//  What is stored is a salted SHA-256 of the /24 network and the user-agent —
+//  never the address itself, and not even the whole network address. The salt is 32 random bytes generated once and kept at
 //  0600 outside the served tree; without it the hashes cannot be walked back
 //  to an address, and it is the reason this can honestly sit under an About
 //  page promising no unvolunteered data is collected.
@@ -46,6 +46,29 @@ function ctx_visits_day($offset = 0) {
     $d = new DateTime('@' . (time() - $offset * 86400));
     $d->setTimezone(new DateTimeZone(CTX_VISITS_TZ));
     return $d->format('Y-m-d');
+}
+
+/**
+ * The network an address sits on, rather than the address itself.
+ *
+ * Mobile carriers hand out a different address every few minutes. On the first
+ * evening this ran, one small group of people on T-Mobile produced eleven
+ * addresses between them — and eleven "unique visitors". Hashing the /24
+ * collapses that to roughly one per group while keeping separate households
+ * apart, since two of them sharing both a /24 and an identical user-agent
+ * string is unlikely.
+ *
+ * It is a trade, not a cure: someone moving between 172.56.40.x and
+ * 172.56.41.x still counts twice. Coarser than /24 starts merging strangers,
+ * which is the worse error.
+ */
+function ctx_visits_network($ip) {
+    if (strpos($ip, ':') !== false) {                 // IPv6 — first four groups
+        $parts = explode(':', $ip);
+        return implode(':', array_slice($parts, 0, 4));
+    }
+    $parts = explode('.', $ip);
+    return count($parts) === 4 ? implode('.', array_slice($parts, 0, 3)) : $ip;
 }
 
 /** The secret salt, created on first use. */
@@ -135,7 +158,7 @@ function ctx_visit() {
         if (!is_writable($dir)) return;
 
         $hash = hash('sha256', ctx_visits_salt()
-                              . ($_SERVER['REMOTE_ADDR'] ?? '')
+                              . ctx_visits_network($_SERVER['REMOTE_ADDR'] ?? '')
                               . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
 
         // Seen today already? Then there is nothing to do, and this is the
