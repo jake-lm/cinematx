@@ -47,6 +47,13 @@ function fetch_alamo_films_scrape() {
         CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; CinemaTX/1.0; +https://cinematx.net)',
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT        => 20,
+        // Ubuntu 22.04 ships curl 7.81 with nghttp2 1.43, which cannot complete
+        // an HTTP/2 handshake with Cloudflare here — every request died with
+        // "stream 0 was not closed cleanly: PROTOCOL_ERROR" and curl_exec
+        // returned false, so the scraper silently produced nothing. A newer
+        // curl on the development machine negotiated it fine, which is why this
+        // only appeared on deploy. HTTP/1.1 is unaffected and just as fast.
+        CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
     ]);
     $body = curl_exec($ch);
     curl_close($ch);
