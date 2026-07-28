@@ -71,6 +71,7 @@ function ctx_enrich(array $films) {
         $f['genres']        = $f['genres']   ?? null;
         $f['director']      = $f['director'] ?? null;
         $f['wiki']          = $f['wiki']     ?? null;
+        $f['location']      = $f['location'] ?? null;
 
         // A year printed in the listing itself is the fallback, not the
         // preference — TMDB knows the film, the venue is describing it.
@@ -106,7 +107,12 @@ function ctx_bits($s, $venue = true) {
     $bits = [];
     if (!empty($s['year']))    $bits[] = (string)$s['year'];
     if (!empty($s['runtime'])) $bits[] = (int)$s['runtime'] . 'm';
-    if ($venue && !empty($s['venue'])) $bits[] = $s['venue'];
+    if ($venue && !empty($s['venue'])) {
+        // Alamo runs the same film at the same minute in five cinemas, so
+        // without the location two rows are indistinguishable. Only the row
+        // view gets it — a poster card has no width to spare.
+        $bits[] = $s['venue'] . (empty($s['location']) ? '' : ', ' . $s['location']);
+    }
     return $bits;
 }
 
@@ -132,7 +138,7 @@ function ctx_venue_short($v) {
         foreach (preg_split('/\s+/', $v) as $w) $initials .= mb_strtoupper(mb_substr($w, 0, 1));
         return $initials;                                  // Austin Film Society → AFS
     }
-    $short = trim(preg_replace('/\s*(Theatre|Theater|Cinema|Film Club)$/i', '', $v));
+    $short = trim(preg_replace('/\s*(Theatre|Theater|Cinema|Film Club|Drafthouse)$/i', '', $v));
     return $short !== '' ? $short : $v;                    // Hyperreal Film Club → Hyperreal
 }
 
@@ -172,7 +178,9 @@ function ctx_screening_hover($s) {
         'meta'  => implode(' · ', ctx_bits($s, false)),
         'sub'   => implode(' · ', $sub),
         'body'  => $s['overview'] ?? null,
-        'foot'  => trim(($s['venue'] ?? '') . (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp'])), ' ·'),
+        'foot'  => trim(($s['venue'] ?? '')
+                      . (empty($s['location']) ? '' : ', ' . $s['location'])
+                      . (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp'])), ' ·'),
         'link'  => empty($s['wiki']) ? null : ['href' => $s['wiki'], 'label' => 'Wikipedia'],
     ]);
 }

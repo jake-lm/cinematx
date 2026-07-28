@@ -2,6 +2,7 @@
 require_once __DIR__ . '/scraper_paramount.php';
 require_once __DIR__ . '/scraper_afs.php';
 require_once __DIR__ . '/scraper_hyperreal.php';
+require_once __DIR__ . '/scraper_alamo.php';
 require_once __DIR__ . '/tmdb.php';
 
 function filter_screenings($films, $now, $end) {
@@ -21,12 +22,16 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         ['films' => filter_screenings(fetch_paramount_films($force), $now, $end), 'venue' => 'Paramount Theatre'],
         ['films' => filter_screenings(fetch_afs_films($force),       $now, $end), 'venue' => 'Austin Film Society'],
         ['films' => filter_screenings(fetch_hyperreal_films($force), $now, $end), 'venue' => 'Hyperreal Film Club'],
+        // Five Austin locations under one venue name, so the filter bar gets
+        // one chip rather than five. Which location is carried per screening.
+        ['films' => filter_screenings(fetch_alamo_films($force),     $now, $end), 'venue' => 'Alamo Drafthouse'],
     ];
     $all_films = [];
     foreach ($sources as $src) {
         foreach ($src['films'] as $film) {
-            $film['venue'] = $src['venue'];
-            $film['source'] = 'official';
+            $film['venue']    = $src['venue'];
+            $film['source']   = 'official';
+            $film['location'] = $film['location'] ?? null;
 
             $tmdb = fetch_tmdb($film['title']);
             $film['poster']   = $tmdb['poster'];
@@ -60,6 +65,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             // renderer omits whatever is null rather than showing a gap.
             'year'      => null,
             'runtime'   => null,
+            'location'  => null,
             'overview'  => null,
             'genres'    => null,
             'director'  => null,
