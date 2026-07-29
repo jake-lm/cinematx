@@ -44,17 +44,43 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">The List</span></a>
     <a class="rail__link<?php echo $on('theatre'); ?>" href="/th1">
       <span class="ico"><i class="fa-solid fa-clapperboard"></i></span><span class="txt">Theatre</span></a>
-    <a class="rail__link<?php echo $on('about'); ?>" href="/about">
+    <?php // Guests still have no "You" menu to fall back to, so About only
+          // joins the mobile collapse for members who actually have one. ?>
+    <a class="rail__link<?php echo $full ? ' rail__link--full' : ''; ?><?php echo $on('about'); ?>" href="/about">
       <span class="ico"><i class="fa-solid fa-circle-info"></i></span><span class="txt">About</span></a>
 
     <?php if ($full): ?>
     <div class="rail__group">Yours</div>
-    <a class="rail__link<?php echo $on('dashboard'); ?>" href="/dashboard">
+    <a class="rail__link rail__link--full<?php echo $on('dashboard'); ?>" href="/dashboard">
       <span class="ico"><i class="fa-solid fa-gauge"></i></span><span class="txt">Dashboard</span></a>
-    <a class="rail__link<?php echo $on('directory'); ?>" href="/directory">
+    <a class="rail__link rail__link--full<?php echo $on('directory'); ?>" href="/directory">
       <span class="ico"><i class="fa-solid fa-users"></i></span><span class="txt">Directory</span></a>
-    <a class="rail__link<?php echo $on('profile'); ?>" href="/users/profile.php?id=<?php echo (int)$me['id']; ?>">
+    <a class="rail__link rail__link--full<?php echo $on('profile'); ?>" href="/users/profile.php?id=<?php echo (int)$me['id']; ?>">
       <span class="ico"><i class="fa-solid fa-user"></i></span><span class="txt">Profile</span></a>
+
+    <?php // The mobile bottom bar has no room for four member-only icons
+          // beside the four public ones — collapses to this one trigger,
+          // hidden on the desktop rail where the full set already fits.
+          // A small popover anchored above the button, not a sheet: this is
+          // four links, not a screen's worth of content, so it shouldn't
+          // behave like one — no scrim, no covering the page. initYouMenu()
+          // moves #you-menu to <body> and positions it itself, the same way
+          // the custom-select menu escapes the rail's own clipping. ?>
+    <button class="rail__link rail__link--compact" id="you-trigger" type="button"
+            aria-haspopup="true" aria-expanded="false">
+      <span class="ico"><i class="fa-solid fa-ellipsis"></i></span><span class="txt">You</span></button>
+    <div class="you-menu" id="you-menu">
+      <a class="you-menu__link<?php echo $on('profile'); ?>" href="/users/profile.php?id=<?php echo (int)$me['id']; ?>">
+        <i class="fa-solid fa-user"></i><span>Profile</span></a>
+      <a class="you-menu__link<?php echo $on('dashboard'); ?>" href="/dashboard">
+        <i class="fa-solid fa-gauge"></i><span>Dashboard</span></a>
+      <a class="you-menu__link<?php echo $on('directory'); ?>" href="/directory">
+        <i class="fa-solid fa-users"></i><span>Directory</span></a>
+      <a class="you-menu__link" href="/dashboard#account">
+        <i class="fa-solid fa-gear"></i><span>Settings</span></a>
+      <a class="you-menu__link<?php echo $on('about'); ?>" href="/about">
+        <i class="fa-solid fa-circle-info"></i><span>About</span></a>
+    </div>
     <?php endif; ?>
     <?php endif; ?>
   </nav>

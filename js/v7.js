@@ -293,6 +293,52 @@
     });
   }
 
+  // ══ Mobile "You" menu ════════════════════════════════════════════════════
+  // The compact trigger's only job on a wide screen is to not be there — see
+  // .rail__link--compact in the stylesheet. On the mobile bottom bar it opens
+  // this instead of a sheet, on purpose: four links don't need a scrim and a
+  // page-covering panel, just a small menu above the tab that opened it.
+
+  function initYouMenu() {
+    var btn = $('#you-trigger'), menu = $('#you-menu');
+    if (!btn || !menu) return;
+
+    // Escapes the rail nav's own overflow (it scrolls horizontally on
+    // mobile), the same reason the custom-select menu and the hovercard
+    // both live at the body level rather than nested where they open.
+    document.body.appendChild(menu);
+
+    function place() {
+      var r = btn.getBoundingClientRect();
+      var w = menu.offsetWidth;
+      var left = r.left + r.width / 2 - w / 2;
+      left = Math.min(Math.max(8, left), window.innerWidth - w - 8);
+      menu.style.left = Math.round(left) + 'px';
+      menu.style.top  = Math.round(r.top - menu.offsetHeight - 8) + 'px';
+    }
+
+    function open() {
+      menu.classList.add('is-on');
+      place();
+      btn.setAttribute('aria-expanded', 'true');
+    }
+    function close() {
+      menu.classList.remove('is-on');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('is-on')) close(); else open();
+    });
+    document.addEventListener('click', function (e) {
+      if (menu.classList.contains('is-on') && !menu.contains(e.target) && e.target !== btn) close();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+  }
+
   // ══ The List — view mode + venue filter ══════════════════════════════════
   // Every screening for the day is in the DOM. The panel scrolls internally,
   // so nothing is hidden behind a required navigation and the page still
@@ -730,10 +776,48 @@
 
   // ══ Theatre overlay (front page) ═════════════════════════════════════════
 
+  // A muted, controls-free mirror of the real playback in the card's own
+  // thumbnail slot — same diff-from-showtime math startSync() uses, reimplemented
+  // against a plain <video> rather than shared with it. The two players have
+  // nothing else in common: this one has no controls to wire up, never
+  // unmutes, and never waits for a pre-show start, so folding it into
+  // startSync() would mean threading those differences through a function
+  // that already works for the two players that do need them.
+  function startCardPreview(el) {
+    var showtime = window.CTX_SHOWTIME || 0,
+        dur      = window.CTX_DUR || 0,
+        filename = window.CTX_FILE || '';
+    if (!el || !showtime || !filename) return;
+
+    var diff = Math.floor(Date.now() / 1000 - showtime);
+    if (diff < 0 || diff >= dur) return;   // not actually live
+
+    el.preload = 'auto';
+    el.src = '/motw/stream.php?f=' + encodeURIComponent(filename);
+
+    function seek() {
+      el.muted = true;
+      el.currentTime = Math.floor(Date.now() / 1000 - showtime);
+      var p = el.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+    if (el.readyState >= 1) seek();
+    else el.addEventListener('loadedmetadata', seek, { once: true });
+
+    setInterval(function () {
+      var d = Math.floor(Date.now() / 1000 - showtime);
+      if (d < 0 || d >= dur) return;
+      if (Math.abs(Math.floor(el.currentTime) - d) > 2) el.currentTime = d;
+    }, 3000);
+  }
+
   function initTheatre() {
     var shell = $('#theatre');
     if (!shell) return;
     var started = false;
+
+    var preview = $('#theatre-card-preview');
+    if (preview) startCardPreview(preview);
 
     function open() {
       shell.classList.add('is-on');
@@ -1050,7 +1134,7 @@
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
-    initProfileFaceUpload(); initLetterboxdConnect();
+    initProfileFaceUpload(); initLetterboxdConnect(); initYouMenu();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

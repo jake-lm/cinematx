@@ -252,9 +252,18 @@ require __DIR__ . '/_chrome.php';
         </section>
 
         <!-- 03 · The Theatre -->
-        <section class="theatre-card" id="theatre-card">
+        <section class="theatre-card<?php echo $is_live ? ' theatre-card--live' : ''; ?>" id="theatre-card">
           <div class="theatre-card__in">
-            <div class="theatre-card__poster" <?php if ($film): ?>style="background-image:url('/motw/<?php echo $e($film['poster']); ?>.png')"<?php endif; ?>></div>
+            <div class="theatre-card__poster" <?php if ($film): ?>style="background-image:url('/motw/<?php echo $e($film['poster']); ?>.png')"<?php endif; ?>>
+              <?php // A little synced mirror of the real playback — muted, no
+                    // controls, the same diff-from-showtime math as the full
+                    // overlay. Only when something is actually on screen; the
+                    // "next showing" state stays a still poster. ?>
+              <?php if ($is_live): ?>
+              <video id="theatre-card-preview" muted playsinline preload="none"
+                     poster="/motw/<?php echo $e($film['poster']); ?>.png"></video>
+              <?php endif; ?>
+            </div>
             <div class="theatre-card__meta">
               <?php if ($is_live): ?>
                 <span class="theatre-card__kicker"><span class="dot"></span> 03 &mdash; On screen now</span>
@@ -309,10 +318,6 @@ require __DIR__ . '/_chrome.php';
                   // showing an empty panel and leaving them to guess. ?>
             <div class="shut">
               <p class="shut__lede">The Directory is for members.</p>
-              <p class="shut__text">
-                Everyone behind Cinema, TX — <em>who they are,
-                and how to reach them</em>.
-              </p>
               <button class="btn shut__cta" data-open="account">Become a member</button>
             </div>
             <?php endif; ?>
