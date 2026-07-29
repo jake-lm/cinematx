@@ -15,7 +15,8 @@ $q->execute([':id' => $profile_id]);
 $who = $q->fetch(PDO::FETCH_ASSOC);
 if (!$who) { header('Location: /directory'); exit; }
 
-$is_me = (int)$who['id'] === (int)$me['id'];
+$is_me     = (int)$who['id'] === (int)$me['id'];
+$who_roles = ctx_roles_grouped(ctx_user_roles($conn, $who['id']));
 
 // Their writing.
 $q = $conn->prepare(
@@ -46,7 +47,18 @@ require dirname(__DIR__) . '/v7/_chrome.php';
     <div class="listing">
 
       <!-- ── Who ─────────────────────────────────────────────────────── -->
-      <header class="who">
+      <header class="who<?php echo !empty($who['banner']) ? ' who--banner' : ''; ?>"
+              <?php if (!empty($who['banner'])): ?>style="background-image:url('/uploads/banners/<?php echo $e($who['banner']); ?>')"<?php endif; ?>>
+        <?php if (!empty($who['banner'])): ?><div class="who__scrim"></div><?php endif; ?>
+
+        <?php if ($is_me): ?>
+        <label class="who__banner-edit" for="who-banner-input"
+               title="<?php echo empty($who['banner']) ? 'Add a banner' : 'Change banner'; ?>">
+          <i class="fa-solid fa-image"></i>
+        </label>
+        <input type="file" id="who-banner-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+        <?php endif; ?>
+
         <div class="who__face"<?php echo $is_me ? ' id="who-face"' : ''; ?>>
           <?php if (!empty($who['photo'])): ?>
           <img src="/uploads/profiles/<?php echo $e($who['photo']); ?>" alt="<?php echo $e($who['name']); ?>" />
@@ -62,9 +74,25 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <div class="who__body">
           <h1 class="who__name"><?php echo $e($who['name']); ?></h1>
           <div class="who__meta">
-            <?php if (!empty($who['dept'])): ?><span class="pill"><?php echo $e($who['dept']); ?></span><?php endif; ?>
+            <?php foreach ($who_roles as $i => $rg): ?>
+              <?php if ($rg['subs']): ?>
+              <button type="button" class="pill pill--expand" data-role-toggle="role-drop-<?php echo $i; ?>" aria-expanded="false">
+                <?php echo $e($rg['name']); ?><i class="fa-solid fa-caret-down"></i>
+              </button>
+              <?php else: ?>
+              <span class="pill"><?php echo $e($rg['name']); ?></span>
+              <?php endif; ?>
+            <?php endforeach; ?>
             <?php if (!empty($who['sign_date'])): ?><span>Since <?php echo date('F Y', (int)$who['sign_date']); ?></span><?php endif; ?>
           </div>
+
+          <?php // One after the row, not inside it — a flex child would just
+                // squeeze in next to the pills instead of appearing below them. ?>
+          <?php foreach ($who_roles as $i => $rg): if ($rg['subs']): ?>
+          <div class="pill-drop" id="role-drop-<?php echo $i; ?>">
+            <?php foreach ($rg['subs'] as $s): ?><span class="pill-drop__item"><?php echo $e($s); ?></span><?php endforeach; ?>
+          </div>
+          <?php endif; endforeach; ?>
 
           <div class="who__links">
             <?php if (!empty($who['email'])): ?>

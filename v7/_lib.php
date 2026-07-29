@@ -116,11 +116,17 @@ function ctx_state($conn) {
     $me = ctx_me($conn);
     if (!$me) return 'guest';
     $noName = trim((string)($me['name'] ?? '')) === '';
-    $noRole = in_array((string)($me['dept'] ?? ''), ['', '0'], true);
+    $noRole = empty(ctx_user_roles($conn, $me['id']));
     if ($noName || $noRole)      return 'onboard';
     if ((int)($me['active']) === 0) return 'gated';
     return 'member';
 }
+
+// ctx_user_roles(), ctx_roles_grouped() and ctx_save_user_roles() live in
+// roles.php, not here — dashboard/signup.php writes roles without loading
+// the rest of this bootstrap (fetch_screenings.php, visits.php and its
+// counting), so the taxonomy and its helpers need to be reachable on their
+// own. roles.php is already required above, so they're in scope regardless.
 
 // ── 01 · The List ──────────────────────────────────────────────────────────
 
@@ -233,11 +239,16 @@ function ctx_journal($conn, $more = 4) {
 // ── 04 · The Directory ─────────────────────────────────────────────────────
 
 function ctx_members($conn, $limit = 7) {
-    $q = $conn->prepare("SELECT id, name, photo, dept FROM `users`
+    $q = $conn->prepare("SELECT id, name, photo FROM `users`
         WHERE `active` = 1 AND `name` != '' ORDER BY `id` DESC LIMIT " . (int)$limit);
     $q->execute();
+    $members = $q->fetchAll(PDO::FETCH_ASSOC);
+    // A handful of rows — a query per member here is simpler than a JOIN this
+    // preview would otherwise have to de-duplicate, and correct either way.
+    foreach ($members as &$m) $m['roles'] = ctx_user_roles($conn, $m['id']);
+    unset($m);
     return [
-        'members' => $q->fetchAll(PDO::FETCH_ASSOC),
+        'members' => $members,
         'count'   => (int)$conn->query("SELECT count(*) FROM `users` WHERE `active` = 1 AND `name` != ''")->fetchColumn(),
     ];
 }

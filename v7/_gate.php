@@ -15,8 +15,9 @@
 //  Set before including:  $ctx_gate  'onboard' | 'gated'
 // ═══════════════════════════════════════════════════════════════════════════
 
-$err = $_GET['error'] ?? null;
-$me  = ctx_me($conn);
+$err      = $_GET['error'] ?? null;
+$me       = ctx_me($conn);
+$my_roles = $me ? ctx_user_roles($conn, $me['id']) : [];
 ?>
 <main class="canvas">
   <div class="gate">
@@ -43,13 +44,29 @@ $me  = ctx_me($conn);
           </div>
 
           <div class="field">
-            <label class="field__label" for="g-role">Role</label>
-            <select class="field__input" id="g-role" name="dept" required>
-              <option value="0">Select one</option>
-              <?php foreach ($roles as $r): ?>
-              <option value="<?php echo ctx_e($r); ?>"<?php echo ($me['dept'] ?? '') === $r ? ' selected' : ''; ?>><?php echo ctx_e($r); ?></option>
+            <label class="field__label">Role</label>
+            <div class="role-group">
+              <?php foreach ($roles as $top => $subs): ?>
+              <label class="role-check">
+                <input type="checkbox" name="roles[]" value="<?php echo ctx_e($top); ?>"
+                       <?php echo in_array($top, $my_roles, true) ? 'checked' : ''; ?>
+                       <?php echo $subs ? 'data-expands="role-sub-' . ctx_slug($top) . '"' : ''; ?> />
+                <?php echo ctx_e($top); ?>
+              </label>
+              <?php if ($subs): ?>
+              <div class="role-sub" id="role-sub-<?php echo ctx_slug($top); ?>">
+                <p class="role-sub__hint">Select as many as apply.</p>
+                <?php foreach ($subs as $s): ?>
+                <label class="role-check role-check--sub">
+                  <input type="checkbox" name="roles[]" value="<?php echo ctx_e($s); ?>"
+                         <?php echo in_array($s, $my_roles, true) ? 'checked' : ''; ?> />
+                  <?php echo ctx_e($s); ?>
+                </label>
+                <?php endforeach; ?>
+              </div>
+              <?php endif; ?>
               <?php endforeach; ?>
-            </select>
+            </div>
           </div>
 
           <div class="gate__optional">

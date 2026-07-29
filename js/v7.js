@@ -595,6 +595,29 @@
 
   // ══ Join ═════════════════════════════════════════════════════════════════
 
+  // ══ Role picker ══════════════════════════════════════════════════════════
+  // Checking Filmmaker reveals its sub-role checkboxes; unchecking hides them
+  // again. max-height + measured scrollHeight rather than display:none —
+  // an instant cut reads as broken for something the click just caused.
+  // Shared by the onboarding gate and the dashboard's Account tab, since
+  // both render the same [data-expands] markup from roles.php's taxonomy.
+
+  function initRoleGroup() {
+    $$('[data-expands]').forEach(function (cb) {
+      var sub = document.getElementById(cb.getAttribute('data-expands'));
+      if (!sub) return;
+
+      // A measured scrollHeight would be 0 here whenever this sits inside a
+      // currently-hidden dashboard tab (display:none collapses it and every
+      // descendant regardless of content) — pre-checked Filmmaker would then
+      // stay visually collapsed on load until the checkbox was clicked once.
+      // A class + a generous fixed cap sidesteps the measurement entirely.
+      function sync() { sub.classList.toggle('is-on', cb.checked); }
+      sync();
+      cb.addEventListener('change', sync);
+    });
+  }
+
   function initJoin() {
     var form = $('#join-form');
     if (!form) return;
@@ -644,9 +667,10 @@
       post('/dashboard/signup.php?action=signup', new FormData(form))
         .then(function (res) {
           if (res && res.success) {
-            var s1 = $('#join-step-1'), s2 = $('#join-step-2');
-            if (s1) s1.style.display = 'none';
-            if (s2) s2.style.display = 'block';
+            // Signed in now, but with no name or role yet — ctx_state() calls
+            // that 'onboard' and / shows the dedicated gate for it, the same
+            // form this used to duplicate inline.
+            location.href = '/';
             return;
           }
           var msgs = { '102': 'Fill every field and make sure the passwords match.',
@@ -905,10 +929,82 @@
     });
   }
 
+  // ══ Profile — banner upload ══════════════════════════════════════════════
+  // Same shape as the face uploader above, but the target is a background
+  // image on the header itself rather than an <img>, so a fresh upload has
+  // to also add .who--banner and the scrim — someone with no banner yet has
+  // neither in the DOM at all until their first upload succeeds.
+
+  function initProfileBannerUpload() {
+    var input = $('#who-banner-input');
+    var header = $('.who');
+    if (!input || !header) return;
+
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        header.style.backgroundImage = 'url(' + e.target.result + ')';
+        header.classList.add('who--banner');
+        if (!header.querySelector('.who__scrim')) {
+          var scrim = document.createElement('div');
+          scrim.className = 'who__scrim';
+          header.insertBefore(scrim, header.firstChild);
+        }
+      };
+      reader.readAsDataURL(file);
+
+      var fd = new FormData();
+      fd.append('image', file);
+      fetch('/dashboard/profile.php?action=upload_banner', {
+        method: 'POST', body: fd, credentials: 'same-origin'
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) { if (!res || !res.success) location.reload(); })
+        .catch(function () { location.reload(); });
+    });
+  }
+
   // ══ Profile — Letterboxd connect ════════════════════════════════════════
   // Favourites and recent watches need a fresh scrape to show up, which only
   // happens on page load — so success here reloads rather than trying to
   // splice the Letterboxd card together client-side.
+
+  // ══ Profile — role pill dropdown ═════════════════════════════════════════
+  // Only Filmmaker ever renders one of these — the one tag with sub-roles to
+  // reveal — but written to handle more than one without assuming that stays
+  // true. No positioning math needed here: unlike the You menu, nothing on
+  // this page clips or scrolls, so the panel is just normal flow below the
+  // pill row rather than something reparented to <body>.
+
+  function initRoleDrop() {
+    var triggers = $$('[data-role-toggle]');
+    if (!triggers.length) return;
+
+    function closeAll() {
+      triggers.forEach(function (t) {
+        var d = document.getElementById(t.getAttribute('data-role-toggle'));
+        if (d) d.classList.remove('is-on');
+        t.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    triggers.forEach(function (btn) {
+      var drop = document.getElementById(btn.getAttribute('data-role-toggle'));
+      if (!drop) return;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var wasOpen = drop.classList.contains('is-on');
+        closeAll();
+        if (!wasOpen) { drop.classList.add('is-on'); btn.setAttribute('aria-expanded', 'true'); }
+      });
+    });
+
+    document.addEventListener('click', closeAll);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+  }
 
   function initLetterboxdConnect() {
     var input = $('#lb-input'), save = $('#lb-save');
@@ -949,9 +1045,12 @@
       var shown = 0;
 
       $$('.member', roster).forEach(function (m) {
+        // A member can carry more than one tag now — data-role is a
+        // space-separated list, so a filter matches if it's any one of them.
+        var memberRoles = (m.getAttribute('data-role') || '').split(' ');
         var okRole = role === 'all'
                   || (role === 'saved' ? m.getAttribute('data-saved') === '1'
-                                       : m.getAttribute('data-role') === role);
+                                       : memberRoles.indexOf(role) !== -1);
         var okTerm = !term || (m.getAttribute('data-search') || '').indexOf(term) !== -1;
         var ok = okRole && okTerm;
         m.classList.toggle('is-hidden', !ok);
@@ -1134,7 +1233,8 @@
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
-    initProfileFaceUpload(); initLetterboxdConnect(); initYouMenu();
+    initProfileFaceUpload(); initProfileBannerUpload(); initLetterboxdConnect(); initYouMenu();
+    initRoleGroup(); initRoleDrop();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

@@ -14,13 +14,19 @@ $me = ctx_me($conn);
 if (!$me || ctx_state($conn) !== 'member') { header('Location: /'); exit; }
 
 $q = $conn->prepare(
-  "SELECT id, name, dept, email, phone, website, lb, photo, sign_date
+  "SELECT id, name, email, phone, website, lb, photo, sign_date
    FROM `users`
-   WHERE `active` = 1 AND `name` != '' AND `dept` NOT IN ('', '0')
+   WHERE `active` = 1 AND `name` != ''
+     AND EXISTS (SELECT 1 FROM `user_roles` ur WHERE ur.uid = users.id)
    ORDER BY `sign_date` DESC"
 );
 $q->execute();
 $members = $q->fetchAll(PDO::FETCH_ASSOC);
+
+// A query per member rather than a JOIN this page would only have to
+// de-duplicate — the roster is a few dozen rows at most, not thousands.
+foreach ($members as &$m) $m['roles'] = ctx_roles_grouped(ctx_user_roles($conn, $m['id']));
+unset($m);
 
 // Whose entries this member has saved — one query, where the old entries.php
 // ran a COUNT per row.
@@ -28,10 +34,12 @@ $q = $conn->prepare("SELECT `uid` FROM `mylist` WHERE `fid` = :fid");
 $q->execute([':fid' => $me['id']]);
 $saved = array_flip($q->fetchAll(PDO::FETCH_COLUMN));
 
+// Chips are the top-level tags only (Filmmaker, not Director/Producer/…) —
+// the same "profile gets the detail, the list gets the summary" split as
+// the roster row itself.
 $roles_present = [];
 foreach ($members as $m) {
-    $r = $m['dept'];
-    if ($r !== '') $roles_present[$r] = ($roles_present[$r] ?? 0) + 1;
+    foreach ($m['roles'] as $rg) $roles_present[$rg['name']] = ($roles_present[$rg['name']] ?? 0) + 1;
 }
 ksort($roles_present);
 
@@ -79,12 +87,20 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
       <div class="roster" id="roster">
         <?php foreach ($members as $m):
-          $is_saved = isset($saved[$m['id']]);
-          $is_me    = (int)$m['id'] === (int)$me['id'];
+          $is_saved  = isset($saved[$m['id']]);
+          $is_me     = (int)$m['id'] === (int)$me['id'];
+          $top_names = array_column($m['roles'], 'name');
+          // Every level of every tag — searching "director" should find a
+          // Filmmaker who picked Director, not just literal top-level names.
+          $all_role_words = $top_names;
+          foreach ($m['roles'] as $rg) $all_role_words = array_merge($all_role_words, $rg['subs']);
           // One searchable haystack, so the client filter stays trivial.
-          $hay = mb_strtolower(trim($m['name'] . ' ' . $m['dept'] . ' ' . $m['email'] . ' ' . $m['phone']));
+          $hay = mb_strtolower(trim($m['name'] . ' ' . implode(' ', $all_role_words) . ' ' . $m['email'] . ' ' . $m['phone']));
+          // Space-separated: a member with more than one tag now needs to
+          // match more than one filter chip.
+          $role_slugs = implode(' ', array_map('ctx_slug', $top_names));
         ?>
-        <div class="member" data-role="<?php echo $e(ctx_slug($m['dept'])); ?>"
+        <div class="member" data-role="<?php echo $e($role_slugs); ?>"
              data-saved="<?php echo $is_saved ? '1' : '0'; ?>"
              data-search="<?php echo $e($hay); ?>">
 
@@ -98,7 +114,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <a class="member__name" href="/users/profile.php?id=<?php echo (int)$m['id']; ?>">
               <?php echo $e($m['name']); ?><?php if ($is_me): ?> <span class="member__you">you</span><?php endif; ?>
             </a>
-            <div class="member__role"><?php echo $e($m['dept']); ?></div>
+            <?php if ($top_names): ?><div class="member__role"><?php echo $e(implode(', ', $top_names)); ?></div><?php endif; ?>
           </div>
 
           <div class="member__links">

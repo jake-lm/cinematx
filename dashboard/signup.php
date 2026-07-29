@@ -3,6 +3,7 @@ session_start();
 date_default_timezone_set('America/Chicago');
 
 require '../database.php';
+require '../roles.php';
 
 // ── Password policy ────────────────────────────────────────────────────────
 // bcrypt silently ignores everything past 72 bytes, so a longer passphrase is
@@ -164,7 +165,6 @@ else if($action==='signup') {
   $website = null;
   $sign_date = time();
   $lb = null;
-  $dept = 0;
   $position = null;
   $active = 1;
 
@@ -234,8 +234,8 @@ else if($action==='signup') {
 
   $hash = password_hash($pass, PASSWORD_DEFAULT);
 
-  $stmt = $conn->prepare("INSERT INTO `users` (name, email, password, phone, website, lb, dept, position, active, sign_date, last_date)
-                         VALUES (:name, :email, :password, :phone, :website, :lb, :dept, :position, :active, :sign_date, :last_date)");
+  $stmt = $conn->prepare("INSERT INTO `users` (name, email, password, phone, website, lb, position, active, sign_date, last_date)
+                         VALUES (:name, :email, :password, :phone, :website, :lb, :position, :active, :sign_date, :last_date)");
   $stmt->execute([
     ':name'      => $name,
     ':email'     => $email,
@@ -243,7 +243,6 @@ else if($action==='signup') {
     ':phone'     => $phone,
     ':website'   => $website,
     ':lb'        => $lb,
-    ':dept'      => $dept,
     ':position'  => $position,
     ':active'    => $active,
     ':sign_date' => $sign_date,
@@ -282,8 +281,9 @@ else if($action==="updateprof") {
   $phone    = trim((string)($_POST['phone'] ?? '')) ?: null;
   $website  = trim((string)($_POST['website'] ?? '')) ?: null;
   $lb       = normalize_lb($_POST['lb'] ?? '');
-  $dept     = $_POST['dept'] ?? '0';
   $position = $_POST['position'] ?? null;
+  $roles_in = $_POST['roles'] ?? [];
+  if (!is_array($roles_in)) $roles_in = [];
 
   // Nothing stopped two accounts sharing an address, and ctx_me() resolves a
   // member by email with LIMIT 1 — so the loser of that collision would start
@@ -292,27 +292,18 @@ else if($action==="updateprof") {
   $taken->execute([':email' => $email, ':uid' => $uid]);
   if ($email === '' || $taken->fetchColumn()) { header('Location: /dashboard?error=104'); exit; }
 
-  $stmt = $conn->prepare("UPDATE `users` SET `email` = :email, `name` = :name, `phone` = :phone, `website` = :website, `lb` = :lb, `dept` = :dept, `position` = :position WHERE `id` = :uid");
+  $stmt = $conn->prepare("UPDATE `users` SET `email` = :email, `name` = :name, `phone` = :phone, `website` = :website, `lb` = :lb, `position` = :position WHERE `id` = :uid");
+  $stmt->execute([
+    'email' => $email,
+    'name' => $name,
+    'phone' => $phone,
+    'website' => $website,
+    'lb' => $lb,
+    'position' => $position,
+    'uid' => $uid
+  ]);
 
-  /*$stmt->bindParam(':email', $email);
-  $stmt->bindParam(':name', $name);
-  $stmt->bindParam(':phone', $phone);
-  $stmt->bindParam(':website', $website);
-  $stmt->bindParam(':lb', $lb);
-  $stmt->bindParam(':id', $uid);*/
-
-  $stmt->execute(
-    array(
-      'email' => $email,
-      'name' => $name,
-      'phone' => $phone,
-      'website' => $website,
-      'lb' => $lb,
-      'dept' => $dept,
-      'position' => $position,
-      'uid' => $uid
-    )
-  );
+  ctx_save_user_roles($conn, $uid, $roles_in);
 
   ?>
     <script type="text/javascript" language="javascript">
@@ -329,10 +320,11 @@ else if($action==="firstcontact") {
   $phone    = trim((string)($_POST['phone'] ?? '')) ?: null;
   $website  = trim((string)($_POST['website'] ?? '')) ?: null;
   $lb       = normalize_lb($_POST['lb'] ?? '');
-  $dept     = $_POST['dept'] ?? '0';
   $position = $_POST['position'] ?? null;
+  $roles_in = $_POST['roles'] ?? [];
+  if (!is_array($roles_in)) $roles_in = [];
 
-  if($dept == "0" || $name == null || $name == "") {
+  if (empty($roles_in) || $name === null || $name === '') {
     ?>
       <script type="text/javascript" language="javascript">
         window.location="/?error=106"
@@ -341,26 +333,17 @@ else if($action==="firstcontact") {
   exit;
   }
 
-  $stmt = $conn->prepare("UPDATE `users` SET `name` = :name, `phone` = :phone, `website` = :website, `lb` = :lb, `dept` = :dept, `position` = :position WHERE `id` = :uid");
+  $stmt = $conn->prepare("UPDATE `users` SET `name` = :name, `phone` = :phone, `website` = :website, `lb` = :lb, `position` = :position WHERE `id` = :uid");
+  $stmt->execute([
+    'name' => $name,
+    'phone' => $phone,
+    'website' => $website,
+    'lb' => $lb,
+    'position' => $position,
+    'uid' => $uid
+  ]);
 
-  /*$stmt->bindParam(':email', $email);
-  $stmt->bindParam(':name', $name);
-  $stmt->bindParam(':phone', $phone);
-  $stmt->bindParam(':website', $website);
-  $stmt->bindParam(':lb', $lb);
-  $stmt->bindParam(':id', $uid);*/
-
-  $stmt->execute(
-    array(
-      'name' => $name,
-      'phone' => $phone,
-      'website' => $website,
-      'lb' => $lb,
-      'dept' => $dept,
-      'position' => $position,
-      'uid' => $uid
-    )
-  );
+  ctx_save_user_roles($conn, $uid, $roles_in);
 
   ?>
     <script type="text/javascript" language="javascript">

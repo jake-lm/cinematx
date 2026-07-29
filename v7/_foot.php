@@ -62,37 +62,12 @@ if (!empty($ctx_extra_sheets)) echo $ctx_extra_sheets;
       </form>
     </div>
 
-    <div id="join-step-2" style="display:none;">
-      <?php // Same fields as the onboarding gate in _gate.php. Someone who
-            // fills these in here never has to go find them in the dashboard.
-            //
-            // No uid field: firstcontact derives it from the session and
-            // ignores anything POSTed, so carrying one would only suggest
-            // otherwise to whoever reads this next. ?>
-      <form action="/dashboard/signup.php?action=firstcontact" method="post">
-        <div class="field"><label class="field__label" for="j-name">Name</label>
-          <input class="field__input" id="j-name" type="text" name="uname" required /></div>
-        <div class="field"><label class="field__label" for="j-role">Role</label>
-          <select class="field__input" id="j-role" name="dept" required>
-            <option value="0">Select one</option>
-            <?php foreach ($roles as $r): ?><option value="<?php echo ctx_e($r); ?>"><?php echo ctx_e($r); ?></option><?php endforeach; ?>
-          </select></div>
-
-        <div class="field__label" style="margin:var(--s-5) 0 var(--s-3);">Optional</div>
-
-        <div class="field"><label class="field__label" for="j-lb">Letterboxd</label>
-          <?php // Username, not a URL — it is interpolated into
-                // letterboxd.com/<lb>/ and handed to the scraper. Pasted URLs
-                // are unpicked server-side, but ask for the right thing first. ?>
-          <input class="field__input" id="j-lb" type="text" name="lb" placeholder="username" /></div>
-        <div class="field"><label class="field__label" for="j-phone">Phone</label>
-          <input class="field__input" id="j-phone" type="tel" name="phone" autocomplete="tel" /></div>
-        <div class="field"><label class="field__label" for="j-site">Website</label>
-          <input class="field__input" id="j-site" type="text" name="website" placeholder="https://" /></div>
-
-        <input class="btn btn--block" type="submit" value="Continue" />
-      </form>
-    </div>
+    <?php // Step 2 (name, role, the optional fields) used to live here too,
+          // shown inline after a successful signup — a second copy of the
+          // exact form _gate.php's "onboard" state already is, now that the
+          // role picker is a checkbox hierarchy and not a one-line <select>.
+          // initJoin() redirects to / on success instead, which lands there
+          // on its own via ctx_state(). One form, not two. ?>
 
     <div class="field__label" style="margin:var(--s-6) 0 var(--s-3);">Already a member</div>
     <form action="/dashboard/signup.php?action=login" method="post">

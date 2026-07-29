@@ -309,7 +309,8 @@ require __DIR__ . '/_chrome.php';
               </span>
               <span class="member__body">
                 <span class="member__name"><?php echo $e($m['name']); ?></span>
-                <?php if (!empty($m['dept'])): ?><span class="member__role"><?php echo $e($m['dept']); ?></span><?php endif; ?>
+                <?php $m_top = array_column(ctx_roles_grouped($m['roles']), 'name'); ?>
+                <?php if ($m_top): ?><span class="member__role"><?php echo $e(implode(', ', $m_top)); ?></span><?php endif; ?>
               </span>
             </a>
             <?php endforeach; ?>

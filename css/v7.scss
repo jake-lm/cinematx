@@ -1221,6 +1221,68 @@ button, input, select, textarea { font: inherit; color: inherit; }
          color: #fff; border-radius: 6px; @include label(var(--t-3xs), #fff); }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  ROLE PICKER — the checkbox hierarchy shared by the onboarding gate and
+//  the dashboard's Account tab. Checking Filmmaker is what makes someone a
+//  Filmmaker; the reveal underneath is additional detail, not a second
+//  question, which is why it has no checkbox of its own to also tick.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.role-group { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.role-check {
+  display: flex; align-items: center; gap: var(--s-2);
+  font-size: var(--t-sm); color: var(--text);
+  cursor: pointer;
+  input { accent-color: var(--red); }
+}
+.role-check--sub { color: var(--text-2); }
+
+// max-height + measured scrollHeight, not display:none — an instant cut is
+// jarring for something the click just caused, and jQuery's slide helpers
+// are exactly what this project moved away from.
+.role-sub {
+  max-height: 0; overflow: hidden;
+  margin-left: var(--s-6);
+  display: flex; flex-direction: column; gap: var(--s-2);
+  transition: max-height var(--t-mid) var(--ease);
+  // A fixed cap rather than a measured scrollHeight — comfortably more than
+  // five checkboxes and a hint line will ever need, and unlike a measured
+  // value it's still correct when this sits inside a dashboard tab that's
+  // display:none at the moment JS first runs.
+  &.is-on { max-height: 300px; }
+}
+.role-sub__hint { margin: var(--s-1) 0; @include label(var(--t-3xs), var(--text-4)); }
+
+// The only .pill that ever gets this is Filmmaker — the one tag in the
+// taxonomy with children to reveal. Deliberately not a new visual style:
+// the pill itself looks exactly like every other one, plus a caret.
+.pill--expand {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: inherit; cursor: pointer;
+  i { font-size: 0.75em; transition: transform var(--t-fast) var(--ease); }
+  &[aria-expanded="true"] i { transform: rotate(180deg); }
+}
+
+.pill-drop {
+  display: none;
+  flex-wrap: wrap; gap: 4px;
+  margin-top: var(--s-3);
+  padding: var(--s-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  &.is-on { display: flex; }
+}
+
+.pill-drop__item {
+  padding: 2px var(--s-2);
+  border-radius: 4px;
+  background: var(--surface-2);
+  @include label(9px, var(--text-2));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  CUSTOM SELECT
 //  Every <select> on the site gets this. The real element stays in the DOM —
 //  invisible rather than display:none, so required-field validation and any
@@ -2506,10 +2568,49 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // ═══════════════════════════════════════════════════════════════════════════
 
 .who {
+  position: relative;   // anchors .who__scrim and .who__banner-edit
   display: flex; align-items: center; gap: var(--s-5);
   padding: var(--s-7) 0 var(--s-6);
   border-bottom: 1px solid var(--line);
   margin-bottom: var(--s-7);
+}
+
+// The optional banner photo behind the whole header. Contained within .who
+// rather than bleeding to the viewport edge — full-bleed has never once
+// worked out for this project. Sized generously enough that a wide photo
+// actually reads as one, not a sliver behind the text.
+.who--banner {
+  background-size: cover; background-position: center;
+  padding: var(--s-6);
+  min-height: 220px;
+  border-radius: var(--radius);
+}
+
+// Legibility for whatever the photo happens to be. On the two-column desktop
+// row it's a left-to-right gradient — strong where the name and links sit,
+// fading out toward the right so the photo actually shows through — and a
+// flat scrim once the header stacks to a single column below, where there is
+// no "toward the right" left to fade into.
+.who__scrim {
+  position: absolute; inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0.08));
+}
+
+// Persistent rather than hover-only like .who__face-edit — this covers the
+// whole header, not one small circle, so "hover to discover it" doesn't
+// really work at this scale. Doubles as the only way to notice the feature
+// exists at all before you have a banner set.
+.who__banner-edit {
+  position: absolute; top: var(--s-4); right: var(--s-4); z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  background: rgba(20, 18, 15, 0.55);
+  border-radius: 50%;
+  color: #fff; font-size: var(--t-sm); cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+  &:hover { background: rgba(20, 18, 15, 0.8); }
 }
 
 .who__face {
@@ -2542,6 +2643,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .lb-connect .field__input { width: 50%; flex: none; padding: var(--s-3); }
 
+// Needs to be positioned, not just the default static flex child it was —
+// .who__scrim is also positioned, and paint order for a mix of positioned
+// and non-positioned siblings ignores DOM order in non-positioned's favour.
+// Without this the scrim drew on top of the name and links, not behind them.
+.who__body { position: relative; z-index: 1; min-width: 0; }
+
 .who__name {
   margin: 0;
   font-family: var(--f-display);
@@ -2555,6 +2662,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .who__meta  { display: flex; align-items: center; gap: var(--s-3); margin-top: var(--s-3);
               @include label(var(--t-3xs), var(--text-3)); }
 .who__links { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-4); }
+
+// White against the scrim regardless of theme — the underlying photo makes
+// "match the paper/dark tokens" meaningless here.
+.who--banner {
+  .who__name { color: #fff; }
+  .who__meta { color: rgba(255, 255, 255, 0.75); }
+  .pill      { background: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.3); color: #fff; }
+  .ilink     { color: rgba(255, 255, 255, 0.85); &:hover { background: rgba(255, 255, 255, 0.15); color: #fff; } }
+  .btn--quiet { border-color: rgba(255, 255, 255, 0.4); color: #fff;
+                &:hover { background: rgba(255, 255, 255, 0.15); } }
+}
 
 .profile {
   display: grid;
@@ -2618,6 +2736,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (max-width: 900px) {
   .profile { grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
   .who { flex-direction: column; align-items: flex-start; gap: var(--s-4); }
+
+  // No "toward the right" once the header stacks to one column — the
+  // gradient's whole reason stops applying, so it becomes a flat scrim
+  // behind the stacked photo, name and links instead.
+  .who__scrim { background: rgba(0, 0, 0, 0.55); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2876,6 +2999,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .profile-photo-actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+
+.profile-banner-wrap {
+  padding-bottom: var(--s-6);
+  margin-bottom: var(--s-6);
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-banner-preview {
+  width: 100%; max-width: 420px;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--surface-3);
+  margin-bottom: var(--s-3);
+  img { width: 100%; height: 100%; object-fit: cover; }
+}
+
+.profile-banner-actions { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 
 .profile-photo-remove {
   padding: var(--s-2) var(--s-3);

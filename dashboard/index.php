@@ -9,7 +9,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 require dirname(__DIR__) . '/v7/_lib.php';
 
-$me = ctx_me($conn);
+$me       = ctx_me($conn);
+$my_roles = ctx_user_roles($conn, $me['id']);
 // Signing in and onboarding both live at the root now.
 if (!$me || ctx_state($conn) !== 'member') { header('Location: /'); exit; }
 
@@ -240,33 +241,56 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             </div>
           </div>
 
+          <div class="profile-banner-wrap">
+            <div class="profile-banner-preview" id="profile-banner-preview"
+                 style="<?php echo empty($me['banner']) ? 'display:none;' : ''; ?>">
+              <img id="profile-banner-preview-img"
+                   src="<?php echo !empty($me['banner']) ? '/uploads/banners/' . $e($me['banner']) : ''; ?>" alt="" />
+            </div>
+            <div class="profile-banner-actions">
+              <label class="write-image-btn enabled" for="profile-banner-input">
+                <i class="fa-solid fa-image"></i> <?php echo empty($me['banner']) ? 'Add banner' : 'Change banner'; ?>
+              </label>
+              <input type="file" id="profile-banner-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" />
+              <button type="button" class="profile-photo-remove" id="profile-banner-remove"
+                      style="<?php echo empty($me['banner']) ? 'display:none;' : ''; ?>">Remove</button>
+            </div>
+            <p class="write-image-hint" style="margin-top:var(--s-2);">Shows behind your profile header — a wide image works best.</p>
+          </div>
+
           <form class="dash-form" action="/dashboard/signup.php?action=updateprof" method="post">
             <div class="field">
               <label class="field__label">Email</label>
               <input class="field__input" type="text" value="<?php echo $e($me['email']); ?>" disabled />
               <input type="hidden" name="email" value="<?php echo $e($me['email']); ?>" />
             </div>
-            <div class="gate__row">
-              <div class="field">
-                <label class="field__label" for="d-name">Name</label>
-                <input class="field__input" id="d-name" type="text" name="uname" value="<?php echo $e($me['name']); ?>" />
-              </div>
-              <div class="field">
-                <label class="field__label" for="d-role">Role</label>
-                <select class="field__input" id="d-role" name="dept">
-                  <option value="0">Select your role</option>
-                  <?php // The role list changes over time — "Filmmaker" split into
-                        // more specific ones — and a member who hasn't re-picked
-                        // yet still has the old value stored. Show it rather than
-                        // silently falling back to "Select your role", which would
-                        // save as dept=0 the moment they hit save without noticing. ?>
-                  <?php if (!empty($me['dept']) && !in_array($me['dept'], $roles, true)): ?>
-                  <option value="<?php echo $e($me['dept']); ?>" selected><?php echo $e($me['dept']); ?></option>
-                  <?php endif; ?>
-                  <?php foreach ($roles as $r): ?>
-                  <option value="<?php echo $e($r); ?>"<?php echo $me['dept'] === $r ? ' selected' : ''; ?>><?php echo $e($r); ?></option>
+            <div class="field">
+              <label class="field__label" for="d-name">Name</label>
+              <input class="field__input" id="d-name" type="text" name="uname" value="<?php echo $e($me['name']); ?>" />
+            </div>
+            <div class="field">
+              <label class="field__label">Role</label>
+              <div class="role-group">
+                <?php foreach ($roles as $top => $subs): ?>
+                <label class="role-check">
+                  <input type="checkbox" name="roles[]" value="<?php echo $e($top); ?>"
+                         <?php echo in_array($top, $my_roles, true) ? 'checked' : ''; ?>
+                         <?php echo $subs ? 'data-expands="role-sub-' . $e(ctx_slug($top)) . '"' : ''; ?> />
+                  <?php echo $e($top); ?>
+                </label>
+                <?php if ($subs): ?>
+                <div class="role-sub" id="role-sub-<?php echo $e(ctx_slug($top)); ?>">
+                  <p class="role-sub__hint">Select as many as apply.</p>
+                  <?php foreach ($subs as $s): ?>
+                  <label class="role-check role-check--sub">
+                    <input type="checkbox" name="roles[]" value="<?php echo $e($s); ?>"
+                           <?php echo in_array($s, $my_roles, true) ? 'checked' : ''; ?> />
+                    <?php echo $e($s); ?>
+                  </label>
                   <?php endforeach; ?>
-                </select>
+                </div>
+                <?php endif; ?>
+                <?php endforeach; ?>
               </div>
             </div>
             <div class="gate__row">

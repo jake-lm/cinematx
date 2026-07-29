@@ -155,6 +155,45 @@ $(document).ready(function() {
     });
   });
 
+  // ── Profile banner upload (Account tab) ─────────────────────────────────────
+
+  $('#profile-banner-input').on('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      $('#profile-banner-preview-img').attr('src', e.target.result);
+      $('#profile-banner-preview').show();
+    };
+    reader.readAsDataURL(file);
+
+    var fd = new FormData();
+    fd.append('image', file);
+    $.ajax({
+      type: 'POST', url: '/dashboard/profile.php?action=upload_banner',
+      data: fd, dataType: 'json',
+      processData: false, contentType: false,
+      success: function(res) {
+        if (res.success) {
+          $('#profile-banner-remove').show();
+        } else {
+          alert('Banner upload failed.');
+        }
+      },
+      error: function() { alert('Banner upload failed.'); }
+    });
+  });
+
+  $('#profile-banner-remove').on('click', function() {
+    $('#profile-banner-preview-img').attr('src', '');
+    $('#profile-banner-preview').hide();
+    $(this).hide();
+    $.ajax({
+      type: 'POST', url: '/dashboard/profile.php?action=upload_banner&remove=1',
+      data: {}, dataType: 'json'
+    });
+  });
+
   // ── Save ───────────────────────────────────────────────────────────────────
 
   function save() {
