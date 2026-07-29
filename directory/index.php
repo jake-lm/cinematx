@@ -96,9 +96,12 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           foreach ($m['roles'] as $rg) $all_role_words = array_merge($all_role_words, $rg['subs']);
           // One searchable haystack, so the client filter stays trivial.
           $hay = mb_strtolower(trim($m['name'] . ' ' . implode(' ', $all_role_words) . ' ' . $m['email'] . ' ' . $m['phone']));
-          // Space-separated: a member with more than one tag now needs to
-          // match more than one filter chip.
-          $role_slugs = implode(' ', array_map('ctx_slug', $top_names));
+          // Space-separated, and every level rather than just top-level tags —
+          // a member with more than one tag now needs to match more than one
+          // filter chip, and a profile link for a specific sub-role (e.g.
+          // Director) needs something to match even though only top-level
+          // tags get a visible chip.
+          $role_slugs = implode(' ', array_map('ctx_slug', $all_role_words));
         ?>
         <div class="member" data-role="<?php echo $e($role_slugs); ?>"
              data-saved="<?php echo $is_saved ? '1' : '0'; ?>"

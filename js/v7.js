@@ -596,25 +596,30 @@
   // ══ Join ═════════════════════════════════════════════════════════════════
 
   // ══ Role picker ══════════════════════════════════════════════════════════
-  // Checking Filmmaker reveals its sub-role checkboxes; unchecking hides them
-  // again. max-height + measured scrollHeight rather than display:none —
-  // an instant cut reads as broken for something the click just caused.
-  // Shared by the onboarding gate and the dashboard's Account tab, since
-  // both render the same [data-expands] markup from roles.php's taxonomy.
+  // The Role field is a single <select> (Filmmaker, Actor, Critic, …) — same
+  // as before this taxonomy grew sub-roles. Picking the one option that has
+  // children (currently Filmmaker) reveals its sub-role checkboxes; picking
+  // anything else hides them and clears any that were checked, so switching
+  // away doesn't silently submit a sub-role with no parent selected. Shared
+  // by the onboarding gate and the dashboard's Account tab, since both render
+  // the same select + [data-expands] markup from roles.php's taxonomy.
 
   function initRoleGroup() {
-    $$('[data-expands]').forEach(function (cb) {
-      var sub = document.getElementById(cb.getAttribute('data-expands'));
-      if (!sub) return;
-
-      // A measured scrollHeight would be 0 here whenever this sits inside a
-      // currently-hidden dashboard tab (display:none collapses it and every
-      // descendant regardless of content) — pre-checked Filmmaker would then
-      // stay visually collapsed on load until the checkbox was clicked once.
-      // A class + a generous fixed cap sidesteps the measurement entirely.
-      function sync() { sub.classList.toggle('is-on', cb.checked); }
+    $$('[data-role-select]').forEach(function (select) {
+      // A generous fixed cap rather than a measured scrollHeight — the
+      // dashboard's copy of this sits inside a tab panel that starts
+      // display:none, where scrollHeight reads 0 regardless of content.
+      function sync() {
+        var opt = select.options[select.selectedIndex];
+        var activeId = opt ? opt.getAttribute('data-expands') : null;
+        $$('.role-sub').forEach(function (sub) {
+          var on = sub.id === activeId;
+          sub.classList.toggle('is-on', on);
+          if (!on) $$('input[type="checkbox"]', sub).forEach(function (cb) { cb.checked = false; });
+        });
+      }
       sync();
-      cb.addEventListener('change', sync);
+      select.addEventListener('change', sync);
     });
   }
 
@@ -979,31 +984,51 @@
   // this page clips or scrolls, so the panel is just normal flow below the
   // pill row rather than something reparented to <body>.
 
+  // Reparented to <body> like the custom-select menu and the you-menu — left
+  // in place, .pill-drop's own display:flex on .is-on sat in normal flow and
+  // pushed .who__links down whenever it opened. Fixed position + closing on
+  // scroll/resize (rather than repositioning) matches that same pattern.
   function initRoleDrop() {
     var triggers = $$('[data-role-toggle]');
     if (!triggers.length) return;
 
+    var entries = triggers.map(function (btn) {
+      var drop = document.getElementById(btn.getAttribute('data-role-toggle'));
+      if (!drop) return null;
+      document.body.appendChild(drop);
+      return { btn: btn, drop: drop };
+    }).filter(Boolean);
+
+    function place(entry) {
+      var r = entry.btn.getBoundingClientRect();
+      entry.drop.style.left = Math.round(r.left) + 'px';
+      entry.drop.style.top  = Math.round(r.bottom + 6) + 'px';
+    }
+
     function closeAll() {
-      triggers.forEach(function (t) {
-        var d = document.getElementById(t.getAttribute('data-role-toggle'));
-        if (d) d.classList.remove('is-on');
-        t.setAttribute('aria-expanded', 'false');
+      entries.forEach(function (entry) {
+        entry.drop.classList.remove('is-on');
+        entry.btn.setAttribute('aria-expanded', 'false');
       });
     }
 
-    triggers.forEach(function (btn) {
-      var drop = document.getElementById(btn.getAttribute('data-role-toggle'));
-      if (!drop) return;
-      btn.addEventListener('click', function (e) {
+    entries.forEach(function (entry) {
+      entry.btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        var wasOpen = drop.classList.contains('is-on');
+        var wasOpen = entry.drop.classList.contains('is-on');
         closeAll();
-        if (!wasOpen) { drop.classList.add('is-on'); btn.setAttribute('aria-expanded', 'true'); }
+        if (!wasOpen) {
+          place(entry);
+          entry.drop.classList.add('is-on');
+          entry.btn.setAttribute('aria-expanded', 'true');
+        }
       });
     });
 
     document.addEventListener('click', closeAll);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+    window.addEventListener('scroll', closeAll, true);
+    window.addEventListener('resize', closeAll);
   }
 
   function initLetterboxdConnect() {
@@ -1038,7 +1063,9 @@
     var search = $('#dir-search');
     var count  = $('#dir-count');
     var empty  = $('#dir-empty');
-    var role   = 'all';
+    // A profile's role tag links here as ?role=director — a sub-role with no
+    // chip of its own still narrows the roster, it just won't light one up.
+    var role   = new URLSearchParams(window.location.search).get('role') || 'all';
 
     function apply() {
       var term  = (search && search.value || '').trim().toLowerCase();
@@ -1064,6 +1091,11 @@
       if (count) count.textContent = shown;
       if (empty) empty.style.display = shown ? 'none' : '';
     }
+
+    // Only matters when role didn't default to 'all' — a profile's role tag
+    // deep-links here with ?role=, and the server-rendered roster doesn't
+    // know to pre-hide anything for that.
+    if (role !== 'all') apply();
 
     if (search) search.addEventListener('input', apply);
     $$('button[data-role]').forEach(function (b) {

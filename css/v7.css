@@ -940,10 +940,14 @@ button, input, select, textarea {
 }
 
 .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 2px var(--s-2);
   border: 1px solid var(--red-wash);
   border-radius: 4px;
   background: var(--red-wash);
+  text-decoration: none;
   font-family: var(--f-ui);
   font-size: 9px;
   font-weight: 600;
@@ -1902,12 +1906,6 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
-.role-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-
 .role-check {
   display: flex;
   align-items: center;
@@ -1949,9 +1947,6 @@ button, input, select, textarea {
 }
 
 .pill--expand {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   font: inherit;
   cursor: pointer;
 }
@@ -1963,11 +1958,40 @@ button, input, select, textarea {
   transform: rotate(180deg);
 }
 
+.pill__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.pill--filmmaker .pill__dot {
+  background: #B08A3E;
+}
+
+.pill--actor .pill__dot {
+  background: #6E8C9E;
+}
+
+.pill--critic .pill__dot {
+  background: #9C6B84;
+}
+
+.pill--enthusiast .pill__dot {
+  background: #6E9C7B;
+}
+
+.pill--member .pill__dot {
+  background: var(--text-4);
+}
+
 .pill-drop {
   display: none;
+  position: fixed;
+  z-index: 720;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: var(--s-3);
+  max-width: 260px;
   padding: var(--s-2);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1982,6 +2006,7 @@ button, input, select, textarea {
   padding: 2px var(--s-2);
   border-radius: 4px;
   background: var(--surface-2);
+  text-decoration: none;
   font-family: var(--f-ui);
   font-size: 9px;
   font-weight: 600;
@@ -1989,6 +2014,9 @@ button, input, select, textarea {
   text-transform: uppercase;
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
+}
+.pill-drop__item:hover {
+  background: var(--surface-3);
 }
 
 .xselect {

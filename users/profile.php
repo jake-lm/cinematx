@@ -74,13 +74,15 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <div class="who__body">
           <h1 class="who__name"><?php echo $e($who['name']); ?></h1>
           <div class="who__meta">
-            <?php foreach ($who_roles as $i => $rg): ?>
+            <?php foreach ($who_roles as $i => $rg): $slug = ctx_slug($rg['name']); ?>
               <?php if ($rg['subs']): ?>
-              <button type="button" class="pill pill--expand" data-role-toggle="role-drop-<?php echo $i; ?>" aria-expanded="false">
-                <?php echo $e($rg['name']); ?><i class="fa-solid fa-caret-down"></i>
+              <button type="button" class="pill pill--expand pill--<?php echo $e($slug); ?>" data-role-toggle="role-drop-<?php echo $i; ?>" aria-expanded="false">
+                <span class="pill__dot"></span><?php echo $e($rg['name']); ?><i class="fa-solid fa-caret-down"></i>
               </button>
               <?php else: ?>
-              <span class="pill"><?php echo $e($rg['name']); ?></span>
+              <a class="pill pill--<?php echo $e($slug); ?>" href="/directory?role=<?php echo $e($slug); ?>">
+                <span class="pill__dot"></span><?php echo $e($rg['name']); ?>
+              </a>
               <?php endif; ?>
             <?php endforeach; ?>
             <?php if (!empty($who['sign_date'])): ?><span>Since <?php echo date('F Y', (int)$who['sign_date']); ?></span><?php endif; ?>
@@ -90,7 +92,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 // squeeze in next to the pills instead of appearing below them. ?>
           <?php foreach ($who_roles as $i => $rg): if ($rg['subs']): ?>
           <div class="pill-drop" id="role-drop-<?php echo $i; ?>">
-            <?php foreach ($rg['subs'] as $s): ?><span class="pill-drop__item"><?php echo $e($s); ?></span><?php endforeach; ?>
+            <?php foreach ($rg['subs'] as $s): ?><a class="pill-drop__item" href="/directory?role=<?php echo $e(ctx_slug($s)); ?>"><?php echo $e($s); ?></a><?php endforeach; ?>
           </div>
           <?php endif; endforeach; ?>
 

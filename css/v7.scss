@@ -651,10 +651,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .pill {
+  display: inline-flex; align-items: center; gap: 4px;
   padding: 2px var(--s-2);
   border: 1px solid var(--red-wash);
   border-radius: 4px;
   background: var(--red-wash);
+  text-decoration: none;
   @include label(9px, var(--red-hi));
 }
 
@@ -1221,13 +1223,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
          color: #fff; border-radius: 6px; @include label(var(--t-3xs), #fff); }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ROLE PICKER — the checkbox hierarchy shared by the onboarding gate and
-//  the dashboard's Account tab. Checking Filmmaker is what makes someone a
-//  Filmmaker; the reveal underneath is additional detail, not a second
-//  question, which is why it has no checkbox of its own to also tick.
+//  ROLE PICKER — a single <select> (Filmmaker, Actor, Critic, …) shared by
+//  the onboarding gate and the dashboard's Account tab. Picking Filmmaker is
+//  what makes someone a Filmmaker; the sub-role checkboxes that reveal below
+//  it are additional detail, not a second question.
 // ═══════════════════════════════════════════════════════════════════════════
-
-.role-group { display: flex; flex-direction: column; gap: var(--s-2); }
 
 .role-check {
   display: flex; align-items: center; gap: var(--s-2);
@@ -1257,16 +1257,34 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // taxonomy with children to reveal. Deliberately not a new visual style:
 // the pill itself looks exactly like every other one, plus a caret.
 .pill--expand {
-  display: inline-flex; align-items: center; gap: 4px;
   font: inherit; cursor: pointer;
   i { font-size: 0.75em; transition: transform var(--t-fast) var(--ease); }
   &[aria-expanded="true"] i { transform: rotate(180deg); }
 }
 
+// A muted category cue, not a second color scheme — the pill itself keeps
+// its one shared style; this is just a small hint at which top-level role
+// it is. Member (everyone, effectively) gets a neutral dot rather than a
+// hue of its own.
+.pill__dot {
+  width: 6px; height: 6px; flex: none;
+  border-radius: 50%;
+}
+.pill--filmmaker  .pill__dot { background: #B08A3E; }
+.pill--actor      .pill__dot { background: #6E8C9E; }
+.pill--critic     .pill__dot { background: #9C6B84; }
+.pill--enthusiast .pill__dot { background: #6E9C7B; }
+.pill--member     .pill__dot { background: var(--text-4); }
+
+// Reparented to <body> and positioned under its trigger pill by
+// initRoleDrop() — fixed, not in flow, so opening it can't push .who__links
+// (or anything else on the page) around the way an in-flow reveal did.
 .pill-drop {
   display: none;
+  position: fixed;
+  z-index: 720;
   flex-wrap: wrap; gap: 4px;
-  margin-top: var(--s-3);
+  max-width: 260px;
   padding: var(--s-2);
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1279,7 +1297,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   padding: 2px var(--s-2);
   border-radius: 4px;
   background: var(--surface-2);
+  text-decoration: none;
   @include label(9px, var(--text-2));
+  &:hover { background: var(--surface-3); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -323,6 +323,7 @@ else if($action==="firstcontact") {
   $position = $_POST['position'] ?? null;
   $roles_in = $_POST['roles'] ?? [];
   if (!is_array($roles_in)) $roles_in = [];
+  $roles_in = array_values(array_diff($roles_in, ['0', '']));
 
   if (empty($roles_in) || $name === null || $name === '') {
     ?>

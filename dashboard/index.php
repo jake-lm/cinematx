@@ -269,30 +269,31 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <input class="field__input" id="d-name" type="text" name="uname" value="<?php echo $e($me['name']); ?>" />
             </div>
             <div class="field">
-              <label class="field__label">Role</label>
-              <div class="role-group">
+              <label class="field__label" for="d-role">Role</label>
+              <select class="field__input" id="d-role" name="roles[]" required data-role-select>
+                <option value="0">Select one</option>
                 <?php foreach ($roles as $top => $subs): ?>
-                <label class="role-check">
-                  <input type="checkbox" name="roles[]" value="<?php echo $e($top); ?>"
-                         <?php echo in_array($top, $my_roles, true) ? 'checked' : ''; ?>
-                         <?php echo $subs ? 'data-expands="role-sub-' . $e(ctx_slug($top)) . '"' : ''; ?> />
+                <option value="<?php echo $e($top); ?>"
+                        <?php echo in_array($top, $my_roles, true) ? ' selected' : ''; ?>
+                        <?php echo $subs ? ' data-expands="role-sub-' . $e(ctx_slug($top)) . '"' : ''; ?>>
                   <?php echo $e($top); ?>
-                </label>
-                <?php if ($subs): ?>
-                <div class="role-sub" id="role-sub-<?php echo $e(ctx_slug($top)); ?>">
-                  <p class="role-sub__hint">Select as many as apply.</p>
-                  <?php foreach ($subs as $s): ?>
-                  <label class="role-check role-check--sub">
-                    <input type="checkbox" name="roles[]" value="<?php echo $e($s); ?>"
-                           <?php echo in_array($s, $my_roles, true) ? 'checked' : ''; ?> />
-                    <?php echo $e($s); ?>
-                  </label>
-                  <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
+                </option>
                 <?php endforeach; ?>
-              </div>
+              </select>
             </div>
+
+            <?php foreach ($roles as $top => $subs): if (!$subs) continue; ?>
+            <div class="role-sub" id="role-sub-<?php echo $e(ctx_slug($top)); ?>">
+              <p class="role-sub__hint">Select as many as apply.</p>
+              <?php foreach ($subs as $s): ?>
+              <label class="role-check role-check--sub">
+                <input type="checkbox" name="roles[]" value="<?php echo $e($s); ?>"
+                       <?php echo in_array($s, $my_roles, true) ? ' checked' : ''; ?> />
+                <?php echo $e($s); ?>
+              </label>
+              <?php endforeach; ?>
+            </div>
+            <?php endforeach; ?>
             <div class="gate__row">
               <div class="field">
                 <label class="field__label" for="d-lb">Letterboxd</label>
