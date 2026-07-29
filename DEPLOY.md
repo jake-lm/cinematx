@@ -75,7 +75,10 @@ rather than visibly broken.
 cp config.example.php config.php
 ```
 
-Fill in the database credentials and `TMDB_API_KEY`, and leave:
+Fill in the database credentials and `TMDB_API_KEY`. `IG_ACCESS_TOKEN`,
+`IG_BUSINESS_ACCOUNT_ID`, `META_APP_ID`, and `META_APP_SECRET` are for the
+daily Instagram post (step 6) — leave them blank until that's set up;
+`bin/post-instagram.php --dry-run` works without them. And leave:
 
 ```php
 define('CTX_DEBUG', false);
@@ -117,6 +120,27 @@ unfamiliar title.
 The log is worth reading occasionally. A venue whose page structure changes
 scrapes to zero results and fails silently — The List simply stops mentioning
 them — so the warmer prints a warning when a venue yields nothing.
+
+---
+
+## 5b. Instagram (optional)
+
+Once `IG_ACCESS_TOKEN` and `IG_BUSINESS_ACCOUNT_ID` are filled in:
+
+```cron
+0 9 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php    >> /var/log/cinematx-ig.log 2>&1
+0 3 1 * *  /usr/bin/php /var/www/cinematx/bin/refresh-ig-token.php  >> /var/log/cinematx-ig.log 2>&1
+```
+
+The first posts today's Austin screenings every morning. The second refreshes
+the long-lived token monthly — it expires after ~60 days, and without this the
+first cron job just starts failing silently two months in. It rewrites
+`IG_ACCESS_TOKEN` in `config.php` in place, so `config.php` needs to stay
+writable by whichever user cron runs as.
+
+Run `php bin/post-instagram.php --dry-run` first — it writes the card to
+`uploads/social/` and prints the caption without posting anything, so you can
+check the render before it goes live.
 
 ---
 
