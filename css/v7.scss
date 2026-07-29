@@ -1477,13 +1477,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  ADMIN  (/_admin/)
-//  A clean, neutral dashboard rather than the public site's editorial voice
-//  — set via $ctx_shell = 'admin-shell' (the same mechanism screening rooms
-//  use to go dark), so every component below just inherits new custom
-//  properties instead of needing admin-specific variants of .card/.btn/etc.
+//
+//  A workspace, not a publication. The public side is editorial — Fraunces
+//  headlines, warm paper, one piece asking to be read. Admin has the opposite
+//  job: several live things whose state you check at a glance.
+//
+//  Scoped under $ctx_shell = 'admin-shell', the same mechanism a screening
+//  room uses to take the shell dark, so the public site inherits none of it.
+//
+//  Built to DESIGN.md's finding rather than around it: claustrophobia is
+//  competing claims on attention, and the fix is hierarchy. So the panels
+//  here are deliberately unequal in size, and each shows its actual contents
+//  instead of a sentence describing them.
 // ═══════════════════════════════════════════════════════════════════════════
 
 .admin-shell {
+  // Cooler and flatter than paper. The red is untouched — it is the one thing
+  // carried across from the public side.
   --bg:        #F7F7F5;
   --surface:   #FFFFFF;
   --surface-2: #F4F4F2;
@@ -1494,7 +1504,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   --text-2:    #52525B;
   --text-3:    #6B6B74;
   --text-4:    #9A9AA2;
+
+  // Two steps of one hue for the visitor graph. Unique visitors sit inside
+  // connections, so this is a part of a whole — not two categories, and so
+  // not two hues.
+  --vis-part:  #922E32;
+  --vis-whole: #DEC0C1;
+  --vis-bot:   #8C887F;
 }
+
 [data-theme="dark"] .admin-shell {
   --bg:        #17171A;
   --surface:   #1D1D21;
@@ -1506,12 +1524,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   --text-2:    #C2C2C8;
   --text-3:    #9C9CA4;
   --text-4:    #6E6E77;
+
+  // Stepped against this ground rather than flipped from the light values.
+  --vis-part:  #CE565B;
+  --vis-whole: #63343A;
+  --vis-bot:   #74747E;
 }
 
-// Card/field labels read as an editorial plaque site-wide (uppercase,
-// letter-spaced, tiny, via the label() mixin) — inside admin they drop that
-// for a plainer, slightly larger, normal-case treatment closer to how a
-// SaaS app sets field labels and section titles.
+// No Fraunces in here. The wordmark in the rail keeps it — a logo stays a
+// logo — but every title, label and figure is the UI face.
 .admin-shell {
   .card__title, .field__label, .rail__group {
     text-transform: none;
@@ -1521,122 +1542,322 @@ button, input, select, textarea { font: inherit; color: inherit; }
   }
 }
 
-.admin-grid {
-  margin-top: var(--s-6);
+// ── Page shell ──────────────────────────────────────────────────────────────
+// Admin used to borrow .reading — a 720px article column — and force it open
+// with an inline max-width override. This is the container it actually wanted.
+.adm { max-width: 1400px; margin: 0 auto; padding-bottom: var(--s-8); }
+
+.adm__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--s-5);
+}
+.adm__title {
+  margin: 0;
+  font-family: var(--f-ui);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.adm__meta { @include label(var(--t-3xs), var(--text-3)); }
+.adm__end  { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
+
+// ── Dashboard bento ─────────────────────────────────────────────────────────
+// Unequal on purpose. Equal tiles are the information wall the design doc
+// names as the thing that goes wrong.
+//
+// Two columns, and the right one is its own grid rather than a row-span in the
+// outer one. A tall item spanning rows forces every row it crosses to be tall,
+// which left the short panels beside it floating in their own dead space.
+.adm-bento {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: start;
+}
+.adm-bento__col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-5);
+  align-items: start;
+}
+.adm-bento__col > .adm-wide { grid-column: 1 / -1; }
+
+// Sub-pages: the form is a fixed narrow column and the content takes the
+// rest. Previously a 300px card sat alone in a 1300px row.
+.adm-two {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: var(--s-5);
   align-items: start;
 }
 
-.admin-card .card__body { overflow: visible; padding-top: var(--s-4); }
-
-.admin-textarea { resize: vertical; min-height: 96px; font-family: var(--f-read); line-height: 1.6; }
-.admin-tz       { margin-left: var(--s-2); text-transform: none; letter-spacing: 0; color: var(--text-4); }
-
-.admin-progress { width: 100%; height: 4px; margin-bottom: var(--s-2); accent-color: var(--red); }
-
-.admin-note {
-  margin-bottom: var(--s-3);
-  font-family: var(--f-read);
-  font-size: var(--t-xs);
-  color: var(--text-3);
+@media (max-width: 1080px) {
+  .adm-bento { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .adm-bento__col, .adm-two { grid-template-columns: minmax(0, 1fr); }
 }
 
-// Scheduling used to happen blind — nothing on the page said what was already
-// booked, so a double-booking only turned up on the theatre page.
-.admin-booked { margin-top: var(--s-5); border-top: 1px solid var(--line); }
-.admin-booked__head { padding: var(--s-3) 0 var(--s-2); @include label(var(--t-3xs), var(--text-3)); }
-.admin-booked__row {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+// ── Panels ──────────────────────────────────────────────────────────────────
+.adm-card {
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04);
+  transition: box-shadow var(--t-mid) var(--ease), border-color var(--t-mid) var(--ease);
+  &:hover { box-shadow: 0 2px 10px rgba(20, 20, 20, 0.07); border-color: var(--line-2); }
+
+  .card__body { padding: var(--s-4); overflow: visible; }
+  .card__body--flush { padding: 0; }
+}
+
+// The count that used to be a standalone stat tile, now living in the head of
+// the panel it actually describes.
+.adm-count {
+  margin-left: auto;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  + .card__more { margin-left: var(--s-3); }
+}
+
+.adm-empty { padding: var(--s-6) var(--s-4); text-align: center; @include label(var(--t-3xs), var(--text-4)); }
+
+// ── Poster strip (the Films peek) ───────────────────────────────────────────
+.adm-posters { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-2); }
+.adm-poster {
+  aspect-ratio: 2 / 3;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  &:hover { transform: translateY(-2px); border-color: var(--red-hi); }
+}
+.adm-poster__blank {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; padding: var(--s-2);
+  text-align: center; font-size: 9px; line-height: 1.25; color: var(--text-4);
+}
+
+// ── Rows (showtimes peek, film list, upcoming list) ─────────────────────────
+.adm-row {
+  display: flex;
+  align-items: center;
   gap: var(--s-3);
-  align-items: baseline;
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  transition: background var(--t-fast) var(--ease);
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--surface-2); }
+}
+.adm-row__thumb {
+  flex: none; width: 32px; aspect-ratio: 2 / 3;
+  border-radius: 4px; overflow: hidden;
+  background: var(--surface-3); border: 1px solid var(--line);
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
+}
+.adm-row__text  { flex: 1; min-width: 0; }
+.adm-row__title {
+  display: block;
+  font-size: var(--t-sm); font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.adm-row__sub  { display: block; margin-top: 1px; font-size: var(--t-xs); color: var(--text-3); }
+.adm-row__when { flex: none; @include label(var(--t-3xs), var(--red-hi)); }
+.adm-row__end  { flex: none; display: flex; align-items: center; gap: var(--s-2); }
+
+// ── Visitor graph ───────────────────────────────────────────────────────────
+// A stack, not an overlay: unique visitors at the base, the repeat visits they
+// generated above it. The column total is connections, so the red block reads
+// as the share of that day's traffic which was somebody new.
+//
+// Bots are counted, but they are not a third colour in this stack. A muted
+// grey beside a muted red is a pair the eye cannot separate — measured at
+// ΔE 5, well under the 15 needed. They get their own strip below the axis, as
+// ticks rather than fills, so the two are never compared as the same object.
+.vis { --vis-h: 96px; --vis-gap: 5px; }
+.vis--peek { --vis-h: 60px; --vis-gap: 3px; }
+
+.vis__plot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--vis-gap);          // the surface gap between adjacent bars
+  height: var(--vis-h);
+}
+.vis__day {
+  position: relative;
+  flex: 1; min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;                     // and between the two segments of one column
+}
+
+// Rounded at the data end, square at the baseline — a column sits *on* the
+// axis rather than floating above it. Within a stack only the topmost segment
+// is rounded, or the two read as two objects instead of one divided column.
+.vis__whole { background: var(--vis-whole); border-radius: 3px 3px 0 0; }
+.vis__part  { background: var(--vis-part);  border-radius: 0; }
+.vis__part:first-child { border-radius: 3px 3px 0 0; }
+
+// A day with no traffic at all still has to hold its slot in the row.
+.vis__nil { height: 2px; border-radius: 2px; background: var(--line); }
+
+// Bots: own strip, own mark, own label — never adjacent to the red ramp.
+.vis__bots {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--vis-gap);
+  height: 18px;
+  margin-top: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.vis__bot { flex: 1; min-width: 0; background: var(--vis-bot); border-radius: 2px; opacity: 0.8; }
+
+.vis__axis { display: flex; gap: var(--vis-gap); margin-top: var(--s-2); }
+.vis__tick { flex: 1; min-width: 0; text-align: center; @include label(9px, var(--text-4)); }
+
+// Values on hover. The pale segment is deliberately low contrast against the
+// surface, so the numbers have to be reachable some other way.
+.vis__day::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 100%; left: 50%;
+  transform: translate(-50%, -6px);
+  padding: var(--s-2) var(--s-3);
+  background: var(--text);
+  color: var(--surface);
+  border-radius: 6px;
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  line-height: 1.45;
+  white-space: pre;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast) var(--ease);
+  z-index: 5;
+}
+.vis__day:hover::after { opacity: 1; }
+
+.vis__legend {
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  margin-top: var(--s-3);
+  @include label(9px, var(--text-3));
+}
+.vis__key    { display: inline-flex; align-items: center; gap: var(--s-2); }
+.vis__swatch { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.vis__swatch--part  { background: var(--vis-part); }
+.vis__swatch--whole { background: var(--vis-whole); }
+.vis__swatch--bot   { background: var(--vis-bot); opacity: 0.5; }
+
+// ── Figures ─────────────────────────────────────────────────────────────────
+.adm-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: var(--s-3);
+}
+.adm-figure { padding: var(--s-4); background: var(--surface-2); border-radius: var(--radius); }
+.adm-figure__n {
+  display: block;
+  font-family: var(--f-ui);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.adm-figure__label { display: block; margin-top: var(--s-2); @include label(9px, var(--text-3)); }
+
+// ── Bands and places ────────────────────────────────────────────────────────
+.adm-band {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  @include label(9px, var(--text-3));
+}
+.adm-band__bar {
+  height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden;
+  span { display: block; height: 100%; background: var(--vis-part); border-radius: 3px; }
+}
+.adm-band__n { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.adm-place {
+  display: flex; justify-content: space-between; gap: var(--s-3);
   padding: var(--s-2) 0;
   border-bottom: 1px solid var(--line);
-  font-size: var(--t-xs);
+  font-size: var(--t-xs); color: var(--text-2);
+  &:last-child { border-bottom: none; }
+  span:last-child { color: var(--text-4); font-variant-numeric: tabular-nums; }
 }
-.admin-booked__when  { @include label(var(--t-3xs), var(--text-3)); }
-.admin-booked__title { min-width: 0; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-booked__th    { @include label(var(--t-3xs), var(--text-4)); }
 
-.admin-card--danger { box-shadow: inset 0 0 0 1px var(--red-wash); }
+// ── Forms ───────────────────────────────────────────────────────────────────
+.admin-textarea { resize: vertical; min-height: 92px; line-height: 1.6; }
+.admin-tz       { margin-left: var(--s-2); text-transform: none; letter-spacing: 0;
+                  font-weight: 400; color: var(--text-4); }
+.admin-progress { width: 100%; height: 4px; margin-bottom: var(--s-2); accent-color: var(--red); }
+.admin-note     { margin-bottom: var(--s-3); font-size: var(--t-xs); line-height: 1.5; color: var(--text-3); }
+
+// Destructive, but a row action rather than a headline — outlined until you
+// are actually on it.
 .admin-danger {
   background: transparent;
-  border: 1px solid var(--red);
-  color: var(--red-hi);
-  &:hover { background: var(--red); color: #fff; }
+  border: 1px solid var(--line-2);
+  color: var(--text-3);
+  &:hover { background: var(--red); border-color: var(--red); color: #fff; }
 }
-
-// Subtle elevation so the operations grid doesn't read as flat bordered
-// boxes. The lift on hover is barely perceptible on purpose — this is a
-// workspace panel, not a marketing page.
-.admin-card {
-  box-shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 20px rgba(23, 21, 15, 0.05);
-  transition: box-shadow var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
-  &:hover { box-shadow: 0 2px 4px rgba(23, 21, 15, 0.06), 0 12px 28px rgba(23, 21, 15, 0.09); transform: translateY(-1px); }
-}
-
 .btn--sm { padding: var(--s-1) var(--s-3); font-size: var(--t-3xs); }
 
-// ── Admin list (Films, Showtimes) ───────────────────────────────────────────
-// A plain grid-row table, same shape as .admin-booked__row but with a
-// visible header and a per-row action slot.
-.admin-list { margin-top: var(--s-7); }
-.admin-list__head,
-.admin-list__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px 90px 110px;
-  gap: var(--s-3);
-  align-items: center;
-}
-.admin-list__head {
-  padding-bottom: var(--s-2);
-  border-bottom: 1px solid var(--line-2);
-  font-size: var(--t-xs);
-  font-weight: 600;
-  color: var(--text-3);
-}
-.admin-list__row {
-  padding: var(--s-3) 0;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--t-sm);
-  form { display: flex; justify-content: flex-end; }
-}
-.admin-list__title {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-weight: 600; color: var(--text);
-}
-.admin-list__meta { color: var(--text-2); }
-
-// Showtimes has different columns (when/title/theatre, no action) than
-// Films (title/director/duration/deactivate) — same row component, its own
-// column widths.
-.admin-list--showtimes .admin-list__head,
-.admin-list--showtimes .admin-list__row {
-  grid-template-columns: 150px minmax(0, 1fr) 90px;
-}
-
 // ── Instagram post mockup ───────────────────────────────────────────────────
-// Renders like the real feed card, so "is this right" can be answered by
-// looking at it rather than reading raw fields next to a plain <img>.
+// Renders like the real feed card, so "is this right" is answered by looking
+// at it rather than by reading fields beside a bare <img>.
 .ig-mock {
-  max-width: 420px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 20px rgba(23, 21, 15, 0.05);
 }
+// Inside a panel the panel already supplies the frame.
+.ig-mock--peek {
+  border: none;
+  border-radius: 0;
+
+  // A 1080×1350 card at column width is ~500px tall, which pushes the caption
+  // out of the panel entirely. Cropped from the top instead: the date and the
+  // first few titles are the part that answers "is today's post right?".
+  .ig-mock__shot {
+    position: relative;
+    display: block;
+    max-height: 250px;
+    overflow: hidden;
+  }
+  // Faded at the cut so it reads as a peek rather than a truncation.
+  .ig-mock__shot::after {
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: 0; height: 64px;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none;
+  }
+}
+
 .ig-mock__head {
   display: flex; align-items: center; gap: var(--s-3);
   padding: var(--s-3) var(--s-4);
 }
 .ig-mock__avatar {
   display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; flex: none; border-radius: 50%;
+  width: 30px; height: 30px; flex: none; border-radius: 50%;
   background: var(--red); color: #fff;
-  font: 700 14px/1 var(--f-ui);
+  font: 700 13px/1 var(--f-ui);
 }
 .ig-mock__handle { font-family: var(--f-ui); font-weight: 600; font-size: var(--t-sm); color: var(--text); }
 .ig-mock__dots   { margin-left: auto; color: var(--text-3); letter-spacing: 1px; }
@@ -1645,7 +1866,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex; align-items: center; gap: var(--s-3);
   padding: var(--s-3) var(--s-4) var(--s-2);
   color: var(--text);
-  svg { width: 23px; height: 23px; display: block; }
+  svg { width: 22px; height: 22px; display: block; }
 }
 .ig-mock__actions-spacer { margin-left: auto; }
 .ig-mock__caption {
@@ -1653,6 +1874,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-family: var(--f-ui);
   font-size: var(--t-sm); line-height: 1.5; color: var(--text-2);
   white-space: pre-wrap;
+}
+// The peek clamps the caption and fades it out — the mechanic the Journal
+// card already uses to tease an essay.
+.ig-mock__caption--clamp {
+  position: relative;
+  max-height: 4.6em;
+  overflow: hidden;
+  &::after {
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: 0; height: 2.2em;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

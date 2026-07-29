@@ -2,12 +2,13 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Admin — Instagram preview & post
 //
-//  Renders today's actual card (same ig_build_image()/ig_build_caption() the
-//  cron job calls) so what you approve here is exactly what would be posted
-//  — no separate preview path to drift out of sync. Posting is a real button
-//  click from a logged-in admin, not something the agent/cron can trigger by
-//  itself; a .posted-<date> flag file stops a double-click (or a later cron
-//  run the same day) from publishing twice.
+//  Renders today's actual card — the same ig_build_image()/ig_build_caption()
+//  the cron job calls — so what you approve here is exactly what would be
+//  posted, with no separate preview path to drift out of sync.
+//
+//  Posting is a real button click from a signed-in admin, never something the
+//  page does on its own. A .posted-<date> flag stops a double click, a reload,
+//  or a later cron run from publishing the same day twice.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 require dirname(__DIR__) . '/v7/_lib.php';
@@ -37,19 +38,23 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
 
   <main class="canvas">
-    <div class="reading" style="max-width:none;">
+    <div class="adm">
 
-      <div class="reading__kicker"><span>Signed in as <?php echo $e($admin_user['name'] ?: 'admin'); ?></span></div>
-      <h1 class="reading__title">Instagram</h1>
-      <div class="reading__by"><?php echo count($films); ?> screenings today &middot; <?php echo date('l, F j', $now); ?></div>
+      <div class="adm__head">
+        <h1 class="adm__title">Instagram</h1>
+        <span class="adm__meta"><?php echo date('l, j F', $now); ?></span>
+        <span class="post-status <?php echo $already_posted ? 'status-live' : 'status-draft'; ?>">
+          <?php echo $already_posted ? 'Posted' : 'Pending'; ?>
+        </span>
+      </div>
 
       <?php if (isset($_GET['posted'])): ?>
-        <div class="admin-note" style="color:var(--red)">Posted — media id <?php echo $e($_GET['posted']); ?></div>
+        <div class="alert" style="margin-bottom:var(--s-5)">Posted &mdash; media id <?php echo $e($_GET['posted']); ?></div>
       <?php elseif (isset($_GET['error'])): ?>
-        <div class="admin-note" style="color:var(--red)">Post failed: <?php echo $e($_GET['error']); ?></div>
+        <div class="alert" style="margin-bottom:var(--s-5)">Post failed: <?php echo $e($_GET['error']); ?></div>
       <?php endif; ?>
 
-      <div class="admin-grid" style="grid-template-columns: minmax(320px, 440px) minmax(260px, 1fr); align-items: start;">
+      <div class="adm-two" style="grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);">
 
         <div class="ig-mock">
           <div class="ig-mock__head">
@@ -68,28 +73,76 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4Z"/></svg>
           </div>
 
-          <div class="ig-mock__caption"><strong class="ig-mock__handle"><?php echo $e('cinematx'); ?></strong> <?php echo $e($caption); ?></div>
+          <div class="ig-mock__caption"><strong class="ig-mock__handle">cinematx</strong> <?php echo $e($caption); ?></div>
         </div>
 
-        <section class="card admin-card">
-          <div class="card__head"><span class="card__n">01</span><span class="card__title">Post</span></div>
-          <div class="card__body">
-            <div class="admin-note"><?php echo count($films); ?> screenings pulled from AFS, Paramount &amp; Hyperreal for <?php echo $e(date('l, F j', $now)); ?>.</div>
+        <div style="display:grid; gap:var(--s-5);">
 
-            <?php if ($already_posted): ?>
-              <div class="admin-note">Already posted today — regenerating this preview won't post again.</div>
-            <?php elseif (!$configured): ?>
-              <div class="admin-note">IG_ACCESS_TOKEN / IG_BUSINESS_ACCOUNT_ID aren't set in config.php yet.</div>
-            <?php else: ?>
-              <form action="/_admin/instagram_post.php" method="post"
-                    onsubmit="return confirm('Publish this to the live Instagram account now? This cannot be undone.');">
-                <?php echo admin_csrf_field(); ?>
-                <button class="btn btn--block" type="submit">Post to Instagram</button>
-              </form>
-            <?php endif; ?>
-          </div>
-        </section>
+          <section class="card adm-card">
+            <div class="card__head">
+              <span class="card__title">Publish</span>
+            </div>
+            <div class="card__body">
+              <?php if ($already_posted): ?>
+                <div class="admin-note">
+                  Already posted today. Reloading this page regenerates the preview but will not
+                  post again &mdash; the same flag also stops the cron job repeating it.
+                </div>
+                <button class="btn btn--block" type="button" disabled>Posted</button>
+              <?php elseif (!$configured): ?>
+                <div class="admin-note">
+                  <code>IG_ACCESS_TOKEN</code> and <code>IG_BUSINESS_ACCOUNT_ID</code> are not set in
+                  <code>config.php</code>, so there is nothing to post to yet.
+                </div>
+                <button class="btn btn--block" type="button" disabled>Not configured</button>
+              <?php else: ?>
+                <div class="admin-note">Publishes the card and caption exactly as shown, to the live account.</div>
+                <form action="/_admin/instagram_post.php" method="post"
+                      onsubmit="return confirm('Publish this to the live Instagram account now? This cannot be undone.');">
+                  <?php echo admin_csrf_field(); ?>
+                  <button class="btn btn--block" type="submit">Post to Instagram</button>
+                </form>
+              <?php endif; ?>
+            </div>
+          </section>
 
+          <section class="card adm-card">
+            <div class="card__head">
+              <span class="card__title">On the card</span>
+              <span class="adm-count"><?php echo count($films); ?></span>
+            </div>
+            <div class="card__body card__body--flush">
+              <?php foreach ($films as $f): ?>
+              <div class="adm-row">
+                <span class="adm-row__text">
+                  <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
+                  <span class="adm-row__sub">
+                    <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
+                  </span>
+                </span>
+                <span class="adm-row__when"><?php echo date('g:i A', $f['timestamp']); ?></span>
+              </div>
+              <?php endforeach; ?>
+              <?php if (!$films): ?>
+              <div class="adm-empty">Nothing scraped for today</div>
+              <?php endif; ?>
+            </div>
+          </section>
+
+          <section class="card adm-card">
+            <div class="card__head"><span class="card__title">Where this comes from</span></div>
+            <div class="card__body">
+              <div class="admin-note" style="margin:0">
+                Today's screenings at <strong>Austin Film Society</strong>, the
+                <strong>Paramount</strong> and <strong>Hyperreal Film Club</strong>, from the same
+                scrape The List runs on. Chains and member-submitted events are left out on purpose.
+                The cron job posts this automatically each morning once it is enabled &mdash; until
+                then it waits for the button.
+              </div>
+            </div>
+          </section>
+
+        </div>
       </div>
     </div>
   </main>

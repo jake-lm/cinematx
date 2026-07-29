@@ -2,20 +2,25 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Admin — Films
 //
-//  Upload and the programmer's note are one form now — a note is optional,
-//  and when given it's attached to the film just uploaded (upload.php calls
-//  lastInsertId()) rather than asking which film it's about. The table below
-//  is every active film with a one-click deactivate, so the whole lifecycle
-//  of a film — add it, note it, retire it — lives on one page.
+//  The whole life of a film on one page. Upload and the programmer's note are
+//  a single submit — a note is optional, and when given it attaches to the
+//  film just uploaded (upload.php uses lastInsertId()) rather than asking
+//  which film it is about. The list beside it is every active film, each row
+//  able to retire itself.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 require dirname(__DIR__) . '/v7/_lib.php';
 
-$films = $conn->query("SELECT `id`, `title`, `director`, `dur`, `active` FROM `films` WHERE `active` = 1 ORDER BY `id` DESC")
-              ->fetchAll(PDO::FETCH_ASSOC);
+$films = $conn->query(
+  "SELECT f.`id`, f.`title`, f.`director`, f.`dur`, f.`poster`,
+          (SELECT COUNT(*) FROM `notes` n WHERE n.`f_id` = f.`id`) AS `notes`
+   FROM `films` f WHERE f.`active` = 1 ORDER BY f.`id` DESC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
+/** Seconds as h:mm:ss, or m:ss under an hour. */
 function admin_fmt_dur($seconds) {
     $seconds = (int)$seconds;
+    if ($seconds <= 0) return '—';
     $h = intdiv($seconds, 3600);
     $m = intdiv($seconds % 3600, 60);
     $s = $seconds % 60;
@@ -36,16 +41,17 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
 
   <main class="canvas">
-    <div class="reading" style="max-width:none;">
+    <div class="adm">
 
-      <div class="reading__kicker"><span>Signed in as <?php echo $e($admin_user['name'] ?: 'admin'); ?></span></div>
-      <h1 class="reading__title">Films</h1>
-      <div class="reading__by"><?php echo count($films); ?> active</div>
+      <div class="adm__head">
+        <h1 class="adm__title">Films</h1>
+        <span class="adm__meta"><?php echo count($films); ?> active</span>
+      </div>
 
-      <div class="admin-grid">
+      <div class="adm-two">
 
-        <section class="card admin-card">
-          <div class="card__head"><span class="card__n">01</span><span class="card__title">Add a film</span></div>
+        <section class="card adm-card">
+          <div class="card__head"><span class="card__title">Add a film</span></div>
           <div class="card__body">
             <form id="upload-form" action="/_admin/upload.php" method="post" enctype="multipart/form-data">
               <?php echo admin_csrf_field(); ?>
@@ -61,8 +67,8 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <textarea class="field__input admin-textarea" id="u-note" name="note" rows="4"></textarea></div>
               <div class="field"><label class="field__label" for="u-film">Video file (.mp4)</label>
                 <input class="field__input" id="u-film" name="film" type="file" accept="video/mp4" required /></div>
-              <div class="field"><label class="field__label" for="u-poster">Poster (.png)</label>
-                <input class="field__input" id="u-poster" name="poster" type="file" accept="image/png" required /></div>
+              <div class="field"><label class="field__label" for="u-poster">Poster</label>
+                <input class="field__input" id="u-poster" name="poster" type="file" accept="image/*" required /></div>
 
               <progress class="admin-progress" id="upload-progress" value="0" max="100" hidden></progress>
               <div class="admin-note" id="upload-note"></div>
@@ -72,30 +78,45 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           </div>
         </section>
 
-      </div>
+        <section class="card adm-card">
+          <div class="card__head">
+            <span class="card__title">In the library</span>
+            <span class="adm-count"><?php echo count($films); ?></span>
+          </div>
+          <div class="card__body card__body--flush">
+            <?php foreach ($films as $f): ?>
+            <div class="adm-row">
+              <span class="adm-row__thumb">
+                <?php if ($f['poster']): ?>
+                <img src="/_admin/thumb.php?w=96&f=<?php echo rawurlencode($f['poster']); ?>"
+                     alt="" loading="lazy" />
+                <?php endif; ?>
+              </span>
+              <span class="adm-row__text">
+                <span class="adm-row__title"><?php echo $e($f['title']); ?></span>
+                <span class="adm-row__sub">
+                  <?php echo $e($f['director'] ?: 'Director unknown'); ?>
+                  &middot; <?php echo admin_fmt_dur($f['dur']); ?>
+                  <?php if ((int)$f['notes']): ?>&middot; <?php echo (int)$f['notes']; ?> note<?php echo (int)$f['notes'] === 1 ? '' : 's'; ?><?php endif; ?>
+                </span>
+              </span>
+              <span class="adm-row__end">
+                <form action="/_admin/delete.php" method="post"
+                      onsubmit="return confirm('Deactivate <?php echo $e(addslashes($f['title'])); ?>? The video and poster are removed from disk and cannot be recovered.');">
+                  <?php echo admin_csrf_field(); ?>
+                  <input type="hidden" name="film_id" value="<?php echo (int)$f['id']; ?>" />
+                  <button class="btn btn--sm admin-danger" type="submit">Deactivate</button>
+                </form>
+              </span>
+            </div>
+            <?php endforeach; ?>
+            <?php if (!$films): ?>
+            <div class="adm-empty">No active films yet</div>
+            <?php endif; ?>
+          </div>
+        </section>
 
-      <div class="admin-list">
-        <div class="admin-list__head">
-          <span>Title</span><span>Director</span><span>Duration</span><span></span>
-        </div>
-        <?php foreach ($films as $f): ?>
-        <div class="admin-list__row">
-          <span class="admin-list__title"><?php echo $e($f['title']); ?></span>
-          <span class="admin-list__meta"><?php echo $e($f['director']); ?></span>
-          <span class="admin-list__meta"><?php echo $e(admin_fmt_dur($f['dur'])); ?></span>
-          <form action="/_admin/delete.php" method="post"
-                onsubmit="return confirm('Deactivate this film? The video and poster are removed from disk and cannot be recovered.');">
-            <?php echo admin_csrf_field(); ?>
-            <input type="hidden" name="film_id" value="<?php echo (int)$f['id']; ?>" />
-            <button class="btn btn--quiet btn--sm" type="submit">Deactivate</button>
-          </form>
-        </div>
-        <?php endforeach; ?>
-        <?php if (!$films): ?>
-        <div class="admin-note">No active films yet.</div>
-        <?php endif; ?>
       </div>
-
     </div>
   </main>
 

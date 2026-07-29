@@ -19,3 +19,5 @@
   <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">Showtimes</span></a>
 <a class="rail__link<?php echo $on('instagram'); ?>" href="/_admin/instagram.php">
   <span class="ico"><i class="fa-brands fa-instagram"></i></span><span class="txt">Instagram</span></a>
+<a class="rail__link<?php echo $on('visitors'); ?>" href="/_admin/visitors.php">
+  <span class="ico"><i class="fa-solid fa-chart-simple"></i></span><span class="txt">Visitors</span></a>
