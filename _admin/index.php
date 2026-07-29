@@ -143,6 +143,14 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           </div>
         </section>
 
+        <section class="card admin-card">
+          <div class="card__head"><span class="card__n">05</span><span class="card__title">Instagram</span></div>
+          <div class="card__body">
+            <div class="admin-note">Preview today's card and caption, then post it yourself when it looks right.</div>
+            <a class="btn btn--block" href="/_admin/instagram.php">Review today's post</a>
+          </div>
+        </section>
+
       </div>
 
       <?php
@@ -153,7 +161,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       ?>
       <section class="stats">
         <div class="stats__head">
-          <span class="card__n">05</span>
+          <span class="card__n">06</span>
           <span class="card__title">Visitors</span>
           <?php if ($v['since']): ?>
           <span class="stats__since">since <?php echo date('j M Y', $v['since']); ?></span>

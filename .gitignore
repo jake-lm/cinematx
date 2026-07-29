@@ -30,3 +30,6 @@ list/cache_*.json
 
 # Generated daily Instagram cards — regenerated on each cron run
 uploads/social/*.png
+
+# Downloaded poster thumbnails for the Instagram card — refetched on a cache miss
+list/poster_cache/

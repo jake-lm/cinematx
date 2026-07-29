@@ -49,8 +49,20 @@ if ($dry_run) {
         fclose($lock);
         exit(1);
     }
+
+    // Shared with the admin panel's "Post to Instagram" button — whichever
+    // posts first today wins, the other is a no-op rather than a duplicate.
+    $flag = $root . '/uploads/social/.posted-' . date('Y-m-d', $now);
+    if (file_exists($flag)) {
+        printf("%s ig: already posted today, skipping\n", date('c'));
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        exit(0);
+    }
+
     try {
         $media_id = ig_publish($url, $caption);
+        file_put_contents($flag, $media_id);
         printf("%s ig: published, media id %s\n", date('c'), $media_id);
     } catch (Throwable $e) {
         fwrite(STDERR, date('c') . ' ig: ' . $e->getMessage() . "\n");

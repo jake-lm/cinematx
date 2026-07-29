@@ -2486,6 +2486,89 @@ button, input, select, textarea {
   color: #fff;
 }
 
+.admin-card {
+  box-shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 20px rgba(23, 21, 15, 0.05);
+  transition: box-shadow var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
+}
+.admin-card:hover {
+  box-shadow: 0 2px 4px rgba(23, 21, 15, 0.06), 0 12px 28px rgba(23, 21, 15, 0.09);
+  transform: translateY(-1px);
+}
+
+.ig-mock {
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 20px rgba(23, 21, 15, 0.05);
+}
+
+.ig-mock__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+}
+
+.ig-mock__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font: 700 14px/1 var(--f-ui);
+}
+
+.ig-mock__handle {
+  font-family: var(--f-ui);
+  font-weight: 600;
+  font-size: var(--t-sm);
+  color: var(--text);
+}
+
+.ig-mock__dots {
+  margin-left: auto;
+  color: var(--text-3);
+  letter-spacing: 1px;
+}
+
+.ig-mock__image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ig-mock__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) var(--s-2);
+  color: var(--text);
+}
+.ig-mock__actions svg {
+  width: 23px;
+  height: 23px;
+  display: block;
+}
+
+.ig-mock__actions-spacer {
+  margin-left: auto;
+}
+
+.ig-mock__caption {
+  padding: 0 var(--s-4) var(--s-4);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+}
+
 .fold__stack {
   position: relative;
   overflow: visible;

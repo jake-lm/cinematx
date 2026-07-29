@@ -58,6 +58,57 @@ function ig_fit_text($text, $font, $size, $maxWidth) {
     return $text;
 }
 
+// A pill — rectangle with semicircular ends — for the wordmark chip.
+function ig_pill($im, $x1, $y1, $x2, $y2, $color) {
+    $r = (int) round(($y2 - $y1) / 2);
+    imagefilledrectangle($im, $x1 + $r, $y1, $x2 - $r, $y2, $color);
+    imagefilledellipse($im, $x1 + $r, $y1 + $r, $r * 2, $r * 2, $color);
+    imagefilledellipse($im, $x2 - $r, $y1 + $r, $r * 2, $r * 2, $color);
+}
+
+// Downloads a poster (TMDB, w300) once and caches it — the same handful of
+// repertory titles recur night after night, no reason to refetch. Returns a
+// cropped-to-cover GD image sized exactly $w x $h, or null on any miss/failure
+// so the caller can fall back to a placeholder rather than breaking the row.
+function ig_fetch_thumb($url, $w, $h) {
+    if (!$url) return null;
+
+    $cacheDir = dirname(__DIR__) . '/list/poster_cache';
+    if (!is_dir($cacheDir)) mkdir($cacheDir, 0775, true);
+    $cacheFile = $cacheDir . '/' . md5($url) . '.jpg';
+
+    if (!file_exists($cacheFile)) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_USERAGENT      => 'CinemaTX/1.0 (+https://cinematx.net)',
+        ]);
+        $data = curl_exec($ch);
+        curl_close($ch);
+        if (!$data) return null;
+        file_put_contents($cacheFile, $data);
+    }
+
+    $src = @imagecreatefromstring(file_get_contents($cacheFile));
+    if (!$src) { @unlink($cacheFile); return null; }
+
+    $srcW = imagesx($src);
+    $srcH = imagesy($src);
+    $thumb = imagecreatetruecolor($w, $h);
+
+    // Cover-crop to the target ratio rather than squashing the poster.
+    if ($srcW / $srcH > $w / $h) {
+        $cropW = (int) round($srcH * $w / $h);
+        imagecopyresampled($thumb, $src, 0, 0, (int) (($srcW - $cropW) / 2), 0, $w, $h, $cropW, $srcH);
+    } else {
+        $cropH = (int) round($srcW * $h / $w);
+        imagecopyresampled($thumb, $src, 0, 0, 0, (int) (($srcH - $cropH) / 2), $w, $h, $srcW, $cropH);
+    }
+    imagedestroy($src);
+    return $thumb;
+}
+
 function ig_build_image(array $films, $date) {
     $w = 1080;
     $h = 1350;
@@ -67,6 +118,8 @@ function ig_build_image(array $films, $date) {
     $red     = ig_hex($im, '#922E32');
     $ink     = ig_hex($im, '#14120F');
     $muted   = ig_hex($im, '#6B6659');
+    $divider = ig_hex($im, '#DED7C7');
+    $placeholder = ig_hex($im, '#E4DECE');
 
     imagefill($im, 0, 0, $paper);
 
@@ -74,17 +127,33 @@ function ig_build_image(array $films, $date) {
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
 
     $margin = 80;
-    $y = 170;
 
-    imagettftext($im, 30, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
-    $y += 70;
-    imagettftext($im, 52, 0, $margin, $y, $ink, IG_FONT_HEADLINE, date('l, F j', $date));
-    $y += 100;
+    // "Cinema, TX" wordmark chip — the same lockup the site header uses,
+    // rendered here since a posted image needs its own brand mark.
+    $chipText = 'CINEMA, TX';
+    $chipBox  = imagettfbbox(20, 0, IG_FONT_BODY, $chipText);
+    $chipW    = $chipBox[2] - $chipBox[0];
+    ig_pill($im, $margin, 70, $margin + $chipW + 48, 114, $red);
+    imagettftext($im, 20, 0, $margin + 24, 100, $paper, IG_FONT_BODY, $chipText);
+
+    $y = 180;
+    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
+    $y += 66;
+    imagettftext($im, 50, 0, $margin, $y, $ink, IG_FONT_HEADLINE, date('l, F j', $date));
+    $y += 50;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 40;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
 
     // Footer sits at a fixed baseline near the bottom, so rows must stop
     // early enough to leave room for it (plus the "+N more" line above it) —
     // otherwise a long list runs straight through the footer text.
-    $rowHeight     = 100;
+    $rowHeight     = $thumbH + 30;
     $footerY       = $h - 60;
     $rowsAreaEnd   = $footerY - 70;
     $maxRows       = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
@@ -96,19 +165,39 @@ function ig_build_image(array $films, $date) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
     }
 
-    foreach ($rows as $film) {
-        $title = ig_fit_text($film['title'], IG_FONT_HEADLINE, 34, $w - 2 * $margin);
-        imagettftext($im, 34, 0, $margin, $y + 34, $ink, IG_FONT_HEADLINE, $title);
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
+        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
 
         $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
-        $meta  = ig_fit_text($venue . '  ·  ' . date('g:i A', $film['timestamp']), IG_FONT_BODY, 24, $w - 2 * $margin);
-        imagettftext($im, 24, 0, $margin, $y + 70, $muted, IG_FONT_BODY, $meta);
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(date('g:i A', $film['timestamp']), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
     }
 
     if ($extra > 0) {
-        imagettftext($im, 24, 0, $margin, $y + 20, $red, IG_FONT_BODY, "+{$extra} more today");
+        imagettftext($im, 24, 0, $margin, $y + 16, $red, IG_FONT_BODY, "+{$extra} more today");
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
@@ -136,12 +225,23 @@ function ig_save_image($im, $date) {
 
 // ── Caption ──────────────────────────────────────────────────────────────
 
+// A handful of intro lines, rotated deterministically by day-of-year so the
+// same day's dry run and real post always match, but it varies day to day.
+const IG_INTROS = [
+    "Here's where to be in Austin today:",
+    "Tonight's lineup around town:",
+    "A few reasons to leave the apartment:",
+    "What's screening across the city today:",
+    "On screens around Austin today:",
+];
+
 function ig_build_caption(array $films, $date) {
-    $lines = ['Today in Austin — ' . date('l, F j', $date), ''];
+    $intro = IG_INTROS[(int) date('z', $date) % count(IG_INTROS)];
+    $lines = ['Today in Austin — ' . date('l, F j', $date), '', $intro, ''];
 
     foreach ($films as $film) {
         $venue = $film['location'] ? "{$film['venue']} ({$film['location']})" : $film['venue'];
-        $lines[] = '• ' . $film['title'] . ' — ' . $venue . ' @ ' . date('g:i A', $film['timestamp']);
+        $lines[] = '• ' . mb_strtoupper($film['title']) . ' — ' . $venue . ' @ ' . date('g:i A', $film['timestamp']);
     }
 
     $lines[] = '';
