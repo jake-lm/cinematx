@@ -39,7 +39,12 @@ $caption = ig_build_caption($films, $now);
 printf("%s ig: %d screenings today, card written to %s\n", date('c'), count($films), $path);
 
 if ($dry_run) {
+    // The absolute form, which is what Meta is handed and has to be able to
+    // fetch. Worth printing: when it is wrong the failure is a generic
+    // "media could not be fetched" from the API, hours later.
+    $public = ig_public_url($url);
     echo "--- caption ---\n{$caption}\n";
+    printf("--- image URL Meta would fetch: %s ---\n", $public !== '' ? $public : '(CTX_SITE_URL unset)');
     echo "--- (dry run, nothing posted) ---\n";
 } else {
     if (!defined('IG_ACCESS_TOKEN') || !defined('IG_BUSINESS_ACCOUNT_ID') || !IG_ACCESS_TOKEN

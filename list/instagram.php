@@ -205,7 +205,18 @@ function ig_build_image(array $films, $date) {
     return $im;
 }
 
-// Writes the PNG, prunes anything older than a week, returns the public URL.
+/**
+ * Writes the PNG, prunes anything older than a week, and returns
+ * [filesystem path, root-relative URL].
+ *
+ * Root-relative, deliberately. This used to return an absolute URL built from
+ * CTX_SITE_URL, which is https://cinematx.net in every environment because
+ * that is what the Graph API has to fetch. The admin preview then rendered
+ * production's copy of the card rather than the one the local machine had
+ * just written — so development showed a stale design and looked like the
+ * generator had drifted. Display and publication want different URLs; only
+ * publication wants the absolute one, and it asks for it explicitly.
+ */
 function ig_save_image($im, $date) {
     $dir = dirname(__DIR__) . '/uploads/social';
     if (!is_dir($dir)) mkdir($dir, 0775, true);
@@ -219,8 +230,19 @@ function ig_save_image($im, $date) {
         if (filemtime($old) < time() - 7 * 86400) unlink($old);
     }
 
-    $site_url = defined('CTX_SITE_URL') ? CTX_SITE_URL : '';
-    return [$path, $site_url . '/uploads/social/' . $name];
+    return [$path, '/uploads/social/' . $name];
+}
+
+/**
+ * The absolute, publicly reachable form of a root-relative upload URL.
+ *
+ * Only the Graph API needs this: Meta fetches the image over the internet, so
+ * "/uploads/social/x.png" is meaningless to it. Returns '' when CTX_SITE_URL
+ * is unset, and callers treat that as "not configured to post".
+ */
+function ig_public_url($relative) {
+    if (!defined('CTX_SITE_URL') || !CTX_SITE_URL) return '';
+    return rtrim(CTX_SITE_URL, '/') . $relative;
 }
 
 // ── Caption ──────────────────────────────────────────────────────────────
@@ -271,11 +293,21 @@ function ig_graph_call($url, array $fields, $method = 'GET') {
     return $response ? json_decode($response, true) : null;
 }
 
-// Container → poll → publish. Returns the published media id, or throws with
-// whatever Meta's error payload said.
-function ig_publish($image_url, $caption) {
+/**
+ * Container → poll → publish. Returns the published media id, or throws with
+ * whatever Meta's error payload said.
+ *
+ * Takes the root-relative URL that ig_save_image() returns and resolves it
+ * here, so no caller has to remember which of the two forms this needs.
+ */
+function ig_publish($image_path, $caption) {
     $base = 'https://graph.facebook.com/' . IG_GRAPH_VERSION;
     $ig   = IG_BUSINESS_ACCOUNT_ID;
+
+    $image_url = ig_public_url($image_path);
+    if ($image_url === '') {
+        throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the card from.');
+    }
 
     $create = ig_graph_call("$base/$ig/media", [
         'image_url'    => $image_url,

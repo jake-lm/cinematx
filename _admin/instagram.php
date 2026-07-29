@@ -63,7 +63,10 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <span class="ig-mock__dots">&#8226;&#8226;&#8226;</span>
           </div>
 
-          <img class="ig-mock__image" src="<?php echo $e($image_url . '?t=' . time()); ?>" alt="Today's Instagram card" />
+          <?php // Keyed on the file's own mtime, not the clock: an unchanged
+                // card can then actually be cached instead of re-fetching
+                // 200KB on every load, while a regenerated one still busts. ?>
+          <img class="ig-mock__image" src="<?php echo $e($image_url . '?v=' . @filemtime($path)); ?>" alt="Today's Instagram card" />
 
           <div class="ig-mock__actions">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.6c0 5-8.8 10-8.8 10s-8.8-5-8.8-10a4.8 4.8 0 0 1 8.8-2.7A4.8 4.8 0 0 1 20.8 8.6Z"/></svg>

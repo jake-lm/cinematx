@@ -41,10 +41,11 @@ $ig_films   = ig_today_films($conn);
 $ig_caption = ig_build_caption($ig_films, $now);
 $ig_name    = 'ig-' . date('Y-m-d', $now) . '.png';
 $ig_path    = dirname(__DIR__) . '/uploads/social/' . $ig_name;
+$ig_rel     = '/uploads/social/' . $ig_name;
 if (!file_exists($ig_path)) {
-    [$ig_path, ] = ig_save_image(ig_build_image($ig_films, $now), $now);
+    [$ig_path, $ig_rel] = ig_save_image(ig_build_image($ig_films, $now), $now);
 }
-$ig_url    = '/uploads/social/' . $ig_name . '?t=' . @filemtime($ig_path);
+$ig_url    = $ig_rel . '?v=' . @filemtime($ig_path);
 $ig_posted = file_exists(dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now));
 
 $v = ctx_visit_stats(14);
