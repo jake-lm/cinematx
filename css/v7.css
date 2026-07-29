@@ -2377,6 +2377,39 @@ button, input, select, textarea {
   color: var(--dark-2nd);
 }
 
+.admin-shell {
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-2: #F4F4F2;
+  --surface-3: #ECECE8;
+  --line: rgba(20, 20, 20, 0.08);
+  --line-2: rgba(20, 20, 20, 0.14);
+  --text: #17171A;
+  --text-2: #52525B;
+  --text-3: #6B6B74;
+  --text-4: #9A9AA2;
+}
+
+[data-theme=dark] .admin-shell {
+  --bg: #17171A;
+  --surface: #1D1D21;
+  --surface-2: #232327;
+  --surface-3: #2C2C31;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --text: #F2F2F4;
+  --text-2: #C2C2C8;
+  --text-3: #9C9CA4;
+  --text-4: #6E6E77;
+}
+
+.admin-shell .card__title, .admin-shell .field__label, .admin-shell .rail__group {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: var(--t-xs);
+}
+
 .admin-grid {
   margin-top: var(--s-6);
   display: grid;
@@ -2493,6 +2526,59 @@ button, input, select, textarea {
 .admin-card:hover {
   box-shadow: 0 2px 4px rgba(23, 21, 15, 0.06), 0 12px 28px rgba(23, 21, 15, 0.09);
   transform: translateY(-1px);
+}
+
+.btn--sm {
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-3xs);
+}
+
+.admin-list {
+  margin-top: var(--s-7);
+}
+
+.admin-list__head,
+.admin-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 90px 110px;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.admin-list__head {
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line-2);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.admin-list__row {
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-sm);
+}
+.admin-list__row form {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.admin-list__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-list__meta {
+  color: var(--text-2);
+}
+
+.admin-list--showtimes .admin-list__head,
+.admin-list--showtimes .admin-list__row {
+  grid-template-columns: 150px minmax(0, 1fr) 90px;
 }
 
 .ig-mock {

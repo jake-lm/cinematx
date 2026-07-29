@@ -46,7 +46,7 @@
     };
 
     xhr.onload = function () {
-      if (xhr.status === 200) { window.location = '/_admin'; return; }
+      if (xhr.status === 200) { window.location = '/_admin/films.php'; return; }
       fail(xhr.status === 400 ? 'Upload rejected — check both files are attached.' : 'Upload failed.');
     };
     xhr.onerror = function () { fail('Upload failed — connection lost.'); };

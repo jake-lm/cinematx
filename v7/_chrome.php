@@ -7,7 +7,12 @@
 //  you actually came to read.
 //
 //  Set before including:
-//    $ctx_active  string  one of: index list about dashboard directory profile
+//    $ctx_active     string  one of: index list about dashboard directory profile
+//                            (or, when $ctx_admin_nav is set: dashboard films
+//                            showtimes instagram)
+//    $ctx_admin_nav  bool    swaps the rail's link list for _admin/_nav.php —
+//                            the wrapper, toggle and theme behaviour are the
+//                            same rail everywhere, only the links differ
 // ═══════════════════════════════════════════════════════════════════════════
 
 $ctx_active = $ctx_active ?? '';
@@ -30,6 +35,9 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
   </div>
 
   <nav class="rail__nav">
+    <?php if (!empty($ctx_admin_nav)): ?>
+      <?php require dirname(__DIR__) . '/_admin/_nav.php'; ?>
+    <?php else: ?>
     <a class="rail__link<?php echo $on('index'); ?>" href="<?php echo CTX_HOME; ?>">
       <span class="ico"><i class="fa-solid fa-film"></i></span><span class="txt">Tonight</span></a>
     <a class="rail__link<?php echo $on('list'); ?>" href="/list">
@@ -47,6 +55,7 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-users"></i></span><span class="txt">Directory</span></a>
     <a class="rail__link<?php echo $on('profile'); ?>" href="/users/profile.php?id=<?php echo (int)$me['id']; ?>">
       <span class="ico"><i class="fa-solid fa-user"></i></span><span class="txt">Profile</span></a>
+    <?php endif; ?>
     <?php endif; ?>
   </nav>
 </aside>

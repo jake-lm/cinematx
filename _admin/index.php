@@ -1,14 +1,12 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-//  CINEMA, TX — Admin
+//  CINEMA, TX — Admin dashboard
 //
-//  The last surface on the old stylesheet, now in the v7 shell.
-//
-//  Four operations, down from five: "film of the week" is gone. Nothing has
-//  read films.motw since the pre-v7 homepage was retired — the only readers
-//  left were script.js and script-jlm.js, which drew a banner on a page that
-//  no longer exists. The column is still there and still written as 0 on
-//  upload; it can be dropped whenever the schema is next touched.
+//  Landing view only: stat tiles + visitor charts + links into Films,
+//  Showtimes, and Instagram, which each own their actual forms now. Upload,
+//  scheduling, and delete used to live here as raw cards — moved to their
+//  own pages so this one answers "what's the state of things" rather than
+//  doubling as every form at once.
 //
 //  _guard.php first, before _lib.php and before any output: authentication
 //  is not something to do after loading the page's context.
@@ -16,34 +14,22 @@
 require __DIR__ . '/_guard.php';
 require dirname(__DIR__) . '/v7/_lib.php';
 
-// The old page ran the same query four times — once per <select>, because
-// each one consumed the cursor — and drove the loops off a separate COUNT.
-// Fetch once and reuse.
-$films = $conn->query("SELECT `id`, `title` FROM `films` WHERE `active` = 1 ORDER BY `id` DESC")
-              ->fetchAll(PDO::FETCH_ASSOC);
+$film_count = (int) $conn->query("SELECT COUNT(*) FROM `films` WHERE `active` = 1")->fetchColumn();
 
-// Scheduling into a void was the panel's real weakness: no way to see what
-// was already booked, so double-bookings were only visible on the theatre page.
-$booked = $conn->prepare(
-  "SELECT s.`id`, s.`showtime`, s.`theatre`, f.`title`
-   FROM `showtimes` s LEFT JOIN `films` f ON f.`id` = s.`f_id`
-   WHERE s.`endtime` > :now ORDER BY s.`showtime` ASC LIMIT 12"
-);
-$booked->execute([':now' => $CTX_NOW]);
-$booked = $booked->fetchAll(PDO::FETCH_ASSOC);
+$showtime_stmt = $conn->prepare("SELECT COUNT(*) FROM `showtimes` WHERE `endtime` > :now");
+$showtime_stmt->execute([':now' => $CTX_NOW]);
+$showtime_count = (int) $showtime_stmt->fetchColumn();
 
-$e   = 'ctx_e';
-$opt = function ($films) use ($e) {
-    foreach ($films as $f) {
-        echo '<option value="' . (int)$f['id'] . '">' . $e($f['title']) . '</option>';
-    }
-};
+$posted_today = file_exists(dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $CTX_NOW));
 
-$ctx_title  = 'Admin — Cinema, TX';
-$ctx_active = '';
-$ctx_scroll = true;
-$ctx_video  = false;
-$ctx_scripts = '<script src="/js/admin.js?v=' . filemtime(dirname(__DIR__) . '/js/admin.js') . '" defer></script>';
+$e = 'ctx_e';
+
+$ctx_title     = 'Admin — Cinema, TX';
+$ctx_active    = 'dashboard';
+$ctx_admin_nav = true;
+$ctx_shell     = 'admin-shell';
+$ctx_scroll    = true;
+$ctx_video     = false;
 
 require dirname(__DIR__) . '/v7/_head.php';
 require dirname(__DIR__) . '/v7/_chrome.php';
@@ -53,98 +39,43 @@ require dirname(__DIR__) . '/v7/_chrome.php';
     <div class="reading" style="max-width:none;">
 
       <div class="reading__kicker"><span>Signed in as <?php echo $e($admin_user['name'] ?: 'admin'); ?></span></div>
-      <h1 class="reading__title">Admin</h1>
-      <div class="reading__by"><?php echo count($films); ?> films &middot; <?php echo count($booked); ?> upcoming showtimes</div>
+      <h1 class="reading__title">Dashboard</h1>
+
+      <div class="stats__figures" style="margin-top: var(--s-6);">
+        <div class="figure">
+          <span class="figure__n"><?php echo $film_count; ?></span>
+          <span class="figure__label">Active films</span>
+        </div>
+        <div class="figure">
+          <span class="figure__n"><?php echo $showtime_count; ?></span>
+          <span class="figure__label">Upcoming showtimes</span>
+        </div>
+        <div class="figure">
+          <span class="figure__n"><?php echo $posted_today ? 'Posted' : 'Pending'; ?></span>
+          <span class="figure__label">Today's Instagram post</span>
+        </div>
+      </div>
 
       <div class="admin-grid">
 
         <section class="card admin-card">
-          <div class="card__head"><span class="card__n">01</span><span class="card__title">Upload a film</span></div>
+          <div class="card__head"><span class="card__n">01</span><span class="card__title">Films</span></div>
           <div class="card__body">
-            <form id="upload-form" action="/_admin/upload.php" method="post" enctype="multipart/form-data">
-              <?php echo admin_csrf_field(); ?>
-              <div class="field"><label class="field__label" for="u-title">Title</label>
-                <input class="field__input" id="u-title" name="title" type="text" required /></div>
-              <div class="field"><label class="field__label" for="u-dir">Director</label>
-                <input class="field__input" id="u-dir" name="director" type="text" /></div>
-              <div class="field"><label class="field__label" for="u-wiki">Wikipedia URL</label>
-                <input class="field__input" id="u-wiki" name="wiki" type="url" placeholder="https://en.wikipedia.org/wiki/…" /></div>
-              <div class="field"><label class="field__label" for="u-prog">Programmed by</label>
-                <input class="field__input" id="u-prog" name="program" type="text" /></div>
-              <div class="field"><label class="field__label" for="u-film">Video file (.mp4)</label>
-                <input class="field__input" id="u-film" name="film" type="file" accept="video/mp4" required /></div>
-              <div class="field"><label class="field__label" for="u-poster">Poster (.png)</label>
-                <input class="field__input" id="u-poster" name="poster" type="file" accept="image/png" required /></div>
-
-              <progress class="admin-progress" id="upload-progress" value="0" max="100" hidden></progress>
-              <div class="admin-note" id="upload-note"></div>
-
-              <input class="btn btn--block" id="upload-button" type="submit" value="Upload" />
-            </form>
+            <div class="admin-note">Upload a film, attach a programmer's note, or deactivate an existing one.</div>
+            <a class="btn btn--block" href="/_admin/films.php">Open Films</a>
           </div>
         </section>
 
         <section class="card admin-card">
-          <div class="card__head"><span class="card__n">02</span><span class="card__title">Schedule a showtime</span></div>
+          <div class="card__head"><span class="card__n">02</span><span class="card__title">Showtimes</span></div>
           <div class="card__body">
-            <form action="/_admin/showtime.php" method="post">
-              <?php echo admin_csrf_field(); ?>
-              <div class="field"><label class="field__label" for="s-film">Film</label>
-                <select class="field__input" id="s-film" name="film_id"><?php $opt($films); ?></select></div>
-              <div class="field"><label class="field__label" for="s-th">Theatre</label>
-                <select class="field__input" id="s-th" name="theatre">
-                  <option value="1">Theatre 1</option><option value="2">Theatre 2</option>
-                </select></div>
-              <div class="field"><label class="field__label" for="s-when">Date &amp; time <span class="admin-tz">America/Chicago</span></label>
-                <input class="field__input" id="s-when" name="showtime" type="datetime-local" required /></div>
-              <button class="btn btn--block" type="submit">Create showtime</button>
-            </form>
-
-            <?php if ($booked): ?>
-            <div class="admin-booked">
-              <div class="admin-booked__head">Already booked</div>
-              <?php foreach ($booked as $b): ?>
-              <div class="admin-booked__row">
-                <span class="admin-booked__when"><?php echo date('D j M, g:ia', $b['showtime']); ?></span>
-                <span class="admin-booked__title"><?php echo $e($b['title']); ?></span>
-                <span class="admin-booked__th">Th<?php echo (int)$b['theatre']; ?></span>
-              </div>
-              <?php endforeach; ?>
-            </div>
-            <?php endif; ?>
+            <div class="admin-note">Schedule a screening and see what's already booked.</div>
+            <a class="btn btn--block" href="/_admin/showtimes.php">Open Showtimes</a>
           </div>
         </section>
 
         <section class="card admin-card">
-          <div class="card__head"><span class="card__n">03</span><span class="card__title">Programmer's note</span></div>
-          <div class="card__body">
-            <form action="/_admin/note.php" method="post">
-              <?php echo admin_csrf_field(); ?>
-              <div class="field"><label class="field__label" for="n-film">Film</label>
-                <select class="field__input" id="n-film" name="film_id"><?php $opt($films); ?></select></div>
-              <div class="field"><label class="field__label" for="n-note">Note</label>
-                <textarea class="field__input admin-textarea" id="n-note" name="note" rows="5" required></textarea></div>
-              <button class="btn btn--block" type="submit">Add note</button>
-            </form>
-          </div>
-        </section>
-
-        <section class="card admin-card admin-card--danger">
-          <div class="card__head"><span class="card__n">04</span><span class="card__title">Delete a film</span></div>
-          <div class="card__body">
-            <form action="/_admin/delete.php" method="post"
-                  onsubmit="return confirm('Delete this film? The video and poster files are removed from disk and cannot be recovered.');">
-              <?php echo admin_csrf_field(); ?>
-              <div class="field"><label class="field__label" for="d-film">Film</label>
-                <select class="field__input" id="d-film" name="film_id"><?php $opt($films); ?></select></div>
-              <div class="admin-note">Deletes the .mp4 and .png from disk. This cannot be undone.</div>
-              <button class="btn btn--block admin-danger" type="submit">Delete film</button>
-            </form>
-          </div>
-        </section>
-
-        <section class="card admin-card">
-          <div class="card__head"><span class="card__n">05</span><span class="card__title">Instagram</span></div>
+          <div class="card__head"><span class="card__n">03</span><span class="card__title">Instagram</span></div>
           <div class="card__body">
             <div class="admin-note">Preview today's card and caption, then post it yourself when it looks right.</div>
             <a class="btn btn--block" href="/_admin/instagram.php">Review today's post</a>
@@ -161,7 +92,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       ?>
       <section class="stats">
         <div class="stats__head">
-          <span class="card__n">06</span>
+          <span class="card__n">04</span>
           <span class="card__title">Visitors</span>
           <?php if ($v['since']): ?>
           <span class="stats__since">since <?php echo date('j M Y', $v['since']); ?></span>

@@ -60,7 +60,21 @@ require 'getid3/getid3.php';
     $stmt->bindParam(':poster', $poster);
     $stmt->execute();
 
-    header("Location: /_admin");
+    // Upload and the programmer's note happen in one submit now — a note is
+    // optional, and when given it's attached to the film just created rather
+    // than asking which film it belongs to.
+    $note = trim($_POST['note'] ?? '');
+    if ($note !== '') {
+      $f_id = $conn->lastInsertId();
+      $noteStmt = $conn->prepare("INSERT INTO `notes` (f_id, note, stamp)
+                                  VALUES (:f_id, :note, :stamp)");
+      $noteStmt->bindParam(':f_id', $f_id);
+      $noteStmt->bindParam(':note', $note);
+      $noteStmt->bindParam(':stamp', $now);
+      $noteStmt->execute();
+    }
+
+    header("Location: /_admin/films.php");
     exit;
 
 

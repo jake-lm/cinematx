@@ -25,6 +25,6 @@ admin_check_csrf();
     $stmt = $conn->prepare("UPDATE `films` SET `active` = 0 WHERE `id` = :f_id");
     $stmt->execute([':f_id' => $f_id]);
 
-    header("Location: /_admin");
+    header("Location: /_admin/films.php");
     exit;
 ?>

@@ -1477,9 +1477,49 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  ADMIN  (/_admin/)
-//  Operations, not editorial. Same components as everywhere else, arranged so
-//  the destructive one is visibly not like the others.
+//  A clean, neutral dashboard rather than the public site's editorial voice
+//  — set via $ctx_shell = 'admin-shell' (the same mechanism screening rooms
+//  use to go dark), so every component below just inherits new custom
+//  properties instead of needing admin-specific variants of .card/.btn/etc.
 // ═══════════════════════════════════════════════════════════════════════════
+
+.admin-shell {
+  --bg:        #F7F7F5;
+  --surface:   #FFFFFF;
+  --surface-2: #F4F4F2;
+  --surface-3: #ECECE8;
+  --line:      rgba(20, 20, 20, 0.08);
+  --line-2:    rgba(20, 20, 20, 0.14);
+  --text:      #17171A;
+  --text-2:    #52525B;
+  --text-3:    #6B6B74;
+  --text-4:    #9A9AA2;
+}
+[data-theme="dark"] .admin-shell {
+  --bg:        #17171A;
+  --surface:   #1D1D21;
+  --surface-2: #232327;
+  --surface-3: #2C2C31;
+  --line:      rgba(255, 255, 255, 0.08);
+  --line-2:    rgba(255, 255, 255, 0.14);
+  --text:      #F2F2F4;
+  --text-2:    #C2C2C8;
+  --text-3:    #9C9CA4;
+  --text-4:    #6E6E77;
+}
+
+// Card/field labels read as an editorial plaque site-wide (uppercase,
+// letter-spaced, tiny, via the label() mixin) — inside admin they drop that
+// for a plainer, slightly larger, normal-case treatment closer to how a
+// SaaS app sets field labels and section titles.
+.admin-shell {
+  .card__title, .field__label, .rail__group {
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+    font-size: var(--t-xs);
+  }
+}
 
 .admin-grid {
   margin-top: var(--s-6);
@@ -1535,6 +1575,46 @@ button, input, select, textarea { font: inherit; color: inherit; }
   box-shadow: 0 1px 2px rgba(23, 21, 15, 0.04), 0 8px 20px rgba(23, 21, 15, 0.05);
   transition: box-shadow var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
   &:hover { box-shadow: 0 2px 4px rgba(23, 21, 15, 0.06), 0 12px 28px rgba(23, 21, 15, 0.09); transform: translateY(-1px); }
+}
+
+.btn--sm { padding: var(--s-1) var(--s-3); font-size: var(--t-3xs); }
+
+// ── Admin list (Films, Showtimes) ───────────────────────────────────────────
+// A plain grid-row table, same shape as .admin-booked__row but with a
+// visible header and a per-row action slot.
+.admin-list { margin-top: var(--s-7); }
+.admin-list__head,
+.admin-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px 90px 110px;
+  gap: var(--s-3);
+  align-items: center;
+}
+.admin-list__head {
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line-2);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.admin-list__row {
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--t-sm);
+  form { display: flex; justify-content: flex-end; }
+}
+.admin-list__title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: 600; color: var(--text);
+}
+.admin-list__meta { color: var(--text-2); }
+
+// Showtimes has different columns (when/title/theatre, no action) than
+// Films (title/director/duration/deactivate) — same row component, its own
+// column widths.
+.admin-list--showtimes .admin-list__head,
+.admin-list--showtimes .admin-list__row {
+  grid-template-columns: 150px minmax(0, 1fr) 90px;
 }
 
 // ── Instagram post mockup ───────────────────────────────────────────────────

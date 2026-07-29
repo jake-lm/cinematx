@@ -26,10 +26,12 @@ $configured     = defined('IG_ACCESS_TOKEN') && IG_ACCESS_TOKEN
 
 $e = 'ctx_e';
 
-$ctx_title  = 'Instagram — Cinema, TX Admin';
-$ctx_active = '';
-$ctx_scroll = true;
-$ctx_video  = false;
+$ctx_title     = 'Instagram — Cinema, TX Admin';
+$ctx_active    = 'instagram';
+$ctx_admin_nav = true;
+$ctx_shell     = 'admin-shell';
+$ctx_scroll    = true;
+$ctx_video     = false;
 require dirname(__DIR__) . '/v7/_head.php';
 require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
@@ -70,7 +72,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </div>
 
         <section class="card admin-card">
-          <div class="card__head"><span class="card__n">05</span><span class="card__title">Post</span></div>
+          <div class="card__head"><span class="card__n">01</span><span class="card__title">Post</span></div>
           <div class="card__body">
             <div class="admin-note"><?php echo count($films); ?> screenings pulled from AFS, Paramount &amp; Hyperreal for <?php echo $e(date('l, F j', $now)); ?>.</div>
 

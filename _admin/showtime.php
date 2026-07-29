@@ -26,6 +26,6 @@ $stmt->bindParam(':endtime', $endtime);
 $stmt->bindParam(':theatre', $theatre);
 $stmt->execute();
 
-header("Location: /_admin");
+header("Location: /_admin/showtimes.php");
 exit;
 ?>
