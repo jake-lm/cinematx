@@ -177,7 +177,60 @@ function ig_paginate(array $films, $maxPerPage) {
     return $out;
 }
 
-function ig_build_list_page(array $films, $date) {
+// ── Themes ───────────────────────────────────────────────────────────────
+//
+// Every theme draws its own complete list page and feature page — no shared
+// "layout with a color map" abstraction. The two designs are meant to look
+// like different things, not the same skeleton recolored, and a self-
+// contained function per theme is easier to read and safer to touch than
+// unpicking a color parameter passed through several drawing calls. Row
+// geometry (thumbnail size, row height, the 6-per-page budget Auto mode
+// assumes) stays identical across themes for now, so composition modes and
+// pagination don't need to know which theme is active.
+const IG_THEMES = [
+    'paper'   => 'Paper',
+    'marquee' => 'Marquee',
+];
+
+function ig_build_list_page(array $films, $date, $theme = 'paper') {
+    return $theme === 'marquee'
+        ? ig_build_list_page_marquee($films, $date)
+        : ig_build_list_page_paper($films, $date);
+}
+
+function ig_build_feature_page(array $film, $date, $theme = 'paper') {
+    return $theme === 'marquee'
+        ? ig_build_feature_page_marquee($film, $date)
+        : ig_build_feature_page_paper($film, $date);
+}
+
+// Evenly spaced "bulb" dots walking the perimeter of a rect, each a soft
+// glow behind a bright core — GD has no light-bleed primitive, so the glow
+// is just a larger, low-alpha circle drawn first. The marquee theme's
+// signature: every page gets framed by it, list and feature alike.
+function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb) {
+    $top   = $x2 - $x1;
+    $side  = $y2 - $y1;
+    $perim = 2 * $top + 2 * $side;
+    $n     = max(4, (int) round($perim / $spacing));
+
+    for ($i = 0; $i < $n; $i++) {
+        $d = ($i / $n) * $perim;
+        if ($d < $top) {
+            $x = $x1 + $d; $y = $y1;
+        } elseif ($d < $top + $side) {
+            $x = $x2; $y = $y1 + ($d - $top);
+        } elseif ($d < 2 * $top + $side) {
+            $x = $x2 - ($d - $top - $side); $y = $y2;
+        } else {
+            $x = $x1; $y = $y2 - ($d - 2 * $top - $side);
+        }
+        imagefilledellipse($im, (int) $x, (int) $y, 16, 16, $glow);
+        imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $bulb);
+    }
+}
+
+function ig_build_list_page_paper(array $films, $date) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -273,6 +326,96 @@ function ig_build_list_page(array $films, $date) {
     return $im;
 }
 
+// A classic theatre marquee, at night: black background, a border of gold
+// bulbs, showtimes in the same gold rather than paper's red. Row geometry
+// (thumbnail size, row height, footer position) is identical to the paper
+// theme on purpose — only the palette and the bulb frame change, so this
+// stays a drop-in for the same pagination math.
+function ig_build_list_page_marquee(array $films, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#14120F');
+    $ink         = ig_hex($im, '#F2EEE5');
+    $muted       = ig_hex($im, '#B5AFA0');
+    $divider     = ig_hex($im, '#3A362E');
+    $placeholder = ig_hex($im, '#2A2620');
+    $gold        = ig_hex($im, '#F2C14E');
+    $goldGlow    = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+
+    imagefill($im, 0, 0, $bg);
+    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold);
+
+    $margin = 80;
+
+    $y = 150;
+    imagettftext($im, 26, 0, $margin, $y, $gold, IG_FONT_BODY, strtoupper('Showing Tonight'));
+    $y += 66;
+    imagettftext($im, 50, 0, $margin, $y, $ink, IG_FONT_HEADLINE, date('l, F j', $date));
+    $y += 50;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 40;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_HEADLINE, $initial);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
+        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
+
+        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $gold, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
+    }
+
+    if ($extra > 0) {
+        imagettftext($im, 24, 0, $margin, $y + 16, $gold, IG_FONT_BODY, "+{$extra} more today");
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
 // The list-thumbnail URL fetch_tmdb() gives every film is sized w300; a
 // full-bleed feature-page hero wants more detail. Same image, size segment
 // swapped — no change to the TMDB cache fetch_tmdb() already keeps.
@@ -331,7 +474,7 @@ function ig_wrap_lines($text, $font, $size, $maxWidth, $maxLines) {
  * line, the same graceful-degradation the list rows already use for a
  * missing poster.
  */
-function ig_build_feature_page(array $film, $date) {
+function ig_build_feature_page_paper(array $film, $date) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -405,6 +548,111 @@ function ig_build_feature_page(array $film, $date) {
         // drawn back over the kicker. Gapped by the *next* line's ascent,
         // not the current line's, since it's the line about to be drawn
         // that determines how far up the pixels reach.
+        $y += 68;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $y += 72;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = $film['genres'];
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' min';
+    if ($deckParts) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, implode('  ·  ', $deckParts));
+        $y += 44;
+    }
+
+    $y += 20;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 36;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 26, $textMaxWidth, 4) as $line) {
+            imagettftext($im, 26, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 38;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
+    }
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// Marquee's spotlight page: same skeleton as the paper version — hero,
+// showtime pills, kicker, title, deck, faded overview — but the hero fades
+// to black instead of paper, and the whole card sits inside the same gold
+// bulb frame the list page uses, so a single swiped-to page still reads as
+// part of the same marquee carousel.
+function ig_build_feature_page_marquee(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#14120F');
+    $ink         = ig_hex($im, '#F2EEE5');
+    $muted       = ig_hex($im, '#B5AFA0');
+    $divider     = ig_hex($im, '#3A362E');
+    $placeholder = ig_hex($im, '#2A2620');
+    $gold        = ig_hex($im, '#F2C14E');
+    $goldGlow    = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+
+    imagefill($im, 0, 0, $bg);
+
+    $margin = 80;
+    $heroH  = 700;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    if ($hero) {
+        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(120, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 120, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, $gold, IG_FONT_HEADLINE, $initial);
+    }
+
+    // Fades to black, matching this theme's background, instead of paper's
+    // cream — same alpha-band technique, different destination color.
+    $fadeH = 120;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0x14, 0x12, 0x0F, $alpha);
+        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
+    }
+
+    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold);
+
+    $pillFont = 30;
+    $pillPadX = 30;
+    $pillH    = 60;
+    $py       = 70;
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
+
+    $textMaxWidth = $w - $margin * 2;
+    $y = $heroH + 50;
+
+    $kicker = strtoupper($film['venue'] ?? '');
+    if ($kicker !== '') {
+        imagettftext($im, 24, 0, $margin, $y, $gold, IG_FONT_BODY, $kicker);
         $y += 68;
     }
 
@@ -540,7 +788,7 @@ function ig_caption(array $films, $date) {
 // Absent compose-<date>.json means this: one card, today's exact design,
 // no pagination, no spotlight pages. New days behave exactly as they always
 // have until someone opens the admin page and changes something.
-const IG_COMPOSE_DEFAULT = ['mode' => 'default', 'per_page' => null, 'features' => false];
+const IG_COMPOSE_DEFAULT = ['mode' => 'default', 'per_page' => null, 'features' => false, 'theme' => 'paper'];
 
 // Screenings-per-page when Auto mode (or Manual with no count set) is
 // active — today's exact row height, so a single-page Auto day looks
@@ -580,8 +828,10 @@ function ig_compose_write($date, array $compose) {
  * films or the cap runs out.
  */
 function ig_build_images(array $films, $date, array $compose) {
+    $theme = in_array($compose['theme'] ?? 'paper', array_keys(IG_THEMES), true) ? $compose['theme'] : 'paper';
+
     if ($compose['mode'] === 'default' || empty($films)) {
-        return [ig_build_list_page($films, $date)];
+        return [ig_build_list_page($films, $date, $theme)];
     }
 
     $maxPerPage = ($compose['mode'] === 'manual' && !empty($compose['per_page']))
@@ -590,14 +840,14 @@ function ig_build_images(array $films, $date, array $compose) {
 
     $images = [];
     foreach (ig_paginate($films, $maxPerPage) as $page) {
-        $images[] = ig_build_list_page($page, $date);
+        $images[] = ig_build_list_page($page, $date, $theme);
     }
 
     if (!empty($compose['features'])) {
         $slotsLeft = 10 - count($images);
         foreach ($films as $film) {
             if ($slotsLeft <= 0) break;
-            $images[] = ig_build_feature_page($film, $date);
+            $images[] = ig_build_feature_page($film, $date, $theme);
             $slotsLeft--;
         }
     }

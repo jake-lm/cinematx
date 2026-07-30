@@ -28,11 +28,14 @@ $mode = $_GET['mode'] ?? $saved['mode'];
 if (!in_array($mode, ['default', 'auto', 'manual'], true)) $mode = 'default';
 $per_page = isset($_GET['per_page']) ? max(1, (int) $_GET['per_page']) : ($saved['per_page'] ?: 6);
 $features = isset($_GET['features']) ? $_GET['features'] === '1' : !empty($saved['features']);
+$theme = $_GET['theme'] ?? $saved['theme'] ?? 'paper';
+if (!array_key_exists($theme, IG_THEMES)) $theme = 'paper';
 
-$compose = ['mode' => $mode, 'per_page' => $mode === 'manual' ? $per_page : null, 'features' => $features];
+$compose = ['mode' => $mode, 'per_page' => $mode === 'manual' ? $per_page : null, 'features' => $features, 'theme' => $theme];
 $dirty   = $compose['mode'] !== $saved['mode']
         || ($compose['mode'] === 'manual' && (int) $compose['per_page'] !== (int) ($saved['per_page'] ?? 0))
-        || $compose['features'] !== !empty($saved['features']);
+        || $compose['features'] !== !empty($saved['features'])
+        || $compose['theme'] !== ($saved['theme'] ?? 'paper');
 
 $images  = ig_build_images($films, $now, $compose);
 $pages   = ig_save_images($images, $now);
@@ -47,9 +50,9 @@ $configured     = defined('IG_ACCESS_TOKEN') && IG_ACCESS_TOKEN
                 && defined('IG_BUSINESS_ACCOUNT_ID') && IG_BUSINESS_ACCOUNT_ID;
 
 $e  = 'ctx_e';
-$qs = function ($overrides) use ($mode, $per_page, $features) {
+$qs = function ($overrides) use ($mode, $per_page, $features, $theme) {
     return http_build_query(array_merge(
-        ['mode' => $mode, 'per_page' => $per_page, 'features' => $features ? 1 : 0],
+        ['mode' => $mode, 'per_page' => $per_page, 'features' => $features ? 1 : 0, 'theme' => $theme],
         $overrides
     ));
 };
@@ -128,6 +131,42 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             </div>
             <div class="card__body">
               <div class="field">
+                <span class="field__label">Style</span>
+                <div class="ig-theme-picker">
+                  <a class="ig-theme-swatch<?php echo $theme === 'paper' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'paper'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="96" height="120" fill="#F4F1EB"/>
+                      <rect width="96" height="4" fill="#922E32"/>
+                      <rect x="10" y="14" width="30" height="8" rx="4" fill="#922E32"/>
+                      <rect x="10" y="34" width="50" height="6" fill="#14120F"/>
+                      <rect x="10" y="46" width="70" height="16" fill="#DED7C7"/>
+                      <rect x="10" y="70" width="60" height="6" fill="#14120F"/>
+                      <rect x="10" y="80" width="40" height="4" fill="#6B6659"/>
+                      <rect x="10" y="88" width="30" height="4" fill="#922E32"/>
+                    </svg>
+                    <span>Paper</span>
+                  </a>
+                  <a class="ig-theme-swatch<?php echo $theme === 'marquee' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'marquee'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="96" height="120" fill="#14120F"/>
+                      <g fill="#F2C14E">
+                        <circle cx="8" cy="8" r="2.4"/><circle cx="24" cy="8" r="2.4"/><circle cx="40" cy="8" r="2.4"/><circle cx="56" cy="8" r="2.4"/><circle cx="72" cy="8" r="2.4"/><circle cx="88" cy="8" r="2.4"/>
+                        <circle cx="8" cy="112" r="2.4"/><circle cx="24" cy="112" r="2.4"/><circle cx="40" cy="112" r="2.4"/><circle cx="56" cy="112" r="2.4"/><circle cx="72" cy="112" r="2.4"/><circle cx="88" cy="112" r="2.4"/>
+                        <circle cx="8" cy="24" r="2.4"/><circle cx="8" cy="40" r="2.4"/><circle cx="8" cy="56" r="2.4"/><circle cx="8" cy="72" r="2.4"/><circle cx="8" cy="96" r="2.4"/>
+                        <circle cx="88" cy="24" r="2.4"/><circle cx="88" cy="40" r="2.4"/><circle cx="88" cy="56" r="2.4"/><circle cx="88" cy="72" r="2.4"/><circle cx="88" cy="96" r="2.4"/>
+                      </g>
+                      <rect x="16" y="24" width="30" height="8" rx="4" fill="#F2C14E"/>
+                      <rect x="16" y="44" width="50" height="6" fill="#F2EEE5"/>
+                      <rect x="16" y="56" width="64" height="16" fill="#2A2620"/>
+                      <rect x="16" y="80" width="60" height="6" fill="#F2EEE5"/>
+                      <rect x="16" y="90" width="40" height="4" fill="#B5AFA0"/>
+                    </svg>
+                    <span>Marquee</span>
+                  </a>
+                </div>
+              </div>
+
+              <div class="field">
                 <span class="field__label">Mode</span>
                 <div class="adm-seg" role="group" aria-label="Composition mode">
                   <a class="adm-seg__btn<?php echo $mode === 'default' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['mode' => 'default'])); ?>">Default</a>
@@ -141,6 +180,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <?php else: ?>
               <form method="get">
                 <input type="hidden" name="mode" value="<?php echo $e($mode); ?>">
+                <input type="hidden" name="theme" value="<?php echo $e($theme); ?>">
                 <?php if ($mode === 'manual'): ?>
                 <div class="field">
                   <label class="field__label" for="per_page">Screenings per page</label>
@@ -164,6 +204,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <input type="hidden" name="mode" value="<?php echo $e($mode); ?>">
                 <input type="hidden" name="per_page" value="<?php echo (int) $per_page; ?>">
                 <input type="hidden" name="features" value="<?php echo $features ? 1 : 0; ?>">
+                <input type="hidden" name="theme" value="<?php echo $e($theme); ?>">
                 <button class="btn btn--block" type="submit">Save composition</button>
               </form>
               <?php endif; ?>

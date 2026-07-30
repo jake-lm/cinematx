@@ -1954,6 +1954,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &.is-on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
 }
 
+// A little poster per theme, not a text toggle — the point is to see the
+// style before committing to it, the same reason the mockup itself renders
+// the real card rather than describing it.
+.ig-theme-picker { display: flex; gap: var(--s-3); }
+.ig-theme-swatch {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
+  padding: var(--s-2);
+  border: 1px solid var(--line); border-radius: 8px;
+  text-decoration: none;
+  @include label(var(--t-3xs), var(--text-3));
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  &:hover { border-color: var(--line-2); }
+  &.is-on { border-color: var(--red-hi); background: var(--surface-2); color: var(--text); }
+}
+.ig-theme-swatch__art {
+  display: block; width: 72px; height: 90px;
+  border-radius: 4px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
 // ── Instagram post mockup ───────────────────────────────────────────────────
 // Renders like the real feed card, so "is this right" is answered by looking
 // at it rather than by reading fields beside a bare <img>.

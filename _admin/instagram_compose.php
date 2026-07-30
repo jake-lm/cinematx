@@ -20,10 +20,14 @@ if ($mode === 'manual' && isset($_POST['per_page']) && $_POST['per_page'] !== ''
     $per_page = max(1, (int) $_POST['per_page']);
 }
 
+$theme = $_POST['theme'] ?? 'paper';
+if (!array_key_exists($theme, IG_THEMES)) $theme = 'paper';
+
 ig_compose_write($now, [
     'mode'     => $mode,
     'per_page' => $per_page,
     'features' => !empty($_POST['features']),
+    'theme'    => $theme,
 ]);
 
 header('Location: /_admin/instagram.php');

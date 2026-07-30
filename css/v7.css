@@ -3123,6 +3123,47 @@ button, input, select, textarea {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
+.ig-theme-picker {
+  display: flex;
+  gap: var(--s-3);
+}
+
+.ig-theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.ig-theme-swatch:hover {
+  border-color: var(--line-2);
+}
+.ig-theme-swatch.is-on {
+  border-color: var(--red-hi);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.ig-theme-swatch__art {
+  display: block;
+  width: 72px;
+  height: 90px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
 .ig-mock {
   background: var(--surface);
   border: 1px solid var(--line);
