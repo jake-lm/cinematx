@@ -52,25 +52,38 @@ function fetch_afs_films_scrape() {
             $url      = $link_node->getAttribute('href') ?: null;
             $time_str = $time_node ? trim($time_node->textContent) : '';
 
-            $timestamp = null;
-            if ($time_str) {
-                $dt = DateTime::createFromFormat('Ymd g:i A', "$date_id $time_str", $tz);
-                $timestamp = $dt ? $dt->getTimestamp() : null;
-            }
-            if (!$timestamp) {
-                // Fallback: midnight of the day
-                $dt = DateTime::createFromFormat('Ymd', $date_id, $tz);
-                $timestamp = $dt ? $dt->getTimestamp() : null;
-            }
+            // A film playing more than once in a day renders as one row with
+            // every time comma-joined ("4:15 PM, 7:30 PM"), not a row per
+            // showing — split first, or the parse below chokes on the
+            // leftover ", 7:30 PM", fails, and the fallback loses both times.
+            $times = $time_str !== '' ? array_filter(array_map('trim', explode(',', $time_str))) : [''];
 
-            $films[] = [
-                'title'        => $title,
-                'url'          => $url,
-                'timestamp'    => $timestamp,
-                'display_date' => $timestamp
-                    ? (new DateTime('@' . $timestamp))->setTimezone($tz)->format('D, M j · g:ia')
-                    : $date_id,
-            ];
+            foreach ($times as $one_time) {
+                $timestamp = null;
+                if ($one_time !== '') {
+                    $dt = DateTime::createFromFormat('Ymd g:i A', "$date_id $one_time", $tz);
+                    $timestamp = $dt ? $dt->getTimestamp() : null;
+                }
+                if (!$timestamp) {
+                    // Fallback: midnight of the day. 'Ymd' leaves every time
+                    // component the format doesn't mention — here, all of
+                    // them — at the current wall-clock time rather than
+                    // zero, so without an explicit setTime() this "midnight"
+                    // silently drifts to whatever moment the scrape runs.
+                    $dt = DateTime::createFromFormat('Ymd', $date_id, $tz);
+                    if ($dt) $dt->setTime(0, 0, 0);
+                    $timestamp = $dt ? $dt->getTimestamp() : null;
+                }
+
+                $films[] = [
+                    'title'        => $title,
+                    'url'          => $url,
+                    'timestamp'    => $timestamp,
+                    'display_date' => $timestamp
+                        ? (new DateTime('@' . $timestamp))->setTimezone($tz)->format('D, M j · g:ia')
+                        : $date_id,
+                ];
+            }
         }
     }
 
