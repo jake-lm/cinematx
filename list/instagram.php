@@ -741,10 +741,20 @@ function ig_save_images(array $gdImages, $date) {
  * Only the Graph API needs this: Meta fetches the image over the internet, so
  * "/uploads/social/x.png" is meaningless to it. Returns '' when CTX_SITE_URL
  * is unset, and callers treat that as "not configured to post".
+ *
+ * Carries the same mtime cache-buster the admin mockup already uses (pass
+ * the file's local path as $path), for the same reason: every day reuses
+ * the exact same filename, so with a bare URL, anything that caches by URL —
+ * and Meta's fetcher is exactly that kind of thing — can serve back whatever
+ * it fetched the *first* time that path was ever posted, not what's on disk
+ * now. Discovered when a repeat-tested carousel's last image published with
+ * stale (pre-Marquee) content despite the current file being correct.
  */
-function ig_public_url($relative) {
+function ig_public_url($relative, $path = null) {
     if (!defined('CTX_SITE_URL') || !CTX_SITE_URL) return '';
-    return rtrim(CTX_SITE_URL, '/') . $relative;
+    $url = rtrim(CTX_SITE_URL, '/') . $relative;
+    if ($path && file_exists($path)) $url .= '?v=' . filemtime($path);
+    return $url;
 }
 
 // ── Caption ──────────────────────────────────────────────────────────────
@@ -918,21 +928,25 @@ function ig_create_container($base, $ig, array $fields) {
  * Container(s) → poll → publish. Returns the published media id, or throws
  * with whatever Meta's error payload said.
  *
- * Takes the root-relative path(s) ig_save_images() returns and resolves
- * them to absolute URLs here, so no caller has to remember which form this
- * needs. A single path publishes as one image, same as always; an array of
- * 2+ publishes as a carousel — each becomes a child
- * container (polled individually, so a failure names which image it was)
- * before the CAROUSEL parent is created and published. Either way this is
- * one post against the rate limit.
+ * Takes the [path, url] pairs ig_save_images() returns — the local path is
+ * needed here, not just the URL, so each image can carry ig_public_url()'s
+ * mtime cache-buster. Without it, every day reposts the exact same URL
+ * (ig-<date>-<n>.png), and a fetcher that caches by URL — Meta's included —
+ * can serve back whatever it fetched on an earlier test rather than today's
+ * actual content. A single pair publishes as one image, same as always; an
+ * array of 2+ publishes as a carousel — each becomes a child container
+ * (polled individually, so a failure names which image it was) before the
+ * CAROUSEL parent is created and published. Either way this is one post
+ * against the rate limit.
  */
-function ig_publish($image_paths, $caption) {
+function ig_publish(array $pages, $caption) {
     $base  = 'https://graph.facebook.com/' . IG_GRAPH_VERSION;
     $ig    = IG_BUSINESS_ACCOUNT_ID;
-    $paths = is_array($image_paths) ? array_values($image_paths) : [$image_paths];
+    $pages = array_values($pages);
 
-    if (count($paths) === 1) {
-        $image_url = ig_public_url($paths[0]);
+    if (count($pages) === 1) {
+        [$path, $url] = $pages[0];
+        $image_url = ig_public_url($url, $path);
         if ($image_url === '') {
             throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the card from.');
         }
@@ -942,8 +956,8 @@ function ig_publish($image_paths, $caption) {
         ]);
     } else {
         $children = [];
-        foreach ($paths as $i => $path) {
-            $image_url = ig_public_url($path);
+        foreach ($pages as $i => [$path, $url]) {
+            $image_url = ig_public_url($url, $path);
             if ($image_url === '') {
                 throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the card from.');
             }
@@ -953,7 +967,7 @@ function ig_publish($image_paths, $caption) {
                     'is_carousel_item' => 'true',
                 ]);
             } catch (RuntimeException $e) {
-                throw new RuntimeException('Carousel image ' . ($i + 1) . ' of ' . count($paths) . ' failed: ' . $e->getMessage());
+                throw new RuntimeException('Carousel image ' . ($i + 1) . ' of ' . count($pages) . ' failed: ' . $e->getMessage());
             }
         }
         $container_id = ig_create_container($base, $ig, [

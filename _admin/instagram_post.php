@@ -20,7 +20,7 @@ $pages   = ig_save_images($images, $now);
 $caption = ig_caption($films, $now);
 
 try {
-    $media_id = ig_publish(array_column($pages, 1), $caption);
+    $media_id = ig_publish($pages, $caption);
     file_put_contents($flag, $media_id);
     header('Location: /_admin/instagram.php?posted=' . urlencode($media_id));
 } catch (Throwable $ex) {

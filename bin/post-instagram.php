@@ -48,7 +48,7 @@ if ($dry_run) {
     // "media could not be fetched" from the API, hours later.
     echo "--- caption ---\n{$caption}\n";
     foreach ($pages as $i => [$path, $url]) {
-        $public = ig_public_url($url);
+        $public = ig_public_url($url, $path);
         printf("--- page %d image URL Meta would fetch: %s ---\n", $i + 1, $public !== '' ? $public : '(CTX_SITE_URL unset)');
     }
     echo "--- (dry run, nothing posted) ---\n";
@@ -74,7 +74,7 @@ if ($dry_run) {
     // }
 
     try {
-        $media_id = ig_publish(array_column($pages, 1), $caption);
+        $media_id = ig_publish($pages, $caption);
         file_put_contents($flag, $media_id);
         printf("%s ig: published, media id %s\n", date('c'), $media_id);
     } catch (Throwable $e) {
