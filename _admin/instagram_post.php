@@ -6,10 +6,12 @@ require dirname(__DIR__) . '/list/instagram.php';
 $now   = time();
 $flag  = dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now);
 
-if (file_exists($flag)) {
-    header('Location: /_admin/instagram.php?error=' . urlencode('already posted today'));
-    exit;
-}
+// DEV OVERRIDE (2026-07-30): double-post guard disabled for live testing.
+// Re-enable before this goes near a real posting schedule.
+// if (file_exists($flag)) {
+//     header('Location: /_admin/instagram.php?error=' . urlencode('already posted today'));
+//     exit;
+// }
 
 $films   = ig_today_films($conn);
 $compose = ig_compose_read($now);

@@ -64,12 +64,14 @@ if ($dry_run) {
     // Shared with the admin panel's "Post to Instagram" button — whichever
     // posts first today wins, the other is a no-op rather than a duplicate.
     $flag = $root . '/uploads/social/.posted-' . date('Y-m-d', $now);
-    if (file_exists($flag)) {
-        printf("%s ig: already posted today, skipping\n", date('c'));
-        flock($lock, LOCK_UN);
-        fclose($lock);
-        exit(0);
-    }
+    // DEV OVERRIDE (2026-07-30): guard disabled to match instagram_post.php
+    // while composition modes are being live-tested. Re-enable both together.
+    // if (file_exists($flag)) {
+    //     printf("%s ig: already posted today, skipping\n", date('c'));
+    //     flock($lock, LOCK_UN);
+    //     fclose($lock);
+    //     exit(0);
+    // }
 
     try {
         $media_id = ig_publish(array_column($pages, 1), $caption);
