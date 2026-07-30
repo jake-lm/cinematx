@@ -141,6 +141,9 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
     <?php endif; ?>
     <?php if ($signed): ?>
       <?php if ($full): ?><a class="ibtn" href="/dashboard" title="Write"><i class="fa-solid fa-pen"></i></a><?php endif; ?>
+      <?php if ($full && (int)($me['admin'] ?? 0) === 1): ?>
+      <a class="ibtn" href="/_admin/" title="Admin"><i class="fa-solid fa-toolbox"></i></a>
+      <?php endif; ?>
       <form action="/dashboard/signup.php?action=logout" method="post" style="display:flex;">
         <button class="ibtn" type="submit" title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
       </form>
