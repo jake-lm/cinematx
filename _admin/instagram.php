@@ -232,7 +232,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                     <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
                   </span>
                 </span>
-                <span class="adm-row__when"><?php echo date('g:i A', $f['timestamp']); ?></span>
+                <span class="adm-row__when"><?php echo $e(ig_format_times($f['timestamps'] ?? [$f['timestamp']])); ?></span>
               </div>
               <?php endforeach; ?>
               <?php if (!$films): ?>

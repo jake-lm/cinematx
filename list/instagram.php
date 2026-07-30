@@ -31,7 +31,46 @@ function ig_today_films($conn) {
     $start = strtotime('today');
     $end   = strtotime('tomorrow') - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
-    return array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    return ig_group_showtimes($films);
+}
+
+/**
+ * A film playing twice in one day at the same venue (a scraper row per
+ * showing, since the AFS parser fix) is one listing here, not two — one
+ * poster, one row, one spotlight page, with every time on it. Same title,
+ * same venue, same location (already same day — ig_today_films() only ever
+ * fetches one day) collapse into a single entry carrying a `timestamps`
+ * array; every other field is kept from whichever showing was seen first,
+ * since it comes from the same TMDB lookup either way.
+ */
+function ig_group_showtimes(array $films) {
+    $groups = [];
+    foreach ($films as $film) {
+        $key = mb_strtolower(trim($film['title'])) . '|' . $film['venue'] . '|' . ($film['location'] ?? '');
+        if (isset($groups[$key])) {
+            $groups[$key]['timestamps'][] = $film['timestamp'];
+        } else {
+            $film['timestamps'] = [$film['timestamp']];
+            $groups[$key] = $film;
+        }
+    }
+
+    $out = array_values($groups);
+    usort($out, fn($a, $b) => min($a['timestamps']) <=> min($b['timestamps']));
+    return $out;
+}
+
+// "7:00 PM" for one showing, "7:00 PM & 9:30 PM" for two, an Oxford-joined
+// list for more than that — every card/caption line that shows a time reads
+// off this instead of the single `timestamp` field once ig_today_films()
+// has grouped same-day repeats together.
+function ig_format_times(array $timestamps) {
+    sort($timestamps);
+    $times = array_map(fn($t) => date('g:i A', $t), $timestamps);
+    if (count($times) === 1) return $times[0];
+    $last = array_pop($times);
+    return implode(', ', $times) . ' & ' . $last;
 }
 
 // ── Image ────────────────────────────────────────────────────────────────
@@ -216,7 +255,7 @@ function ig_build_list_page(array $films, $date) {
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(date('g:i A', $film['timestamp']), IG_FONT_BODY, 22, $textMaxWidth);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
@@ -346,7 +385,7 @@ function ig_build_feature_page(array $film, $date) {
     $y = $heroH + 50;
 
     $venue  = strtoupper($film['venue'] ?? '');
-    $time   = !empty($film['timestamp']) ? date('g:i A', $film['timestamp']) : '';
+    $time   = !empty($film['timestamps']) ? ig_format_times($film['timestamps']) : (!empty($film['timestamp']) ? date('g:i A', $film['timestamp']) : '');
     $kicker = trim($venue . ($time ? "  ·  {$time}" : ''));
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $kicker);
@@ -457,7 +496,7 @@ function ig_build_caption(array $films, $date) {
 
     foreach ($films as $film) {
         $venue = $film['location'] ? "{$film['venue']} ({$film['location']})" : $film['venue'];
-        $lines[] = '• ' . mb_strtoupper($film['title']) . ' — ' . $venue . ' @ ' . date('g:i A', $film['timestamp']);
+        $lines[] = '• ' . mb_strtoupper($film['title']) . ' — ' . $venue . ' @ ' . ig_format_times($film['timestamps'] ?? [$film['timestamp']]);
     }
 
     $lines[] = '';
