@@ -371,22 +371,33 @@ function ig_build_feature_page(array $film, $date) {
         imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
     }
 
-    // Brand mark on top of the hero, same lockup and position as the list
-    // page, so a single swiped-to feature page still reads as a CinemaTX
-    // post on its own rather than an anonymous photo.
+    // The thin brand rule carries across every page for consistency, but the
+    // "CINEMA, TX" wordmark itself only needs to appear once per carousel —
+    // the list page (always page 1) already establishes it. Its spot here
+    // goes to the thing a spotlight page is actually for: when this is
+    // showing. One pill per showtime, stacked, so a repeat screening (two
+    // showings of the same film in a day) reads as two pills rather than a
+    // single cramped line.
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
-    $chipText = 'CINEMA, TX';
-    $chipBox  = imagettfbbox(20, 0, IG_FONT_BODY, $chipText);
-    $chipW    = $chipBox[2] - $chipBox[0];
-    ig_pill($im, $margin, 70, $margin + $chipW + 48, 114, $red);
-    imagettftext($im, 20, 0, $margin + 24, 100, $paper, IG_FONT_BODY, $chipText);
+
+    $pillFont = 30;
+    $pillPadX = 30;
+    $pillH    = 60;
+    $py       = 70;
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $red);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $paper, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
 
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
-    $venue  = strtoupper($film['venue'] ?? '');
-    $time   = !empty($film['timestamps']) ? ig_format_times($film['timestamps']) : (!empty($film['timestamp']) ? date('g:i A', $film['timestamp']) : '');
-    $kicker = trim($venue . ($time ? "  ·  {$time}" : ''));
+    $kicker = strtoupper($film['venue'] ?? '');
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $kicker);
         // 56px caps reach ~52px above their own baseline — a flat leading
