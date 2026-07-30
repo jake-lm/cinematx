@@ -30,21 +30,27 @@ if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
     exit(0);
 }
 
-$now    = time();
-$films  = ig_today_films($conn);
-$image  = ig_build_image($films, $now);
-[$path, $url] = ig_save_image($image, $now);
-$caption = ig_build_caption($films, $now);
+$now     = time();
+$films   = ig_today_films($conn);
+$compose = ig_compose_read($now);
+$images  = ig_build_images($films, $now, $compose);
+$pages   = ig_save_images($images, $now);
+$caption = ig_caption($films, $now);
 
-printf("%s ig: %d screenings today, card written to %s\n", date('c'), count($films), $path);
+printf(
+    "%s ig: %d screenings today, %s mode, %d page(s) written (%s)\n",
+    date('c'), count($films), $compose['mode'], count($pages), implode(', ', array_column($pages, 0))
+);
 
 if ($dry_run) {
     // The absolute form, which is what Meta is handed and has to be able to
     // fetch. Worth printing: when it is wrong the failure is a generic
     // "media could not be fetched" from the API, hours later.
-    $public = ig_public_url($url);
     echo "--- caption ---\n{$caption}\n";
-    printf("--- image URL Meta would fetch: %s ---\n", $public !== '' ? $public : '(CTX_SITE_URL unset)');
+    foreach ($pages as $i => [$path, $url]) {
+        $public = ig_public_url($url);
+        printf("--- page %d image URL Meta would fetch: %s ---\n", $i + 1, $public !== '' ? $public : '(CTX_SITE_URL unset)');
+    }
     echo "--- (dry run, nothing posted) ---\n";
 } else {
     if (!defined('IG_ACCESS_TOKEN') || !defined('IG_BUSINESS_ACCOUNT_ID') || !IG_ACCESS_TOKEN
@@ -66,7 +72,7 @@ if ($dry_run) {
     }
 
     try {
-        $media_id = ig_publish($url, $caption);
+        $media_id = ig_publish(array_column($pages, 1), $caption);
         file_put_contents($flag, $media_id);
         printf("%s ig: published, media id %s\n", date('c'), $media_id);
     } catch (Throwable $e) {

@@ -11,13 +11,14 @@ if (file_exists($flag)) {
     exit;
 }
 
-$films = ig_today_films($conn);
-$image = ig_build_image($films, $now);
-[$path, $image_url] = ig_save_image($image, $now);
-$caption = ig_build_caption($films, $now);
+$films   = ig_today_films($conn);
+$compose = ig_compose_read($now);
+$images  = ig_build_images($films, $now, $compose);
+$pages   = ig_save_images($images, $now);
+$caption = ig_caption($films, $now);
 
 try {
-    $media_id = ig_publish($image_url, $caption);
+    $media_id = ig_publish(array_column($pages, 1), $caption);
     file_put_contents($flag, $media_id);
     header('Location: /_admin/instagram.php?posted=' . urlencode($media_id));
 } catch (Throwable $ex) {

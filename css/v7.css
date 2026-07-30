@@ -3092,6 +3092,37 @@ button, input, select, textarea {
   font-size: var(--t-3xs);
 }
 
+.adm-seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 2px;
+}
+
+.adm-seg__btn {
+  padding: var(--s-1) var(--s-3);
+  border-radius: 5px;
+  color: var(--text-3);
+  text-decoration: none;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.adm-seg__btn:hover {
+  color: var(--text);
+}
+.adm-seg__btn.is-on {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
 .ig-mock {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3147,6 +3178,16 @@ button, input, select, textarea {
   color: var(--text);
 }
 
+.ig-mock__pagecount {
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .ig-mock__dots {
   margin-left: auto;
   color: var(--text-3);
@@ -3157,6 +3198,19 @@ button, input, select, textarea {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.ig-mock__strip {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ig-mock__page {
+  flex: none;
+  width: 100%;
+  scroll-snap-align: start;
 }
 
 .ig-mock__actions {

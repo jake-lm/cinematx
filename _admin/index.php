@@ -35,15 +35,18 @@ $booked_count = (int) $booked_count->fetchColumn();
 
 // Today's Instagram card. The admin Instagram page regenerates on every view
 // so its preview is always current; the dashboard reuses whatever is already
-// on disk, because rendering a 1080×1350 PNG to draw a thumbnail of it would
-// be silly.
+// on disk for the *saved* composition, because rendering a 1080×1350 PNG to
+// draw a thumbnail of it would be silly. Only the first page shows here —
+// a peek, not the full carousel — the Instagram page is where you review
+// every page.
 $ig_films   = ig_today_films($conn);
-$ig_caption = ig_build_caption($ig_films, $now);
-$ig_name    = 'ig-' . date('Y-m-d', $now) . '.png';
+$ig_compose = ig_compose_read($now);
+$ig_caption = ig_caption($ig_films, $now);
+$ig_name    = 'ig-' . date('Y-m-d', $now) . '-1.png';
 $ig_path    = dirname(__DIR__) . '/uploads/social/' . $ig_name;
 $ig_rel     = '/uploads/social/' . $ig_name;
 if (!file_exists($ig_path)) {
-    [$ig_path, $ig_rel] = ig_save_image(ig_build_image($ig_films, $now), $now);
+    [[$ig_path, $ig_rel]] = ig_save_images(ig_build_images($ig_films, $now, $ig_compose), $now);
 }
 $ig_url    = $ig_rel . '?v=' . @filemtime($ig_path);
 $ig_posted = file_exists(dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now));
