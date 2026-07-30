@@ -17,6 +17,12 @@ require_once __DIR__ . '/fetch_screenings.php';
 define('IG_GRAPH_VERSION', 'v21.0');
 define('IG_FONT_HEADLINE', dirname(__DIR__) . '/assets/fonts/Fraunces-Bold.ttf');
 define('IG_FONT_BODY',     dirname(__DIR__) . '/assets/fonts/InstrumentSans-SemiBold.ttf');
+// Marquee's title face — bold, tall and condensed, the closest a Google Font
+// gets to a real letter-board headline without hand-drawing tile panels.
+// Themes are otherwise free to keep using IG_FONT_HEADLINE/IG_FONT_BODY;
+// this exists because Marquee specifically wanted its own identity, not
+// because every theme needs its own font.
+define('IG_FONT_MARQUEE_TITLE', dirname(__DIR__) . '/assets/fonts/Anton-Regular.ttf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -385,13 +391,13 @@ function ig_build_list_page_marquee(array $films, $date) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $ibox = imagettfbbox(36, 0, IG_FONT_MARQUEE_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_HEADLINE, $initial);
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_MARQUEE_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
-        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
+        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_MARQUEE_TITLE, $title);
 
         $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
@@ -617,9 +623,9 @@ function ig_build_feature_page_marquee(array $film, $date) {
     } else {
         imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
         $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-        $ibox = imagettfbbox(120, 0, IG_FONT_HEADLINE, $initial);
+        $ibox = imagettfbbox(120, 0, IG_FONT_MARQUEE_TITLE, $initial);
         $iw = $ibox[2] - $ibox[0];
-        imagettftext($im, 120, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, $gold, IG_FONT_HEADLINE, $initial);
+        imagettftext($im, 120, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, $gold, IG_FONT_MARQUEE_TITLE, $initial);
     }
 
     // Fades to black, matching this theme's background, instead of paper's
@@ -653,13 +659,17 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $kicker = strtoupper($film['venue'] ?? '');
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $gold, IG_FONT_BODY, $kicker);
-        $y += 68;
+        // Anton reaches noticeably higher above its own baseline than
+        // Fraunces at the same size (69px of ascent at 56px vs Fraunces'
+        // 52px, measured) — the paper theme's gap would drive the title's
+        // top edge back into the kicker here.
+        $y += 84;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth, 2);
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth, 2);
     foreach ($titleLines as $line) {
-        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
-        $y += 72;
+        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_MARQUEE_TITLE, $line);
+        $y += 86;
     }
 
     $deckParts = [];
