@@ -26,7 +26,20 @@ $root       = dirname(__DIR__);
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title><?php echo ctx_e($ctx_title); ?></title>
 <?php if (!empty($ctx_meta)) echo $ctx_meta; ?>
-<script>try{var t=localStorage.getItem('ctx-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+<script>try{
+  // The admin panel never gets Marquee — decided server-side, not by a
+  // runtime check, since $ctx_shell is exactly how the rest of the shell
+  // already tells an admin page apart from a public one.
+  var isAdmin = <?php echo $ctx_shell === 'admin-shell' ? 'true' : 'false'; ?>;
+  var fam  = isAdmin ? 'paper' : (localStorage.getItem('ctx-theme-family') || 'paper');
+  var mode = localStorage.getItem('ctx-theme-mode-' + fam);
+  // One-time bridge for a stored preference from before Marquee existed,
+  // when there was only a single 'ctx-theme' light/dark flag.
+  if (mode === null && fam === 'paper') mode = localStorage.getItem('ctx-theme');
+  var theme = fam === 'marquee' ? (mode === 'light' ? 'marquee' : 'marquee-dark')
+                                 : (mode === 'dark' ? 'dark' : null);
+  if (theme) document.documentElement.setAttribute('data-theme', theme);
+}catch(e){}</script>
 <link rel="stylesheet" href="/css/v7.css?v=<?php echo filemtime($root . '/css/v7.css'); ?>" />
 <?php if ($ctx_video): ?>
 <link rel="stylesheet" href="https://vjs.zencdn.net/7.8.3/video-js.css" />

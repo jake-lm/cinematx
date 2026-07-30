@@ -96,7 +96,49 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
   <span class="welcome" id="welcome"<?php echo $first ? ' data-name="' . ctx_e($first) . '"' : ''; ?>>Welcome to the Cinema<?php echo $first ? ', ' . ctx_e($first) : ''; ?></span>
 
   <div class="bar__end">
+    <?php
+    // Marquee theme switcher — parked 2026-07-30. Built and demoed (palettes
+    // in v7.scss, initThemeSwitcher() in v7.js, the family/mode read in
+    // _head.php's FOUC script — none of that needs to change), but held back
+    // rather than shipped. Flip this to `!empty($ctx_admin_nav)` to restore
+    // the swatch popover below on public pages.
+    $ctx_theme_switcher_enabled = false;
+    if (!$ctx_theme_switcher_enabled || !empty($ctx_admin_nav)): ?>
     <button class="ibtn" id="theme" title="Dark"><i class="fa-solid fa-moon"></i></button>
+    <?php else: ?>
+    <?php // Paper/Marquee family plus light/dark mode — admin keeps the plain
+          // button above untouched; initTheme() and initThemeSwitcher() in
+          // v7.js each no-op when their own markup isn't on the page, so the
+          // two never run against each other. ?>
+    <button class="ibtn" id="theme-trigger" title="Theme" aria-haspopup="true" aria-expanded="false"><i class="fa-solid fa-moon"></i></button>
+    <div class="theme-menu" id="theme-menu">
+      <div class="theme-swatches">
+        <button type="button" class="theme-swatch" data-family="paper">
+          <svg class="theme-swatch__art" viewBox="0 0 72 54" xmlns="http://www.w3.org/2000/svg">
+            <rect width="72" height="54" fill="#F4F1EB"/>
+            <rect width="16" height="54" fill="#FBF9F5"/>
+            <rect x="4" y="8" width="8" height="8" rx="2" fill="#922E32"/>
+            <rect x="24" y="8" width="30" height="5" fill="#1A1813"/>
+            <rect x="24" y="20" width="40" height="14" fill="#E5E0D5"/>
+            <rect x="24" y="38" width="24" height="4" fill="#6E6960"/>
+          </svg>
+          <span>Paper</span>
+        </button>
+        <button type="button" class="theme-swatch" data-family="marquee">
+          <svg class="theme-swatch__art" viewBox="0 0 72 54" xmlns="http://www.w3.org/2000/svg">
+            <rect width="72" height="54" fill="#14120F"/>
+            <rect width="16" height="54" fill="#1E1B17"/>
+            <rect x="4" y="8" width="8" height="8" rx="2" fill="#922E32"/>
+            <rect x="24" y="8" width="30" height="5" fill="#F2C14E"/>
+            <rect x="24" y="20" width="40" height="14" fill="#2A2620"/>
+            <rect x="24" y="38" width="24" height="4" fill="#B5AFA0"/>
+          </svg>
+          <span>Marquee</span>
+        </button>
+      </div>
+      <button type="button" class="theme-mode" id="theme-mode"><i class="fa-solid fa-moon"></i><span>Dark</span></button>
+    </div>
+    <?php endif; ?>
     <?php if ($signed): ?>
       <?php if ($full): ?><a class="ibtn" href="/dashboard" title="Write"><i class="fa-solid fa-pen"></i></a><?php endif; ?>
       <form action="/dashboard/signup.php?action=logout" method="post" style="display:flex;">

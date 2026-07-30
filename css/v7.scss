@@ -15,7 +15,7 @@
 //  Changed from v6: paper is the default; dark is the option.
 // ═══════════════════════════════════════════════════════════════════════════
 
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Instrument+Sans:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Instrument+Sans:wght@400;500;600&family=Anton&display=swap");
 
 :root {
   // ── Paper (default) ──────────────────────────────────────────────────────
@@ -48,6 +48,11 @@
   --f-display: 'Fraunces', Georgia, serif;
   --f-read:    'Newsreader', Georgia, serif;
   --f-ui:      'Instrument Sans', system-ui, sans-serif;
+  // Card/row/theatre titles only — Marquee overrides this to Anton, but
+  // long-form headings (essays, modal titles) stay on --f-display even
+  // there, since a tall condensed poster face gets hard to read past a
+  // few words.
+  --f-title:   var(--f-display);
 
   --t-3xs: 9px;
   --t-2xs: 10px;
@@ -103,6 +108,57 @@
   // Page ground and theatre ground are close in dark mode, so lift the
   // theatre a step and edge it or it dissolves into the page.
   .theatre-card { background: var(--dark-2); box-shadow: inset 0 0 0 1px var(--dark-rule); }
+}
+
+// ── Marquee (opt-in, a second identity rather than a Paper recolor) ────────
+// A theatre marquee at night. Reuses the same "fixed, never flip" theatre
+// tokens .app--screening already pins a dark room to, since a dark Marquee
+// IS that same theatre-at-night look — not a coincidence, the Instagram
+// Marquee post theme (list/instagram.php) landed on the exact same
+// background/ink pair independently. Red stays red — only gold and the
+// title face are theme-specific here.
+:root[data-theme="marquee-dark"] {
+  --bg:        var(--dark);
+  --surface:   var(--dark);
+  --surface-2: var(--dark-2);
+  --surface-3: #2A2620;
+  --line:      var(--dark-rule);
+  --line-2:    rgba(242, 238, 229, 0.26);
+
+  --text:   var(--dark-ink);
+  --text-2: var(--dark-2nd);
+  --text-3: var(--dark-2nd);
+  --text-4: var(--dark-3rd);
+
+  --red-hi: var(--dark-red);
+  --gold:   #F2C14E;
+  --f-title: 'Anton', Impact, sans-serif;
+
+  color-scheme: dark;
+}
+
+// Marquee's light half has no reference to copy — the Instagram theme is
+// dark-only — so this is a new "poster card by daylight" palette: a warmer,
+// more saturated ground than Paper, so the two light options read as
+// different identities rather than one reskinned into the other.
+:root[data-theme="marquee"] {
+  --bg:        #F5EBD1;
+  --surface:   #FFFBF0;
+  --surface-2: #F0E4C0;
+  --surface-3: #E3D3A0;
+  --line:      rgba(60, 40, 10, 0.14);
+  --line-2:    rgba(60, 40, 10, 0.22);
+
+  --text:   #221A0E;
+  --text-2: #5C4A2E;
+  --text-3: #786239;
+  --text-4: #A6935F;
+
+  --red-hi: var(--red);
+  --gold:   #B8860B;   // darker ochre — Instagram's bright gold fails contrast on this ground
+  --f-title: 'Anton', Impact, sans-serif;
+
+  color-scheme: light;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -557,7 +613,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .shot__title {
   margin-top: var(--s-2);
-  font-family: var(--f-display);
+  font-family: var(--f-title);
   font-size: var(--t-sm);
   font-weight: 600;
   line-height: 1.2;
@@ -621,7 +677,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .line__time  { @include label(var(--t-2xs), var(--red-hi)); }
-.line__title { font-size: var(--t-md); font-family: var(--f-display); font-weight: 600;
+.line__title { font-size: var(--t-md); font-family: var(--f-title); font-weight: 600;
               text-transform: uppercase; letter-spacing: 0.01em;
                line-height: 1.2; color: var(--text);
                transition: color var(--t-fast) var(--ease); }
@@ -1426,7 +1482,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .theatre__bar  { border-bottom: 1px solid var(--dark-rule); }
 .theatre__foot { border-top: 1px solid var(--dark-rule); }
-.theatre__name { font-family: var(--f-display); font-size: var(--t-md); font-weight: 600; }
+.theatre__name { font-family: var(--f-title); font-size: var(--t-md); font-weight: 600; }
 .theatre__meta { margin-left: auto; @include label(var(--t-3xs), var(--dark-3rd)); }
 .theatre__close {
   margin-left: auto; padding: var(--s-2) var(--s-4);
@@ -2125,7 +2181,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .fold__meta  { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.fold__title { font-family: var(--f-display); font-size: var(--t-sm); font-weight: 600;
+.fold__title { font-family: var(--f-title); font-size: var(--t-sm); font-weight: 600;
                color: var(--text); line-height: 1.2;
                text-transform: uppercase; letter-spacing: 0.01em; }
 .fold__bits  { @include label(var(--t-3xs), var(--text-4)); }
@@ -2189,7 +2245,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .deep__head { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; }
 .deep__title {
-  font-family: var(--f-display); font-size: var(--t-lg); font-weight: 600;
+  font-family: var(--f-title); font-size: var(--t-lg); font-weight: 600;
   text-transform: uppercase; letter-spacing: 0.01em;
   color: var(--text); line-height: 1.2;
   transition: color var(--t-fast) var(--ease);
@@ -3106,4 +3162,71 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .draft-row  { flex-wrap: wrap; }
   .draft-date { margin-left: 0; }
   .write-wrap { padding: var(--s-4); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  THEME SWITCHER — a small popover replacing the old single sun/moon
+//  button, since there's now a family (Paper/Marquee) to pick as well as a
+//  light/dark mode. Reuses two patterns already in the codebase rather than
+//  inventing a third: the body-reparented, positioned-under-its-trigger
+//  popover initYouMenu() already implements, and the illustrated swatch
+//  picker built for the Instagram admin page (.ig-theme-swatch above).
+// ═══════════════════════════════════════════════════════════════════════════
+
+.theme-menu {
+  position: fixed;
+  z-index: 720;
+  display: none;
+  flex-direction: column;
+  gap: var(--s-3);
+  width: 200px;
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);   // shadow reads upward, same as .you-menu
+  &.is-on { display: flex; }
+}
+
+.theme-swatches { display: flex; gap: var(--s-2); }
+.theme-swatch {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
+  padding: var(--s-2);
+  background: none;
+  border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer;
+  @include label(9px, var(--text-3));
+  transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  &:hover { border-color: var(--line-2); }
+  &.is-on { border-color: var(--red-hi); background: var(--surface-2); color: var(--text); }
+}
+// Hardcoded per-theme hex rather than var(--bg) etc. — the point of a swatch
+// is to preview a theme that ISN'T the one currently active, so it can't
+// read the live custom properties without showing the wrong thing.
+.theme-swatch__art {
+  display: block; width: 64px; height: 48px;
+  border-radius: 4px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.theme-mode {
+  display: flex; align-items: center; justify-content: center; gap: var(--s-2);
+  height: 34px;
+  background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 7px;
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: var(--t-xs); font-weight: 500;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  &:hover { background: var(--surface-3); color: var(--text); }
+  i { font-size: var(--t-sm); }
+}
+
+// Showtimes in gold — the one flourish beyond palette and type, the same
+// swap ig_build_list_page_marquee() makes for the Instagram post.
+:root[data-theme="marquee"],
+:root[data-theme="marquee-dark"] {
+  .line__time { color: var(--gold); }
+  .deep__time { color: var(--gold); border-color: var(--gold); }
 }

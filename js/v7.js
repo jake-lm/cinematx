@@ -282,6 +282,88 @@
     });
   }
 
+  // ══ Theme switcher ═══════════════════════════════════════════════════════
+  // Public-site-only replacement for the plain sun/moon button above — the
+  // admin panel keeps #theme and initTheme() completely unchanged, since a
+  // page only ever renders one of #theme or #theme-trigger and each init
+  // no-ops when its markup is absent. Adds a family (Paper/Marquee) on top
+  // of light/dark: a swatch pair mirrors the picker already built for the
+  // Instagram admin page, and the mode button applies to whichever family
+  // is active. Each family remembers its own last mode (ctx-theme-mode-<fam>)
+  // rather than one shared flag — that's what makes Marquee "default dark,
+  // still toggle to light" work with no special case: the first time
+  // there's simply no stored mode for it yet.
+  function initThemeSwitcher() {
+    var trigger = $('#theme-trigger'), menu = $('#theme-menu');
+    if (!trigger || !menu) return;
+
+    // Escapes the bar's own stacking context, same reason the You menu and
+    // the custom-select menu both live at the body level.
+    document.body.appendChild(menu);
+
+    var modeBtn  = $('.theme-mode', menu);
+    var swatches = $$('.theme-swatch', menu);
+
+    function family() { return store.get('ctx-theme-family') || 'paper'; }
+    function mode(fam) {
+      // The legacy fallback matches the same one-time bridge in _head.php's
+      // inline FOUC script, so a returning dark-mode visitor's preference
+      // survives the switch to per-family storage instead of silently
+      // resetting to light the first time this runs.
+      var stored = store.get('ctx-theme-mode-' + fam) || (fam === 'paper' ? store.get('ctx-theme') : null);
+      return stored || (fam === 'marquee' ? 'dark' : 'light');
+    }
+
+    function paint() {
+      var fam = family(), m = mode(fam), dark = m === 'dark';
+      var theme = fam === 'marquee' ? (dark ? 'marquee-dark' : 'marquee') : (dark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+
+      swatches.forEach(function (s) { s.classList.toggle('is-on', s.getAttribute('data-family') === fam); });
+      modeBtn.innerHTML = '<i class="fa-solid fa-' + (dark ? 'sun' : 'moon') + '"></i><span>' + (dark ? 'Light' : 'Dark') + '</span>';
+      trigger.innerHTML = '<i class="fa-solid fa-' + (dark ? 'moon' : 'sun') + '"></i>';
+      trigger.title = fam.charAt(0).toUpperCase() + fam.slice(1) + ', ' + m;
+    }
+    paint();
+
+    swatches.forEach(function (s) {
+      s.addEventListener('click', function () {
+        store.set('ctx-theme-family', s.getAttribute('data-family'));
+        paint();
+      });
+    });
+    modeBtn.addEventListener('click', function () {
+      var fam = family();
+      store.set('ctx-theme-mode-' + fam, mode(fam) === 'dark' ? 'light' : 'dark');
+      paint();
+    });
+
+    function place() {
+      var r = trigger.getBoundingClientRect();
+      var w = menu.offsetWidth;
+      var left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+      menu.style.left = Math.round(left) + 'px';
+      menu.style.top  = Math.round(r.bottom + 8) + 'px';
+    }
+    function open()  { menu.classList.add('is-on'); place(); trigger.setAttribute('aria-expanded', 'true'); }
+    function close() { menu.classList.remove('is-on'); trigger.setAttribute('aria-expanded', 'false'); }
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('is-on')) close(); else open();
+    });
+    // Mirrors the You menu: closing on scroll rather than repositioning,
+    // and any click outside either the trigger or the open menu closes it.
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('is-on')) return;
+      if (e.target.closest && (e.target.closest('.theme-menu') || e.target === trigger || trigger.contains(e.target))) return;
+      close();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+  }
+
   // ══ Rail ═════════════════════════════════════════════════════════════════
 
   function initRail() {
@@ -1261,7 +1343,7 @@
   }
 
   function boot() {
-    initWelcome(); initTheme(); initRail(); initList();
+    initWelcome(); initTheme(); initThemeSwitcher(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
