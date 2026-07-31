@@ -202,6 +202,87 @@ function ctx_fold_venue(array $films, $venue, $min = 3) {
 }
 
 /**
+ * Fold one AFS festival's screenings for a day into a single entry — the
+ * exact same shape ctx_fold_venue() produces above (group_id, films,
+ * n_films, n_showings, posters, day_label, and 'venue' as the headline
+ * string), so every renderer that already understands a folded card
+ * (ctx_fold_card(), ctx_fold_children(), ctx_group_sheet()) works
+ * unmodified: none of them know or care whether "venue" names a cinema
+ * chain or a festival. Only entries carrying a detected 'festival' (see
+ * afs_is_festival() in scraper_afs.php) are eligible, and — unlike
+ * ctx_fold_venue() above — every detected festival folds in one pass
+ * rather than needing to be named, since there's no fixed list of them.
+ *
+ * The threshold counts distinct FILMS, not raw showings. ctx_fold_venue()
+ * can use showing-count as a stand-in for film-count because a chain
+ * booking the same title into five cinemas is still "five things
+ * happening" in the sense that matters there. Here it would be wrong: a
+ * single popular festival film shown twice in a day must not read as
+ * "3 films" when it's genuinely one.
+ */
+function ctx_fold_festival(array $films, $min = 3) {
+    $tz   = new DateTimeZone('America/Chicago');
+    $out  = [];
+    $days = [];
+
+    foreach ($films as $f) {
+        $festival = $f['festival'] ?? null;
+        if ($festival === null) { $out[] = $f; continue; }
+        $day = (new DateTime('@' . $f['timestamp']))->setTimezone($tz)->format('Ymd');
+        $days[$festival . '|' . $day][] = $f;
+    }
+
+    foreach ($days as $key => $group) {
+        [$festival, $day] = explode('|', $key, 2);
+        usort($group, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+
+        // One line per film, its showings gathered under it — built before
+        // the threshold check, since the threshold is about films, not rows.
+        $byFilm = [];
+        foreach ($group as $f) {
+            $k = $f['display_title'] ?? $f['title'];
+            if (!isset($byFilm[$k])) { $byFilm[$k] = $f; $byFilm[$k]['showings'] = []; }
+            $byFilm[$k]['showings'][] = ['t' => $f['timestamp'], 'loc' => $f['location'] ?? ''];
+        }
+
+        if (count($byFilm) < $min) { foreach ($group as $f) $out[] = $f; continue; }
+
+        $art = [];
+        foreach ($byFilm as $f) if (!empty($f['poster'])) $art[] = $f['poster'];
+
+        $depth   = min(3, max(count($art), count($group)));
+        $posters = [];
+        for ($i = 0; $i < $depth && $art; $i++) $posters[] = $art[$i % count($art)];
+
+        $out[] = [
+            'is_group'      => true,
+            'group_id'      => ctx_slug($festival) . '-' . $day,
+            'venue'         => $festival,
+            'location'      => null,
+            'source'        => 'official',
+            'timestamp'     => $group[0]['timestamp'],
+            'title'         => $festival,
+            'display_title' => $festival,
+            'series'        => null,
+            // Carried through so ctx_fold_card() can tell this apart from an
+            // ordinary Alamo/Fathom venue fold and give it the same banner
+            // an unfolded festival card gets — otherwise a stack of festival
+            // films looks exactly like a stack of a chain's schedule.
+            'festival'      => $festival,
+            'url'           => '#',
+            'films'         => array_values($byFilm),
+            'n_films'       => count($byFilm),
+            'n_showings'    => count($group),
+            'posters'       => $posters,
+            'day_label'     => (new DateTime('@' . $group[0]['timestamp']))->setTimezone($tz)->format('l j F'),
+        ];
+    }
+
+    usort($out, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    return $out;
+}
+
+/**
  * A few of the titles inside a folded card: "Rashomon, Arco, Casualties of War
  * + 3 more". Naming them beats counting them — "6 films" tells you the size of
  * the thing, not whether you want it.
@@ -282,6 +363,10 @@ function ctx_fold_card($s, $view) {
     if ($view === 'grid') { ?>
       <a class="shot shot--fold" <?php echo $attrs; ?> href="#">
         <span class="shot__art fold__stack">
+          <?php // Same banner an unfolded festival card gets — without it,
+                // a stack of festival films looks exactly like a stack of a
+                // chain's schedule until you read the small text below. ?>
+          <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
           <?php // Two or three faces, back to front, so the offset reads as a
                 // pile of films rather than one card with a heavy border. ?>
           <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
@@ -296,7 +381,10 @@ function ctx_fold_card($s, $view) {
       <a class="line line--fold" <?php echo $attrs; ?> href="#">
         <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
         <span>
-          <span class="line__title"><?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span></span>
+          <span class="line__title">
+            <?php if (!empty($s['festival'])): ?><i class="fa-solid fa-clapperboard line__festival-icon" title="Film festival"></i><?php endif; ?>
+            <?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span>
+          </span>
           <span class="line__sub"><?php echo $e(ctx_fold_titles($s['films'])); ?></span>
         </span>
         <span class="line__venue"><?php echo date('D', $s['timestamp']); ?></span>
@@ -428,13 +516,14 @@ function ctx_deep_card($s, $now) {
        data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
        data-count="<?php echo count($times); ?>">
       <span class="deep__art">
+        <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
         <?php if (!empty($s['poster'])): ?>
         <img src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
         <?php else: ?><span class="shot__blank"><?php echo $e($s['display_title']); ?></span><?php endif; ?>
       </span>
       <span class="deep__body">
         <span class="deep__head">
-          <span class="deep__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
+          <span class="deep__title"><?php echo $e($s['display_title']); ?><?php if (empty($s['festival']) && !empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
           <?php if ($member): ?><span class="shot__by">&#9679; By a member</span><?php endif; ?>
         </span>
         <?php if ($bits): ?><span class="deep__bits"><?php echo $e(implode(' · ', $bits)); ?></span><?php endif; ?>
@@ -470,6 +559,7 @@ function ctx_deep_fold(array $s) {
     <div class="deep deep--fold" data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="venue"
          data-count="<?php echo (int)$s['n_showings']; ?>">
       <span class="deep__stack fold__stack">
+        <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
         <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
         <img class="fold__face fold__face--<?php echo count($s['posters']) - $i; ?>" src="<?php echo $e($p); ?>" alt="" />
         <?php endforeach; ?>

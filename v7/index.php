@@ -42,6 +42,10 @@ $counts       = ctx_venue_counts($films);
 $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
 $films = ctx_fold_venue($films, 'Fathom Events', 2);
 
+// A festival's own threshold (3+ distinct films in a day) is fixed rather
+// than tuned per page — see ctx_fold_festival().
+$films = ctx_fold_festival($films);
+
 // Then a single film with more than one showing across the two days — an
 // alamo stack of its own, so two Spirited Aways read as one film on two
 // evenings rather than as a duplicate.
@@ -123,6 +127,7 @@ require __DIR__ . '/_chrome.php';
                data-count="<?php echo count($times); ?>"<?php echo ctx_screening_hover($s); ?>
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="shot__art<?php echo $stack ? ' fold__stack' : ''; ?>">
+                <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
                 <?php if (!empty($s['poster'])): ?>
                   <?php // One face per showing, capped at three — the stack says
                         // "more than one evening" without needing to be counted. ?>
@@ -159,7 +164,10 @@ require __DIR__ . '/_chrome.php';
                href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
               <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
               <span>
-                <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
+                <span class="line__title"><?php echo $e($s['display_title']); ?>
+                  <?php if (!empty($s['festival'])): ?><span class="line__festival"><?php echo $e($s['festival']); ?></span>
+                  <?php elseif (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?>
+                </span>
                 <span class="line__sub">
                   <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
                   <?php echo $e(implode(' · ', ctx_bits($s))); ?>

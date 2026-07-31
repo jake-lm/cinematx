@@ -31,6 +31,12 @@ $entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
 // rows at the same minute — the same shape, folded the same way.
 $entries = ctx_fold_venue($entries, 'Fathom Events', 3);
 
+// A named AFS festival (Pan African Film Festival, etc.) — see
+// ctx_fold_festival() for why its threshold counts distinct films rather
+// than raw showings, and why it isn't called with a specific name like the
+// two folds above are.
+$entries = ctx_fold_festival($entries);
+
 // Every folded card opens a panel; they are collected as we render.
 $ctx_extra_sheets = '';
 
@@ -77,6 +83,7 @@ function ctx_screening($s, $view) {
     if ($view === 'grid') { ?>
       <a class="shot<?php echo $member ? ' shot--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>
         <span class="shot__art">
+          <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
           <?php if (!empty($s['poster'])): ?>
           <img src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
           <?php else: ?>
@@ -96,7 +103,10 @@ function ctx_screening($s, $view) {
       <a class="line<?php echo $member ? ' line--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>
         <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
         <span>
-          <span class="line__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
+          <span class="line__title"><?php echo $e($s['display_title']); ?>
+            <?php if (!empty($s['festival'])): ?><span class="line__festival"><?php echo $e($s['festival']); ?></span>
+            <?php elseif (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?>
+          </span>
           <span class="line__sub">
             <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
             <?php echo $e(implode(' · ', ctx_bits($s))); ?>
