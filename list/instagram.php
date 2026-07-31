@@ -13,6 +13,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 require_once __DIR__ . '/fetch_screenings.php';
+require_once dirname(__DIR__) . '/v7/screenings.php';
 
 define('IG_GRAPH_VERSION', 'v21.0');
 define('IG_FONT_HEADLINE', dirname(__DIR__) . '/assets/fonts/Fraunces-Bold.ttf');
@@ -38,6 +39,23 @@ function ig_today_films($conn) {
     $end   = strtotime('tomorrow') - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
     $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    // The raw scrape misses posters for anything a venue re-bills with extra
+    // billing baked into the title — "PHAT GIRLZ (20th Anniversary)" doesn't
+    // match TMDB, "PHAT GIRLZ" does. v7/screenings.php's ctx_enrich() already
+    // solves this with a cleaned-title second-chance lookup (that's what
+    // fixes it on /list and the homepage); this just needed to run here too.
+    $films = ctx_enrich($films);
+
+    // Every card/caption renderer here reads $film['title'] directly rather
+    // than knowing about display_title vs. the raw scrape — folding the
+    // enriched title in here means the poster fix and the title cleanup
+    // land together everywhere at once, not just wherever someone remembers
+    // to check for display_title.
+    foreach ($films as &$f) {
+        if (!empty($f['display_title'])) $f['title'] = $f['display_title'];
+    }
+    unset($f);
+
     return ig_group_showtimes($films);
 }
 
