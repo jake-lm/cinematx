@@ -653,6 +653,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .shot__festival {
   position: absolute;
   top: 0; left: 0; right: 0;
+  // On a folded stack the poster faces (.fold__face--1/2/3) carry their own
+  // z-index up to 3 so they pile correctly — without a higher one here, the
+  // front-most face buries this banner instead of the banner sitting on top.
+  z-index: 5;
   padding: 4px var(--s-2);
   background: var(--red);
   @include label(9px, #fff);

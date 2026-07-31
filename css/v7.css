@@ -834,6 +834,7 @@ button, input, select, textarea {
   top: 0;
   left: 0;
   right: 0;
+  z-index: 5;
   padding: 4px var(--s-2);
   background: var(--red);
   font-family: var(--f-ui);
