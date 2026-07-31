@@ -861,6 +861,12 @@ button, input, select, textarea {
   color: var(--red-hi);
 }
 
+.line__festival-icon {
+  margin-right: 3px;
+  font-size: var(--t-3xs);
+  color: var(--red-hi);
+}
+
 .shot__venue {
   margin-top: 2px;
   font-family: var(--f-ui);

@@ -675,6 +675,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--red-hi);
 }
 
+// The folded festival row's title is already the festival's own name (it's
+// standing in for "venue"), so a second text label would just repeat it —
+// this is a small glanceable marker instead, distinguishing the row from an
+// ordinary Alamo/Fathom venue fold at a glance rather than only on reading.
+.line__festival-icon {
+  margin-right: 3px;
+  font-size: var(--t-3xs);
+  color: var(--red-hi);
+}
+
 // Venue, year and runtime share this line. Clamped rather than ellipsised so
 // a long venue name costs a second line instead of eating the runtime.
 .shot__venue {

@@ -264,6 +264,11 @@ function ctx_fold_festival(array $films, $min = 3) {
             'title'         => $festival,
             'display_title' => $festival,
             'series'        => null,
+            // Carried through so ctx_fold_card() can tell this apart from an
+            // ordinary Alamo/Fathom venue fold and give it the same banner
+            // an unfolded festival card gets — otherwise a stack of festival
+            // films looks exactly like a stack of a chain's schedule.
+            'festival'      => $festival,
             'url'           => '#',
             'films'         => array_values($byFilm),
             'n_films'       => count($byFilm),
@@ -358,6 +363,10 @@ function ctx_fold_card($s, $view) {
     if ($view === 'grid') { ?>
       <a class="shot shot--fold" <?php echo $attrs; ?> href="#">
         <span class="shot__art fold__stack">
+          <?php // Same banner an unfolded festival card gets — without it,
+                // a stack of festival films looks exactly like a stack of a
+                // chain's schedule until you read the small text below. ?>
+          <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
           <?php // Two or three faces, back to front, so the offset reads as a
                 // pile of films rather than one card with a heavy border. ?>
           <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
@@ -372,7 +381,10 @@ function ctx_fold_card($s, $view) {
       <a class="line line--fold" <?php echo $attrs; ?> href="#">
         <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
         <span>
-          <span class="line__title"><?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span></span>
+          <span class="line__title">
+            <?php if (!empty($s['festival'])): ?><i class="fa-solid fa-clapperboard line__festival-icon" title="Film festival"></i><?php endif; ?>
+            <?php echo $e($s['venue']); ?><span class="line__series"><?php echo $e($label); ?></span>
+          </span>
           <span class="line__sub"><?php echo $e(ctx_fold_titles($s['films'])); ?></span>
         </span>
         <span class="line__venue"><?php echo date('D', $s['timestamp']); ?></span>
@@ -547,6 +559,7 @@ function ctx_deep_fold(array $s) {
     <div class="deep deep--fold" data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="venue"
          data-count="<?php echo (int)$s['n_showings']; ?>">
       <span class="deep__stack fold__stack">
+        <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
         <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
         <img class="fold__face fold__face--<?php echo count($s['posters']) - $i; ?>" src="<?php echo $e($p); ?>" alt="" />
         <?php endforeach; ?>
