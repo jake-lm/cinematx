@@ -56,7 +56,22 @@ function ig_today_films($conn) {
     }
     unset($f);
 
-    return ig_group_showtimes($films);
+    $films = ig_group_showtimes($films);
+
+    $featured = ig_featured_read($start);
+    foreach ($films as &$f) {
+        $f['featured'] = in_array(ig_film_key($f), $featured, true);
+    }
+    unset($f);
+
+    return $films;
+}
+
+// Same identity a film has for grouping repeat showtimes and for the
+// Featured checkboxes — title+venue+location, already unique enough within
+// one day's window that nothing else is needed.
+function ig_film_key(array $film) {
+    return mb_strtolower(trim($film['title'])) . '|' . $film['venue'] . '|' . ($film['location'] ?? '');
 }
 
 /**
@@ -71,7 +86,7 @@ function ig_today_films($conn) {
 function ig_group_showtimes(array $films) {
     $groups = [];
     foreach ($films as $film) {
-        $key = mb_strtolower(trim($film['title'])) . '|' . $film['venue'] . '|' . ($film['location'] ?? '');
+        $key = ig_film_key($film);
         if (isset($groups[$key])) {
             $groups[$key]['timestamps'][] = $film['timestamp'];
         } else {
@@ -127,6 +142,28 @@ function ig_pill($im, $x1, $y1, $x2, $y2, $color) {
     imagefilledrectangle($im, $x1 + $r, $y1, $x2 - $r, $y2, $color);
     imagefilledellipse($im, $x1 + $r, $y1 + $r, $r * 2, $r * 2, $color);
     imagefilledellipse($im, $x2 - $r, $y1 + $r, $r * 2, $r * 2, $color);
+}
+
+// Vertices of a 5-pointed star centered at ($cx, $cy), alternating outer/
+// inner radius, one point straight up — for imagefilledpolygon().
+function ig_star_points($cx, $cy, $outerR, $innerR) {
+    $points = [];
+    for ($i = 0; $i < 10; $i++) {
+        $r = ($i % 2 === 0) ? $outerR : $innerR;
+        $angle = -M_PI / 2 + $i * (M_PI / 5);
+        $points[] = $cx + $r * cos($angle);
+        $points[] = $cy + $r * sin($angle);
+    }
+    return $points;
+}
+
+// The Featured emblem pinned on a poster thumbnail's corner — a filled
+// circle with a star cut into it, small enough that it doesn't need to be a
+// legible word the way the spotlight page's pill does. Same shape on every
+// theme; only the two colors change.
+function ig_draw_featured_badge($im, $cx, $cy, $badgeColor, $starColor, $radius = 20) {
+    imagefilledellipse($im, $cx, $cy, $radius * 2, $radius * 2, $badgeColor);
+    imagefilledpolygon($im, ig_star_points($cx, $cy, (int) ($radius * 0.62), (int) ($radius * 0.62 * 0.5)), $starColor);
 }
 
 // Downloads a poster (TMDB, w300) once and caches it — the same handful of
@@ -324,6 +361,13 @@ function ig_build_list_page_paper(array $films, $date) {
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
         }
 
+        // Pinned on the poster's corner rather than a text line — the row
+        // height is shared by every film on the page (Auto mode's pagination
+        // depends on it), so Featured can't grow the row it's on.
+        if (!empty($film['featured'])) {
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $ink, $paper);
+        }
+
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
 
@@ -412,6 +456,10 @@ function ig_build_list_page_marquee(array $films, $date) {
             $ibox = imagettfbbox(36, 0, IG_FONT_MARQUEE_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_MARQUEE_TITLE, $initial);
+        }
+
+        if (!empty($film['featured'])) {
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $ink, $bg);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
@@ -551,6 +599,19 @@ function ig_build_feature_page_paper(array $film, $date) {
     $pillPadX = 30;
     $pillH    = 60;
     $py       = 70;
+
+    // An editorial call-out, not a logistics detail like the showtime below
+    // it — kept in a different color (ink, not the showtime pill's red) so
+    // the two read as two different kinds of tag rather than a repeated one.
+    if (!empty($film['featured'])) {
+        $label = 'FEATURED';
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $ink);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $paper, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
+
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
         $label = date('g:i A', $ts);
@@ -661,6 +722,18 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $pillPadX = 30;
     $pillH    = 60;
     $py       = 70;
+
+    // Cream rather than gold — gold already means "showtime" on this theme,
+    // so Featured gets its own color to read as a different kind of tag.
+    if (!empty($film['featured'])) {
+        $label = 'FEATURED';
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $ink);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
+
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
         $label = date('g:i A', $ts);
@@ -850,6 +923,28 @@ function ig_compose_write($date, array $compose) {
     file_put_contents(ig_compose_path($date), json_encode($compose + IG_COMPOSE_DEFAULT));
 }
 
+// Which films the editorial board checked as Featured today — cosmetic only
+// for now (a badge on the list card, a pill on the spotlight page, priority
+// for spotlight slots), not yet a site-wide concept. Keyed by ig_film_key()
+// rather than array position, so it survives the scrape re-running with a
+// different film order.
+function ig_featured_path($date) {
+    return dirname(__DIR__) . '/uploads/social/featured-' . date('Y-m-d', $date) . '.json';
+}
+
+function ig_featured_read($date) {
+    $file = ig_featured_path($date);
+    if (!file_exists($file)) return [];
+    $data = json_decode(file_get_contents($file), true);
+    return is_array($data) ? $data : [];
+}
+
+function ig_featured_write($date, array $keys) {
+    $dir = dirname(__DIR__) . '/uploads/social';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    file_put_contents(ig_featured_path($date), json_encode(array_values($keys)));
+}
+
 /**
  * Renders today's screenings into one or more GD images per the saved (or
  * default) composition choice — the single place all three callers (admin
@@ -882,8 +977,17 @@ function ig_build_images(array $films, $date, array $compose) {
     }
 
     if (!empty($compose['features'])) {
+        // Featured films fill spotlight slots first — still chronological
+        // among themselves — so a busy day with limited slots doesn't leave
+        // an editorial pick without its page. array_filter preserves order
+        // within each group; this only moves featured ones ahead of it.
+        $ordered = array_merge(
+            array_values(array_filter($films, fn($f) => !empty($f['featured']))),
+            array_values(array_filter($films, fn($f) => empty($f['featured'])))
+        );
+
         $slotsLeft = 10 - count($images);
-        foreach ($films as $film) {
+        foreach ($ordered as $film) {
             if ($slotsLeft <= 0) break;
             $images[] = ig_build_feature_page($film, $date, $theme);
             $slotsLeft--;

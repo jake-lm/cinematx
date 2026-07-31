@@ -264,22 +264,35 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <span class="card__title">On the card</span>
               <span class="adm-count"><?php echo count($films); ?></span>
             </div>
-            <div class="card__body card__body--flush">
-              <?php foreach ($films as $f): ?>
-              <div class="adm-row">
-                <span class="adm-row__text">
-                  <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
-                  <span class="adm-row__sub">
-                    <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
+            <?php if ($films): ?>
+            <form action="/_admin/instagram_featured.php" method="post">
+              <?php echo admin_csrf_field(); ?>
+              <div class="card__body card__body--flush">
+                <?php foreach ($films as $f): ?>
+                <label class="adm-row adm-row--check">
+                  <input type="checkbox" name="featured[]" value="<?php echo $e(ig_film_key($f)); ?>"<?php echo !empty($f['featured']) ? ' checked' : ''; ?>>
+                  <span class="adm-row__text">
+                    <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
+                    <span class="adm-row__sub">
+                      <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
+                    </span>
                   </span>
-                </span>
-                <span class="adm-row__when"><?php echo $e(ig_format_times($f['timestamps'] ?? [$f['timestamp']])); ?></span>
+                  <span class="adm-row__when"><?php echo $e(ig_format_times($f['timestamps'] ?? [$f['timestamp']])); ?></span>
+                </label>
+                <?php endforeach; ?>
               </div>
-              <?php endforeach; ?>
-              <?php if (!$films): ?>
+              <div class="card__body">
+                <div class="admin-note" style="margin:0 0 var(--s-3)">
+                  Cosmetic for now &mdash; a badge on the card, priority for spotlight slots. Checked films fill spotlight pages first when there isn't room for everyone.
+                </div>
+                <button class="btn btn--quiet btn--sm" type="submit">Save featured</button>
+              </div>
+            </form>
+            <?php else: ?>
+            <div class="card__body card__body--flush">
               <div class="adm-empty">Nothing scraped for today</div>
-              <?php endif; ?>
             </div>
+            <?php endif; ?>
           </section>
 
           <section class="card adm-card">

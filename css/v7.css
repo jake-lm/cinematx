@@ -2885,6 +2885,14 @@ button, input, select, textarea {
   gap: var(--s-2);
 }
 
+.adm-row--check {
+  cursor: pointer;
+}
+.adm-row--check input[type=checkbox] {
+  flex: none;
+  accent-color: var(--red);
+}
+
 .vis {
   --vis-h: 96px;
   --vis-gap: 5px;

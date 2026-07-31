@@ -1887,6 +1887,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .adm-row__when { flex: none; @include label(var(--t-3xs), var(--red-hi)); }
 .adm-row__end  { flex: none; display: flex; align-items: center; gap: var(--s-2); }
 
+// A row that's also its own checkbox label — Featured, in "On the card".
+.adm-row--check {
+  cursor: pointer;
+  input[type="checkbox"] { flex: none; accent-color: var(--red); }
+}
+
 // ── Visitor graph ───────────────────────────────────────────────────────────
 // A stack, not an overlay: unique visitors at the base, the repeat visits they
 // generated above it. The column total is connections, so the red block reads
