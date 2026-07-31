@@ -459,7 +459,7 @@ function ig_build_list_page_marquee(array $films, $date) {
         }
 
         if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $ink, $bg);
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $bg);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
@@ -723,13 +723,14 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $pillH    = 60;
     $py       = 70;
 
-    // Cream rather than gold — gold already means "showtime" on this theme,
-    // so Featured gets its own color to read as a different kind of tag.
+    // Gold, same as the showtime pill and the bulb frame — the theme's one
+    // signature color, distinguished from the showtime pill by its text
+    // rather than a second accent color.
     if (!empty($film['featured'])) {
         $label = 'FEATURED';
         $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
         $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $ink);
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
         $py += $pillH + 14;
     }
