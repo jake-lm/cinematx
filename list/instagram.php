@@ -407,17 +407,13 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     // actually swipe to — that's the only case that earns the arrow.
     $totalMore = $extra + $moreCount;
     if ($totalMore > 0) {
-        $label = "+{$totalMore} MORE";
-        $pillH = 44;
-        $pillPadX = 24;
-        $box = imagettfbbox(24, 0, IG_FONT_BODY, $label);
-        $tw  = $box[2] - $box[0];
-        $py  = $y + 8;
-        $arrowGap = $moreCount > 0 ? 34 : 0;
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2 + $arrowGap, $py + $pillH, $red);
-        imagettftext($im, 24, 0, $margin + $pillPadX, $py + $pillH - 14, $paper, IG_FONT_BODY, $label);
+        $label   = "+{$totalMore} MORE";
+        $textY   = $y + 38;
+        imagettftext($im, 28, 0, $margin, $textY, $red, IG_FONT_BODY, $label);
         if ($moreCount > 0) {
-            ig_draw_chevron($im, $margin + $pillPadX + $tw + 20, $py + (int) ($pillH / 2), 8, $paper);
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            ig_draw_chevron($im, $margin + $tw + 20, $textY - 12, 8, $red);
         }
     }
 
@@ -513,17 +509,13 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
 
     $totalMore = $extra + $moreCount;
     if ($totalMore > 0) {
-        $label = "+{$totalMore} MORE";
-        $pillH = 44;
-        $pillPadX = 24;
-        $box = imagettfbbox(24, 0, IG_FONT_BODY, $label);
-        $tw  = $box[2] - $box[0];
-        $py  = $y + 8;
-        $arrowGap = $moreCount > 0 ? 34 : 0;
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2 + $arrowGap, $py + $pillH, $gold);
-        imagettftext($im, 24, 0, $margin + $pillPadX, $py + $pillH - 14, $bg, IG_FONT_BODY, $label);
+        $label   = "+{$totalMore} MORE";
+        $textY   = $y + 38;
+        imagettftext($im, 28, 0, $margin, $textY, $gold, IG_FONT_BODY, $label);
         if ($moreCount > 0) {
-            ig_draw_chevron($im, $margin + $pillPadX + $tw + 20, $py + (int) ($pillH / 2), 8, $bg);
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            ig_draw_chevron($im, $margin + $tw + 20, $textY - 12, 8, $gold);
         }
     }
 
