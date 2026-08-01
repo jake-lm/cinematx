@@ -166,14 +166,18 @@ function ig_draw_featured_badge($im, $cx, $cy, $badgeColor, $starColor, $radius 
     imagefilledpolygon($im, ig_star_points($cx, $cy, (int) ($radius * 0.62), (int) ($radius * 0.62 * 0.5)), $starColor);
 }
 
-// A drawn chevron rather than a "→" glyph — same reasoning as the star:
-// nothing guarantees an arrow is in either font, so it gets drawn instead
-// of trusted to render. $cx/$cy is the arrow's own center.
-function ig_draw_chevron($im, $cx, $cy, $size, $color) {
+// A drawn arrow — shaft plus a filled triangular head — rather than a "→"
+// glyph, same reasoning as the star: nothing guarantees an arrow character
+// is in either font, so it's drawn instead of trusted to render. Runs from
+// $x1 to $x2 at height $y.
+function ig_draw_arrow($im, $x1, $y, $x2, $color, $thickness = 3, $headSize = 9) {
+    imagesetthickness($im, $thickness);
+    imageline($im, (int) $x1, (int) $y, (int) ($x2 - $headSize), (int) $y, $color);
+    imagesetthickness($im, 1);
     imagefilledpolygon($im, [
-        $cx - $size / 2, $cy - $size,
-        $cx - $size / 2, $cy + $size,
-        $cx + $size / 2, $cy,
+        $x2, $y,
+        $x2 - $headSize, $y - $headSize,
+        $x2 - $headSize, $y + $headSize,
     ], $color);
 }
 
@@ -413,7 +417,8 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
         if ($moreCount > 0) {
             $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
             $tw  = $box[2] - $box[0];
-            ig_draw_chevron($im, $margin + $tw + 20, $textY - 12, 8, $red);
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $red);
         }
     }
 
@@ -515,7 +520,8 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
         if ($moreCount > 0) {
             $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
             $tw  = $box[2] - $box[0];
-            ig_draw_chevron($im, $margin + $tw + 20, $textY - 12, 8, $gold);
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $gold);
         }
     }
 
