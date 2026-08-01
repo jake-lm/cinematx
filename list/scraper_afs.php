@@ -16,6 +16,7 @@ function fetch_afs_films($force = false) {
 //
 //    <h2>Pan African Film Festival 2026</h2>                          series
 //    <p class="t-small">Directed by Various</p>                       director
+//    <p class="t-smaller">1h 52min, DCP</p>                           runtime
 //    <img class="… c-image-grid__image--poster" src="…">              its own poster
 //
 //  Routine programming gets a series tag too ("New Releases", "Discovery
@@ -32,10 +33,10 @@ function fetch_afs_films($force = false) {
 //  screening is published.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AFS_SCREENING_CACHE_V = 2;
+const AFS_SCREENING_CACHE_V = 3;
 
 function fetch_afs_detail($url) {
-    $empty = ['series' => null, 'director' => null, 'poster' => null];
+    $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null];
     if (!$url) return $empty;
 
     $cache_file = __DIR__ . '/cache_afs_series.json';
@@ -71,11 +72,24 @@ function fetch_afs_detail($url) {
         if (preg_match('/^Directed by\s+(.+)$/i', trim($p->textContent), $m)) { $director = trim($m[1]); break; }
     }
 
+    // The format line — "1h 52min, DCP" for a program, "USA, 2025, 1h 38min,
+    // DCP" for a single film — shares .t-smaller with the series link, so
+    // this is matched by content (needs "min") rather than a class of its
+    // own; the hour group is optional for anything under an hour.
+    $runtime = null;
+    foreach ($xpath->query('//p[contains(@class,"t-smaller")]') as $p) {
+        if (preg_match('/(?:(\d+)\s*h)?\s*(\d+)\s*min/i', trim($p->textContent), $m)) {
+            $runtime = ((int)($m[1] ?? 0)) * 60 + (int)$m[2];
+            break;
+        }
+    }
+
     $out = [
         'v'        => AFS_SCREENING_CACHE_V,
         'series'   => $series_node ? trim($series_node->textContent) : null,
         'director' => $director,
         'poster'   => $poster_node ? $poster_node->getAttribute('src') : null,
+        'runtime'  => $runtime,
     ];
 
     $cache[$url] = $out;
@@ -182,15 +196,17 @@ function fetch_afs_films_scrape() {
                         ? (new DateTime('@' . $timestamp))->setTimezone($tz)->format('D, M j · g:ia')
                         : $date_id,
                     'festival'     => $festival,
-                    // A shorts program's own poster/director, standing in
-                    // for TMDB's — see afs_is_short_program(). 'no_tmdb'
-                    // tells fetch_all_screenings() not to let a TMDB lookup
-                    // overwrite either, even if this poster fetch came back
-                    // empty (a miss here should show no poster, not a wrong
-                    // one borrowed from an unrelated film).
+                    // A shorts program's own poster/director/runtime,
+                    // standing in for TMDB's — see afs_is_short_program().
+                    // 'no_tmdb' tells fetch_all_screenings() not to let a
+                    // TMDB lookup overwrite any of them, even where this
+                    // fetch came back empty (a miss here should show
+                    // nothing, not something borrowed from an unrelated
+                    // film).
                     'no_tmdb'      => $is_short,
-                    'poster'       => $is_short ? $detail['poster'] : null,
-                    'director'     => $is_short ? 'Various' : null,
+                    'poster'       => $is_short ? $detail['poster']   : null,
+                    'director'     => $is_short ? 'Various'           : null,
+                    'runtime'      => $is_short ? $detail['runtime']  : null,
                 ];
             }
         }
