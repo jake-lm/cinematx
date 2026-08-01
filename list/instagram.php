@@ -166,6 +166,17 @@ function ig_draw_featured_badge($im, $cx, $cy, $badgeColor, $starColor, $radius 
     imagefilledpolygon($im, ig_star_points($cx, $cy, (int) ($radius * 0.62), (int) ($radius * 0.62 * 0.5)), $starColor);
 }
 
+// A drawn chevron rather than a "→" glyph — same reasoning as the star:
+// nothing guarantees an arrow is in either font, so it gets drawn instead
+// of trusted to render. $cx/$cy is the arrow's own center.
+function ig_draw_chevron($im, $cx, $cy, $size, $color) {
+    imagefilledpolygon($im, [
+        $cx - $size / 2, $cy - $size,
+        $cx - $size / 2, $cy + $size,
+        $cx + $size / 2, $cy,
+    ], $color);
+}
+
 // Downloads a poster (TMDB, w300) once and caches it — the same handful of
 // repertory titles recur night after night, no reason to refetch. Returns a
 // cropped-to-cover GD image sized exactly $w x $h, or null on any miss/failure
@@ -253,10 +264,14 @@ const IG_THEMES = [
     'marquee' => 'Marquee',
 ];
 
-function ig_build_list_page(array $films, $date, $theme = 'paper') {
+// $moreCount is screenings that exist on a *later* list page — not this
+// page's own row-capacity overflow, which each renderer still tracks
+// internally. Only Auto/Manual multi-page days ever pass a nonzero value;
+// it's what turns the quiet "+N more" line into a "keep swiping" one.
+function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 0) {
     return $theme === 'marquee'
-        ? ig_build_list_page_marquee($films, $date)
-        : ig_build_list_page_paper($films, $date);
+        ? ig_build_list_page_marquee($films, $date, $moreCount)
+        : ig_build_list_page_paper($films, $date, $moreCount);
 }
 
 function ig_build_feature_page(array $film, $date, $theme = 'paper') {
@@ -291,7 +306,7 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb) {
     }
 }
 
-function ig_build_list_page_paper(array $films, $date) {
+function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -385,8 +400,25 @@ function ig_build_list_page_paper(array $films, $date) {
         }
     }
 
-    if ($extra > 0) {
-        imagettftext($im, 24, 0, $margin, $y + 16, $red, IG_FONT_BODY, "+{$extra} more today");
+    // $extra is this page's own row-capacity overflow (Default mode, or a
+    // Manual per-page count set higher than actually fits); $moreCount is
+    // screenings waiting on a later carousel page. Either way there's more
+    // than what's showing, but only $moreCount means there's somewhere to
+    // actually swipe to — that's the only case that earns the arrow.
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $pillH = 44;
+        $pillPadX = 24;
+        $box = imagettfbbox(24, 0, IG_FONT_BODY, $label);
+        $tw  = $box[2] - $box[0];
+        $py  = $y + 8;
+        $arrowGap = $moreCount > 0 ? 34 : 0;
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2 + $arrowGap, $py + $pillH, $red);
+        imagettftext($im, 24, 0, $margin + $pillPadX, $py + $pillH - 14, $paper, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            ig_draw_chevron($im, $margin + $pillPadX + $tw + 20, $py + (int) ($pillH / 2), 8, $paper);
+        }
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
@@ -399,7 +431,7 @@ function ig_build_list_page_paper(array $films, $date) {
 // (thumbnail size, row height, footer position) is identical to the paper
 // theme on purpose — only the palette and the bulb frame change, so this
 // stays a drop-in for the same pagination math.
-function ig_build_list_page_marquee(array $films, $date) {
+function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -479,8 +511,20 @@ function ig_build_list_page_marquee(array $films, $date) {
         }
     }
 
-    if ($extra > 0) {
-        imagettftext($im, 24, 0, $margin, $y + 16, $gold, IG_FONT_BODY, "+{$extra} more today");
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $pillH = 44;
+        $pillPadX = 24;
+        $box = imagettfbbox(24, 0, IG_FONT_BODY, $label);
+        $tw  = $box[2] - $box[0];
+        $py  = $y + 8;
+        $arrowGap = $moreCount > 0 ? 34 : 0;
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2 + $arrowGap, $py + $pillH, $gold);
+        imagettftext($im, 24, 0, $margin + $pillPadX, $py + $pillH - 14, $bg, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            ig_draw_chevron($im, $margin + $pillPadX + $tw + 20, $py + (int) ($pillH / 2), 8, $bg);
+        }
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
@@ -972,9 +1016,12 @@ function ig_build_images(array $films, $date, array $compose) {
         ? max(1, (int) $compose['per_page'])
         : IG_AUTO_MAX_PER_PAGE;
 
-    $images = [];
+    $images   = [];
+    $consumed = 0;
     foreach (ig_paginate($films, $maxPerPage) as $page) {
-        $images[] = ig_build_list_page($page, $date, $theme);
+        $consumed += count($page);
+        $moreCount = count($films) - $consumed; // 0 on the last list page
+        $images[]  = ig_build_list_page($page, $date, $theme, $moreCount);
     }
 
     if (!empty($compose['features'])) {
