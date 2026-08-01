@@ -18,6 +18,7 @@ function fetch_afs_films($force = false) {
 //    <p class="t-small">Directed by Various</p>                       director
 //    <p class="t-smaller">1h 52min, DCP</p>                           runtime
 //    <img class="… c-image-grid__image--poster" src="…">              its own poster
+//    <div class="c-screening-content"><p>A bold compilation…</p>      overview
 //
 //  Routine programming gets a series tag too ("New Releases", "Discovery
 //  Zone"), so that field alone doesn't mean "festival" — only ones whose
@@ -33,10 +34,10 @@ function fetch_afs_films($force = false) {
 //  screening is published.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AFS_SCREENING_CACHE_V = 3;
+const AFS_SCREENING_CACHE_V = 4;
 
 function fetch_afs_detail($url) {
-    $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null];
+    $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null, 'overview' => null];
     if (!$url) return $empty;
 
     $cache_file = __DIR__ . '/cache_afs_series.json';
@@ -84,12 +85,18 @@ function fetch_afs_detail($url) {
         }
     }
 
+    // The synopsis is the first paragraph of .c-screening-content — after
+    // it, a shorts program's page goes on to list each short individually,
+    // which is more than a listing card has room for.
+    $overview_node = $xpath->query('//div[contains(@class,"c-screening-content")]/p')->item(0);
+
     $out = [
         'v'        => AFS_SCREENING_CACHE_V,
         'series'   => $series_node ? trim($series_node->textContent) : null,
         'director' => $director,
         'poster'   => $poster_node ? $poster_node->getAttribute('src') : null,
         'runtime'  => $runtime,
+        'overview' => $overview_node ? trim($overview_node->textContent) : null,
     ];
 
     $cache[$url] = $out;
@@ -196,17 +203,18 @@ function fetch_afs_films_scrape() {
                         ? (new DateTime('@' . $timestamp))->setTimezone($tz)->format('D, M j · g:ia')
                         : $date_id,
                     'festival'     => $festival,
-                    // A shorts program's own poster/director/runtime,
-                    // standing in for TMDB's — see afs_is_short_program().
-                    // 'no_tmdb' tells fetch_all_screenings() not to let a
-                    // TMDB lookup overwrite any of them, even where this
-                    // fetch came back empty (a miss here should show
-                    // nothing, not something borrowed from an unrelated
-                    // film).
+                    // A shorts program's own poster/director/runtime/
+                    // overview, standing in for TMDB's — see
+                    // afs_is_short_program(). 'no_tmdb' tells
+                    // fetch_all_screenings() not to let a TMDB lookup
+                    // overwrite any of them, even where this fetch came back
+                    // empty (a miss here should show nothing, not something
+                    // borrowed from an unrelated film).
                     'no_tmdb'      => $is_short,
                     'poster'       => $is_short ? $detail['poster']   : null,
                     'director'     => $is_short ? 'Various'           : null,
                     'runtime'      => $is_short ? $detail['runtime']  : null,
+                    'overview'     => $is_short ? $detail['overview'] : null,
                 ];
             }
         }

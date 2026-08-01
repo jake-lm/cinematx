@@ -50,14 +50,13 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             } else {
                 // A curated shorts anthology (see afs_is_short_program()) —
                 // TMDB has no correct entry to borrow from, so only what the
-                // scraper already found (its own poster, "Various" as
-                // director, the runtime off the same page) survives;
+                // scraper already found off AFS's own page (poster,
+                // "Various" as director, runtime, synopsis) survives;
                 // everything else stays absent rather than showing a guess.
-                $film['year']     = null;
-                $film['overview'] = null;
-                $film['genres']   = null;
-                $film['cast']     = null;
-                $film['wiki']     = null;
+                $film['year']   = null;
+                $film['genres'] = null;
+                $film['cast']   = null;
+                $film['wiki']   = null;
             }
 
             $all_films[] = $film;
