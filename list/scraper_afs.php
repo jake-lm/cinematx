@@ -8,30 +8,41 @@ function fetch_afs_films($force = false) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Festival detection
+//  Per-screening detail — festival detection, and telling a shorts program
+//  apart from a single film
 //
 //  The calendar page carries no signal at all — no class, no title prefix —
-//  but every screening's own page does, in a field AFS applies uniformly:
+//  but every screening's own page does, in fields AFS applies uniformly:
 //
-//    <a class="c-screening__series-link" href="…">Pan African Film Festival 2026</a>
+//    <h2>Pan African Film Festival 2026</h2>                          series
+//    <p class="t-small">Directed by Various</p>                       director
+//    <img class="… c-image-grid__image--poster" src="…">              its own poster
 //
-//  Routine programming gets tagged too ("New Releases", "Discovery Zone"),
-//  so the field alone doesn't mean "festival" — only ones whose name
-//  actually contains "film festival" do. Cached forever per URL, the same
-//  shape as fetch_tmdb()'s cache_tmdb.json, since a screening's assigned
-//  series never changes once published.
+//  Routine programming gets a series tag too ("New Releases", "Discovery
+//  Zone"), so that field alone doesn't mean "festival" — only ones whose
+//  name actually contains "film festival" do (afs_is_festival()).
+//
+//  A curated shorts anthology ("I AM BECAUSE WE ARE (Short Film Program)")
+//  has no correct TMDB entry — the title matched an unrelated one-minute
+//  short — so afs_is_short_program() flags it and the caller uses this same
+//  fetch's own poster/director instead of ever asking TMDB.
+//
+//  One fetch per screening URL either way, cached forever — the same shape
+//  as fetch_tmdb()'s cache_tmdb.json, since none of this changes once a
+//  screening is published.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AFS_SERIES_CACHE_V = 1;
+const AFS_SCREENING_CACHE_V = 2;
 
-function fetch_afs_series($url) {
-    if (!$url) return null;
+function fetch_afs_detail($url) {
+    $empty = ['series' => null, 'director' => null, 'poster' => null];
+    if (!$url) return $empty;
 
     $cache_file = __DIR__ . '/cache_afs_series.json';
     $cache      = file_exists($cache_file) ? (json_decode(file_get_contents($cache_file), true) ?: []) : [];
 
     $have = $cache[$url] ?? null;
-    if (is_array($have) && ($have['v'] ?? 0) === AFS_SERIES_CACHE_V) return $have['series'];
+    if (is_array($have) && ($have['v'] ?? 0) === AFS_SCREENING_CACHE_V) return $have + $empty;
 
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -42,25 +53,51 @@ function fetch_afs_series($url) {
     ]);
     $html = curl_exec($ch);
     curl_close($ch);
-    if (!$html) return null;   // transient failure — don't cache, retry next scrape
+    if (!$html) return $empty;   // transient failure — don't cache, retry next scrape
 
     $dom = new DOMDocument();
     libxml_use_internal_errors(true);
     $dom->loadHTML($html);
     libxml_clear_errors();
+    $xpath = new DOMXPath($dom);
 
-    $node   = (new DOMXPath($dom))->query('//a[contains(@class,"c-screening__series-link")]')->item(0);
-    $series = $node ? trim($node->textContent) : null;
+    $series_node = $xpath->query('//a[contains(@class,"c-screening__series-link")]')->item(0);
+    $poster_node = $xpath->query('//img[contains(@class,"c-image-grid__image--poster")]')->item(0);
 
-    $cache[$url] = ['v' => AFS_SERIES_CACHE_V, 'series' => $series];
+    // "Directed by X" has no class of its own — it shares .t-small with
+    // nothing else on the page, so matching the text is the only way in.
+    $director = null;
+    foreach ($xpath->query('//p[contains(@class,"t-small")]') as $p) {
+        if (preg_match('/^Directed by\s+(.+)$/i', trim($p->textContent), $m)) { $director = trim($m[1]); break; }
+    }
+
+    $out = [
+        'v'        => AFS_SCREENING_CACHE_V,
+        'series'   => $series_node ? trim($series_node->textContent) : null,
+        'director' => $director,
+        'poster'   => $poster_node ? $poster_node->getAttribute('src') : null,
+    ];
+
+    $cache[$url] = $out;
     file_put_contents($cache_file, json_encode($cache));
 
-    return $series;
+    return $out;
 }
 
 /** A real named festival, not one of AFS's routine programming buckets. */
 function afs_is_festival($series) {
     return $series !== null && stripos($series, 'film festival') !== false;
+}
+
+/**
+ * A curated shorts anthology rather than a single, TMDB-findable film.
+ * The title usually says as much ("… Short Film Program") — checked first
+ * since it needs no network call — and AFS's own "Directed by Various" is
+ * the fallback for whatever doesn't.
+ */
+function afs_is_short_program($title, $director) {
+    if (stripos((string)$title, 'short film') !== false) return true;
+    return $director !== null && strcasecmp(trim($director), 'various') === 0;
 }
 
 function fetch_afs_films_scrape() {
@@ -109,9 +146,10 @@ function fetch_afs_films_scrape() {
             $time_str = $time_node ? trim($time_node->textContent) : '';
 
             // Once per screening, not once per showtime — every time this
-            // film plays today shares the same URL and the same series.
-            $series   = fetch_afs_series($url);
-            $festival = afs_is_festival($series) ? $series : null;
+            // film plays today shares the same URL and the same detail.
+            $detail   = fetch_afs_detail($url);
+            $festival = afs_is_festival($detail['series']) ? $detail['series'] : null;
+            $is_short = afs_is_short_program($title, $detail['director']);
 
             // A film playing more than once in a day renders as one row with
             // every time comma-joined ("4:15 PM, 7:30 PM"), not a row per
@@ -144,6 +182,15 @@ function fetch_afs_films_scrape() {
                         ? (new DateTime('@' . $timestamp))->setTimezone($tz)->format('D, M j · g:ia')
                         : $date_id,
                     'festival'     => $festival,
+                    // A shorts program's own poster/director, standing in
+                    // for TMDB's — see afs_is_short_program(). 'no_tmdb'
+                    // tells fetch_all_screenings() not to let a TMDB lookup
+                    // overwrite either, even if this poster fetch came back
+                    // empty (a miss here should show no poster, not a wrong
+                    // one borrowed from an unrelated film).
+                    'no_tmdb'      => $is_short,
+                    'poster'       => $is_short ? $detail['poster'] : null,
+                    'director'     => $is_short ? 'Various' : null,
                 ];
             }
         }

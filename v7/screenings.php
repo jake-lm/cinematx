@@ -87,6 +87,12 @@ function ctx_enrich(array $films) {
         if (!$f['year']) $f['year'] = ctx_year($raw);
 
         if (!empty($f['poster'])) continue;              // raw matched — leave it alone
+        // A curated shorts anthology never gets this fallback lookup either
+        // — the exact failure it exists to fix: "I AM BECAUSE WE ARE" cleaned
+        // right down to a title TMDB confidently, wrongly matched to an
+        // unrelated one-minute short. A miss on its own AFS poster fetch
+        // should show no poster, not a wrong one from here instead.
+        if (!empty($f['no_tmdb'])) continue;
         if (!function_exists('fetch_tmdb')) continue;
 
         $clean = ctx_clean_title($raw);

@@ -37,15 +37,29 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             $film['source']   = 'official';
             $film['location'] = $film['location'] ?? null;
 
-            $tmdb = fetch_tmdb($film['title']);
-            $film['poster']   = $tmdb['poster'];
-            $film['year']     = $tmdb['year'];
-            $film['runtime']  = $tmdb['runtime'];
-            $film['overview'] = $tmdb['overview'];
-            $film['genres']   = $tmdb['genres'];
-            $film['director'] = $tmdb['director'];
-            $film['cast']     = $tmdb['cast'];
-            $film['wiki']     = $tmdb['wiki'];
+            if (empty($film['no_tmdb'])) {
+                $tmdb = fetch_tmdb($film['title']);
+                $film['poster']   = $tmdb['poster'];
+                $film['year']     = $tmdb['year'];
+                $film['runtime']  = $tmdb['runtime'];
+                $film['overview'] = $tmdb['overview'];
+                $film['genres']   = $tmdb['genres'];
+                $film['director'] = $tmdb['director'];
+                $film['cast']     = $tmdb['cast'];
+                $film['wiki']     = $tmdb['wiki'];
+            } else {
+                // A curated shorts anthology (see afs_is_short_program()) —
+                // TMDB has no correct entry to borrow from, so only what the
+                // scraper already found (its own poster, "Various" as
+                // director) survives; everything else stays absent rather
+                // than showing a guess.
+                $film['year']     = null;
+                $film['runtime']  = null;
+                $film['overview'] = null;
+                $film['genres']   = null;
+                $film['cast']     = null;
+                $film['wiki']     = null;
+            }
 
             $all_films[] = $film;
         }
