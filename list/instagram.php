@@ -411,8 +411,13 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     // actually swipe to — that's the only case that earns the arrow.
     $totalMore = $extra + $moreCount;
     if ($totalMore > 0) {
-        $label   = "+{$totalMore} MORE";
-        $textY   = $y + 38;
+        $label = "+{$totalMore} MORE";
+        // Centered in whatever room is actually left below the last row,
+        // not hugging it — a page well under its 6-row capacity can leave a
+        // lot of that room, and a fixed offset left the line sitting right
+        // against the last poster regardless of how much space followed it.
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
         imagettftext($im, 28, 0, $margin, $textY, $red, IG_FONT_BODY, $label);
         if ($moreCount > 0) {
             $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
@@ -514,8 +519,9 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
 
     $totalMore = $extra + $moreCount;
     if ($totalMore > 0) {
-        $label   = "+{$totalMore} MORE";
-        $textY   = $y + 38;
+        $label = "+{$totalMore} MORE";
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
         imagettftext($im, 28, 0, $margin, $textY, $gold, IG_FONT_BODY, $label);
         if ($moreCount > 0) {
             $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
