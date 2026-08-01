@@ -136,9 +136,23 @@ function ig_fit_text($text, $font, $size, $maxWidth) {
     return $text;
 }
 
-// A pill — rectangle with semicircular ends — for the wordmark chip.
+// A pill — rectangle with semicircular ends — for the wordmark chip, the
+// showtime pills, and the Featured pill. Carries its own weak drop shadow
+// (an offset, low-alpha copy of the same shape, drawn first) so it reads as
+// sitting slightly above whatever it's on — hero photo, paper, or marquee's
+// black — rather than flat against it. GD has no blur filter worth reaching
+// for here, so this is the shadow: a soft edge would need compositing onto
+// a separate canvas first, more than a "weak" shadow calls for.
 function ig_pill($im, $x1, $y1, $x2, $y2, $color) {
     $r = (int) round(($y2 - $y1) / 2);
+
+    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 105);
+    $dx = 3;
+    $dy = 4;
+    imagefilledrectangle($im, $x1 + $r + $dx, $y1 + $dy, $x2 - $r + $dx, $y2 + $dy, $shadow);
+    imagefilledellipse($im, $x1 + $r + $dx, $y1 + $r + $dy, $r * 2, $r * 2, $shadow);
+    imagefilledellipse($im, $x2 - $r + $dx, $y1 + $r + $dy, $r * 2, $r * 2, $shadow);
+
     imagefilledrectangle($im, $x1 + $r, $y1, $x2 - $r, $y2, $color);
     imagefilledellipse($im, $x1 + $r, $y1 + $r, $r * 2, $r * 2, $color);
     imagefilledellipse($im, $x2 - $r, $y1 + $r, $r * 2, $r * 2, $color);
