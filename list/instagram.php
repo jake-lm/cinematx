@@ -321,6 +321,10 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     $muted   = ig_hex($im, '#6B6659');
     $divider = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
+    // Featured's own identity color — same gold Marquee already uses for it —
+    // rather than theme-relative, so "Featured" reads as one consistent mark
+    // regardless of which visual theme is posting that day.
+    $gold    = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -384,7 +388,7 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
         // height is shared by every film on the page (Auto mode's pagination
         // depends on it), so Featured can't grow the row it's on.
         if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $ink, $paper);
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $ink);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
@@ -606,6 +610,7 @@ function ig_build_feature_page_paper(array $film, $date) {
     $muted       = ig_hex($im, '#6B6659');
     $divider     = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
+    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -648,15 +653,14 @@ function ig_build_feature_page_paper(array $film, $date) {
     $pillH    = 60;
     $py       = 70;
 
-    // An editorial call-out, not a logistics detail like the showtime below
-    // it — kept in a different color (ink, not the showtime pill's red) so
-    // the two read as two different kinds of tag rather than a repeated one.
+    // Gold — Featured's own identity color, the same one Marquee already
+    // uses for it, rather than theme-relative.
     if (!empty($film['featured'])) {
         $label = 'FEATURED';
         $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
         $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $ink);
-        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $paper, IG_FONT_BODY, $label);
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $ink, IG_FONT_BODY, $label);
         $py += $pillH + 14;
     }
 
