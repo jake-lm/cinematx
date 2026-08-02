@@ -35,11 +35,14 @@ define('IG_FONT_ZINE_TITLE', dirname(__DIR__) . '/assets/fonts/SpecialElite-Regu
 // nameplate, not just film titles, since the wordmark needed the same
 // "printed newspaper name" character.
 define('IG_FONT_NEWSPRINT_TITLE', dirname(__DIR__) . '/assets/fonts/RobotoSlab-Bold.ttf');
-// Neon/VHS's title face — literally drawn to look like a lit neon tube.
-// Extremely wide (measured: "SPIRITED AWAY" alone runs 682px at 56px), so
-// it leans entirely on the existing wrap/ellipsis safety net rather than
-// any special-casing — same as every other theme's title font.
-define('IG_FONT_NEON_TITLE', dirname(__DIR__) . '/assets/fonts/Monoton-Regular.ttf');
+// Neon/VHS's title face. First attempt was Monoton, an actual neon-tube
+// novelty font — but its glyphs are drawn with several parallel strokes
+// per letter (real neon signage sometimes bends one tube back and forth
+// for a bold look, and the font mimics that), and stacked with the glow on
+// top that read as noise rather than legible type. A clean single-stroke
+// rounded sans reads as neon just as well once glowed, and reads far
+// better as text — the glow is what's doing the "neon" work either way.
+define('IG_FONT_NEON_TITLE', dirname(__DIR__) . '/assets/fonts/Baloo2-Bold.ttf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -901,7 +904,7 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     $margin = 80;
 
     $pinkGlow = imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, 100);
-    ig_neon_text($im, 40, $margin, 112, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
+    ig_neon_text($im, 34, $margin, 108, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
 
     // A recording-light dot — the one place this theme borrows red, since
     // nothing else reads "REC" like it does.
@@ -947,17 +950,17 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(30, 0, IG_FONT_NEON_TITLE, $initial);
+            $ibox = imagettfbbox(26, 0, IG_FONT_NEON_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 30, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 10, $muted, IG_FONT_NEON_TITLE, $initial);
+            imagettftext($im, 26, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_NEON_TITLE, $initial);
         }
 
         if (!empty($film['featured'])) {
             ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $dark);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 32, $textMaxWidth);
-        ig_neon_text($im, 32, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 28, $textMaxWidth);
+        ig_neon_text($im, 28, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
 
         $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
@@ -1531,9 +1534,7 @@ function ig_build_feature_page_newsprint(array $film, $date) {
 // Neon's spotlight page: hero stays full color (this theme is about
 // watching it on a CRT, not a print-reproduction tint), showtime/Featured
 // are ig_pill()'s usual rounded, shadowed shape — a lit rounded-corner sign
-// is exactly what a neon pill already looks like. Title-line gaps run
-// wider than paper/zine (measured: Monoton's ascent at 56px reaches 60px,
-// versus Fraunces' 52px) for the same reason Marquee's did.
+// is exactly what a neon pill already looks like.
 function ig_build_feature_page_neon(array $film, $date) {
     $w = 1080;
     $h = 1350;
@@ -1563,9 +1564,9 @@ function ig_build_feature_page_neon(array $film, $date) {
     } else {
         imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
         $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-        $ibox = imagettfbbox(100, 0, IG_FONT_NEON_TITLE, $initial);
+        $ibox = imagettfbbox(84, 0, IG_FONT_NEON_TITLE, $initial);
         $iw = $ibox[2] - $ibox[0];
-        ig_neon_text($im, 100, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, IG_FONT_NEON_TITLE, $initial, $muted, $cyanGlow);
+        ig_neon_text($im, 84, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 32, IG_FONT_NEON_TITLE, $initial, $muted, $cyanGlow);
     }
 
     $fadeH = 120;
@@ -1607,13 +1608,16 @@ function ig_build_feature_page_neon(array $film, $date) {
     $kicker = strtoupper($film['venue'] ?? '');
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
-        $y += 74;
+        // Baloo 2's ascent at 46px (measured: 42px) runs shorter than
+        // Monoton's did at 56px, so this gap shrank along with the title
+        // size rather than keeping the old, now-oversized clearance.
+        $y += 60;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 56, $textMaxWidth, 2);
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth, 2);
     foreach ($titleLines as $line) {
-        ig_neon_text($im, 56, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
-        $y += 74;
+        ig_neon_text($im, 46, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
+        $y += 60;
     }
 
     $deckParts = [];
