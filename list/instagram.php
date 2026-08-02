@@ -231,12 +231,18 @@ function ig_grayscale_print($im, $contrast = -15) {
     imagefilter($im, IMG_FILTER_CONTRAST, $contrast);
 }
 
-// A soft halo behind crisp text — eight low-alpha copies at a small radius,
+// A soft halo behind crisp text — four low-alpha copies at a small radius,
 // then the real text on top. GD has no blur to reach for, so this is the
-// glow: cheap, and convincing at the sizes these cards render at.
-function ig_neon_text($im, $size, $x, $y, $font, $text, $color, $glowColor) {
-    foreach ([[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]] as [$dx, $dy]) {
-        imagettftext($im, $size, 0, $x + $dx, $y + $dy, $glowColor, $font, $text);
+// glow. Takes the glow as separate RGB rather than a pre-made alpha color:
+// stacking several overlapping semi-transparent passes compounds fast (four
+// passes at the alpha this started at built up to ~77% opacity right at the
+// letterforms, muddying a font as thin as Monoton at small sizes), so this
+// allocates its own much-more-transparent glow color rather than sharing
+// whatever alpha a caller's border glow happens to use.
+function ig_neon_text($im, $size, $x, $y, $font, $text, $color, $glowR, $glowG, $glowB) {
+    $glow = imagecolorallocatealpha($im, $glowR, $glowG, $glowB, 118);
+    foreach ([[-2, 0], [2, 0], [0, -2], [0, 2]] as [$dx, $dy]) {
+        imagettftext($im, $size, 0, $x + $dx, $y + $dy, $glow, $font, $text);
     }
     imagettftext($im, $size, 0, $x, $y, $color, $font, $text);
 }
@@ -900,8 +906,7 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
 
     $margin = 80;
 
-    $pinkGlow = imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, 100);
-    ig_neon_text($im, 40, $margin, 112, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
+    ig_neon_text($im, 40, $margin, 112, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, 0xFF, 0x2E, 0x9A);
 
     // A recording-light dot — the one place this theme borrows red, since
     // nothing else reads "REC" like it does.
@@ -956,8 +961,12 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $dark);
         }
 
+        // Plain, no glow — six of these on a page at 32px is dense enough
+        // that the halo (even softened) started blurring Monoton's already-
+        // thin strokes together. The glow stays for the one-per-page
+        // wordmark and spotlight title, where there's room for it.
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 32, $textMaxWidth);
-        ig_neon_text($im, 32, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
+        imagettftext($im, 32, 0, $textX, $y + 40, $cyan, IG_FONT_NEON_TITLE, $title);
 
         $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
@@ -1565,7 +1574,7 @@ function ig_build_feature_page_neon(array $film, $date) {
         $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
         $ibox = imagettfbbox(100, 0, IG_FONT_NEON_TITLE, $initial);
         $iw = $ibox[2] - $ibox[0];
-        ig_neon_text($im, 100, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, IG_FONT_NEON_TITLE, $initial, $muted, $cyanGlow);
+        ig_neon_text($im, 100, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, IG_FONT_NEON_TITLE, $initial, $muted, 0x2D, 0xE2, 0xE6);
     }
 
     $fadeH = 120;
@@ -1612,7 +1621,7 @@ function ig_build_feature_page_neon(array $film, $date) {
 
     $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 56, $textMaxWidth, 2);
     foreach ($titleLines as $line) {
-        ig_neon_text($im, 56, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
+        ig_neon_text($im, 56, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, 0x2D, 0xE2, 0xE6);
         $y += 74;
     }
 
