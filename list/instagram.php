@@ -35,6 +35,11 @@ define('IG_FONT_ZINE_TITLE', dirname(__DIR__) . '/assets/fonts/SpecialElite-Regu
 // nameplate, not just film titles, since the wordmark needed the same
 // "printed newspaper name" character.
 define('IG_FONT_NEWSPRINT_TITLE', dirname(__DIR__) . '/assets/fonts/RobotoSlab-Bold.ttf');
+// Neon/VHS's title face — literally drawn to look like a lit neon tube.
+// Extremely wide (measured: "SPIRITED AWAY" alone runs 682px at 56px), so
+// it leans entirely on the existing wrap/ellipsis safety net rather than
+// any special-casing — same as every other theme's title font.
+define('IG_FONT_NEON_TITLE', dirname(__DIR__) . '/assets/fonts/Monoton-Regular.ttf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -226,6 +231,35 @@ function ig_grayscale_print($im, $contrast = -15) {
     imagefilter($im, IMG_FILTER_CONTRAST, $contrast);
 }
 
+// A soft halo behind crisp text — eight low-alpha copies at a small radius,
+// then the real text on top. GD has no blur to reach for, so this is the
+// glow: cheap, and convincing at the sizes these cards render at.
+function ig_neon_text($im, $size, $x, $y, $font, $text, $color, $glowColor) {
+    foreach ([[-2, 0], [2, 0], [0, -2], [0, 2], [-2, -2], [2, 2], [-2, 2], [2, -2]] as [$dx, $dy]) {
+        imagettftext($im, $size, 0, $x + $dx, $y + $dy, $glowColor, $font, $text);
+    }
+    imagettftext($im, $size, 0, $x, $y, $color, $font, $text);
+}
+
+// A glowing rectangle frame — a thick low-alpha outline, then a thin bright
+// one on top — the CRT-screen-edge equivalent of Marquee's bulb border.
+function ig_neon_border($im, $x1, $y1, $x2, $y2, $glowColor, $lineColor) {
+    imagesetthickness($im, 10);
+    imagerectangle($im, $x1, $y1, $x2, $y2, $glowColor);
+    imagesetthickness($im, 2);
+    imagerectangle($im, $x1, $y1, $x2, $y2, $lineColor);
+    imagesetthickness($im, 1);
+}
+
+// A final overlay pass — faint horizontal lines the full width of the
+// card — the one texture that has to be drawn last, over everything else,
+// since a real CRT's scanlines sit in front of the whole picture.
+function ig_scanlines($im, $w, $h, $color, $spacing = 4) {
+    for ($y = 0; $y < $h; $y += $spacing) {
+        imageline($im, 0, $y, $w, $y, $color);
+    }
+}
+
 // A torn-paper edge instead of a ruled line — short segments alternating up
 // and down rather than one straight stroke.
 function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) {
@@ -329,6 +363,7 @@ const IG_THEMES = [
     'marquee'   => 'Marquee',
     'zine'      => 'Zine',
     'newsprint' => 'Newsprint',
+    'neon'      => 'Neon',
 ];
 
 // $moreCount is screenings that exist on a *later* list page — not this
@@ -340,6 +375,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount);
         case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
+        case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
         default:          return ig_build_list_page_paper($films, $date, $moreCount);
     }
 }
@@ -349,6 +385,7 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
         case 'marquee':   return ig_build_feature_page_marquee($film, $date);
         case 'zine':      return ig_build_feature_page_zine($film, $date);
         case 'newsprint': return ig_build_feature_page_newsprint($film, $date);
+        case 'neon':      return ig_build_feature_page_neon($film, $date);
         default:          return ig_build_feature_page_paper($film, $date);
     }
 }
@@ -829,6 +866,130 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// A video-store rental card at closing time: deep purple-navy, dual neon
+// accents (cyan for identity/titles, pink for the wordmark and call-outs),
+// posters left in full color rather than tinted — unlike Zine/Newsprint,
+// this is the "watching it on a CRT" theme, not a print-reproduction one.
+// The wordmark is glowing letters with no box around them (a real neon
+// sign has no chip), every page sits inside a glowing border frame like
+// Marquee's bulb border, and scanlines are the final pass over everything.
+function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#150829');
+    $cyan        = ig_hex($im, '#2DE2E6');
+    $pink        = ig_hex($im, '#FF2E9A');
+    $ink         = ig_hex($im, '#F5F0FF');
+    $muted       = ig_hex($im, '#8B7FA8');
+    $divider     = ig_hex($im, '#3A2B5C');
+    $placeholder = ig_hex($im, '#241243');
+    $gold        = ig_hex($im, '#F2C14E');
+    $dark        = $bg;
+
+    imagefill($im, 0, 0, $bg);
+
+    $cyanGlow = imagecolorallocatealpha($im, 0x2D, 0xE2, 0xE6, 105);
+    ig_neon_border($im, 24, 24, $w - 24, $h - 24, $cyanGlow, $cyan);
+
+    $margin = 80;
+
+    $pinkGlow = imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, 100);
+    ig_neon_text($im, 40, $margin, 112, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
+
+    // A recording-light dot — the one place this theme borrows red, since
+    // nothing else reads "REC" like it does.
+    imagefilledellipse($im, $w - $margin - 58, 60, 12, 12, ig_hex($im, '#FF3355'));
+    imagettftext($im, 20, 0, $w - $margin - 42, 66, $ink, IG_FONT_BODY, 'REC');
+
+    $y = 175;
+    imagettftext($im, 24, 0, $margin, $y, $cyan, IG_FONT_BODY, strtoupper('Today in Austin'));
+    $y += 50;
+    imagettftext($im, 40, 0, $margin, $y, $ink, IG_FONT_BODY, date('l, F j', $date));
+    $y += 36;
+
+    imagesetthickness($im, 3);
+    imageline($im, $margin, $y, $w - $margin, $y, $cyanGlow);
+    imagesetthickness($im, 1);
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $cyan);
+    $y += 40;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+            imagerectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $cyan);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(30, 0, IG_FONT_NEON_TITLE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 30, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 10, $muted, IG_FONT_NEON_TITLE, $initial);
+        }
+
+        if (!empty($film['featured'])) {
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $dark);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 32, $textMaxWidth);
+        ig_neon_text($im, 32, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
+
+        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $pink, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
+    }
+
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
+        imagettftext($im, 28, 0, $margin, $textY, $pink, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $pink);
+        }
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
 
     return $im;
 }
@@ -1363,6 +1524,128 @@ function ig_build_feature_page_newsprint(array $film, $date) {
         imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// Neon's spotlight page: hero stays full color (this theme is about
+// watching it on a CRT, not a print-reproduction tint), showtime/Featured
+// are ig_pill()'s usual rounded, shadowed shape — a lit rounded-corner sign
+// is exactly what a neon pill already looks like. Title-line gaps run
+// wider than paper/zine (measured: Monoton's ascent at 56px reaches 60px,
+// versus Fraunces' 52px) for the same reason Marquee's did.
+function ig_build_feature_page_neon(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#150829');
+    $cyan        = ig_hex($im, '#2DE2E6');
+    $pink        = ig_hex($im, '#FF2E9A');
+    $ink         = ig_hex($im, '#F5F0FF');
+    $muted       = ig_hex($im, '#8B7FA8');
+    $divider     = ig_hex($im, '#3A2B5C');
+    $placeholder = ig_hex($im, '#241243');
+    $gold        = ig_hex($im, '#F2C14E');
+    $dark        = $bg;
+    $cyanGlow    = imagecolorallocatealpha($im, 0x2D, 0xE2, 0xE6, 105);
+
+    imagefill($im, 0, 0, $bg);
+
+    $margin = 80;
+    $heroH  = 700;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    if ($hero) {
+        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(100, 0, IG_FONT_NEON_TITLE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        ig_neon_text($im, 100, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, IG_FONT_NEON_TITLE, $initial, $muted, $cyanGlow);
+    }
+
+    $fadeH = 120;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0x15, 0x08, 0x29, $alpha);
+        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
+    }
+
+    ig_neon_border($im, 24, 24, $w - 24, $h - 24, $cyanGlow, $cyan);
+
+    $pillFont = 30;
+    $pillPadX = 30;
+    $pillH    = 60;
+    $py       = 70;
+
+    if (!empty($film['featured'])) {
+        $label = 'FEATURED';
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $dark, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
+
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $cyan);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $dark, IG_FONT_BODY, $label);
+        $py += $pillH + 14;
+    }
+
+    $textMaxWidth = $w - $margin * 2;
+    $y = $heroH + 50;
+
+    $kicker = strtoupper($film['venue'] ?? '');
+    if ($kicker !== '') {
+        imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
+        $y += 74;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 56, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        ig_neon_text($im, 56, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
+        $y += 74;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = $film['genres'];
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' min';
+    if ($deckParts) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, implode('  ·  ', $deckParts));
+        $y += 44;
+    }
+
+    $y += 20;
+    imagesetthickness($im, 3);
+    imageline($im, $margin, $y, $w - $margin, $y, $cyanGlow);
+    imagesetthickness($im, 1);
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 36;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 26, $textMaxWidth, 4) as $line) {
+            imagettftext($im, 26, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 38;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
+    }
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
 
     return $im;
 }
