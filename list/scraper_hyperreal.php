@@ -1,6 +1,14 @@
 <?php
 require_once __DIR__ . '/cache.php';
 
+// Hyperreal appends this to every real screening's title — but not to other
+// event types on the same calendar (a members' mixer, "PREHEAT", has no
+// such suffix). A better signal than the URL slug: most screenings' hrefs
+// end in "-movie-screening", but a live-scored classic and a touring shorts
+// festival used a different slug and were silently dropped by that filter
+// even though their titles carry the same suffix as every other screening.
+const HYPERREAL_SUFFIX = '/\s+at\s+hyperreal\s+film\s+club\s*$/i';
+
 // The scrape itself. Caching, locking and the stale-beats-empty fallback
 // all live in ctx_cached_scrape(); this just fetches and parses.
 function fetch_hyperreal_films($force = false) {
@@ -40,15 +48,19 @@ function fetch_hyperreal_films_scrape() {
 
         $xpath = new DOMXPath($dom);
 
-        // li elements whose h1 link slug contains "movie-screening"
+        // Every card in the events list, filtered below by title rather
+        // than by href — see HYPERREAL_SUFFIX.
         $items = $xpath->query(
             '//main[contains(@class,"Main--events-list")]
-             //li[.//h1/a[contains(@href,"movie-screening")]]'
+             //li[.//h1/a]'
         );
 
         foreach ($items as $item) {
             $link_node = $xpath->query('.//h1/a', $item)->item(0);
             if (!$link_node) continue;
+
+            $raw_title = trim($link_node->textContent);
+            if (!preg_match(HYPERREAL_SUFFIX, $raw_title)) continue;   // not a screening
 
             $href = $link_node->getAttribute('href');
             $abs_url = 'https://hyperrealfilm.club' . $href;
@@ -56,9 +68,7 @@ function fetch_hyperreal_films_scrape() {
             if (isset($seen[$abs_url])) continue; // deduplicate across months
             $seen[$abs_url] = true;
 
-            // Strip " at HYPERREAL FILM CLUB" suffix (with optional trailing space)
-            $raw_title = trim($link_node->textContent);
-            $title     = trim(preg_replace('/\s+at\s+hyperreal\s+film\s+club\s*$/i', '', $raw_title));
+            $title = trim(preg_replace(HYPERREAL_SUFFIX, '', $raw_title));
 
             // Find the date/time div — it's the one that contains "AM" or "PM"
             $date_text = '';
