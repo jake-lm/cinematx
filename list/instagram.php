@@ -160,6 +160,17 @@ function ig_fit_text($text, $font, $size, $maxWidth) {
     return $text;
 }
 
+// The compact "w/ Org" form of ctx_billing()'s "Presented with/by Org" —
+// for tight spaces (right next to a row title) where the full phrase
+// doesn't fit. Live-score billing has no compact form and returns null;
+// it's spelled out in full elsewhere (the spotlight page) instead.
+function ig_presented_with($billing) {
+    if ($billing && preg_match('/^Presented (?:with|by) (.+)$/i', $billing, $m)) {
+        return 'w/ ' . trim($m[1]);
+    }
+    return null;
+}
+
 // A pill — rectangle with semicircular ends — for the wordmark chip, the
 // showtime pills, and the Featured pill. Carries its own weak drop shadow
 // (an offset, low-alpha copy of the same shape, drawn first) so it reads as
@@ -1006,8 +1017,26 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $dark);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 28, $textMaxWidth);
+        // Space for the "w/ Org" tag is reserved before the title is fit,
+        // not squeezed in after — otherwise a long title would always fill
+        // the row and the tag would silently never have room to appear.
+        $presentedWith = ig_presented_with($film['billing'] ?? null);
+        $tagText = null;
+        $tagW = 0;
+        if ($presentedWith) {
+            $tagText = ig_fit_text($presentedWith, IG_FONT_BODY, 18, 200);
+            $tagBox  = imagettfbbox(18, 0, IG_FONT_BODY, $tagText);
+            $tagW    = $tagBox[2] - $tagBox[0];
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 28, $textMaxWidth - ($tagText ? $tagW + 14 : 0));
         ig_neon_text($im, 28, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
+
+        if ($tagText) {
+            $titleBox = imagettfbbox(28, 0, IG_FONT_NEON_TITLE, $title);
+            $titleW   = $titleBox[2] - $titleBox[0];
+            imagettftext($im, 18, 0, $textX + $titleW + 14, $y + 40, $muted, IG_FONT_BODY, $tagText);
+        }
 
         $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
