@@ -1806,6 +1806,14 @@ function ig_build_feature_page_neon(array $film, $date) {
         $y += 60;
     }
 
+    // Live-score/presented-with-or-by billing (ctx_billing() in
+    // v7/screenings.php) — plain text, no glow, deliberately quiet under the
+    // loud glowing title rather than fighting it for attention.
+    if (!empty($film['billing'])) {
+        imagettftext($im, 20, 0, $margin, $y, $muted, IG_FONT_BODY, ig_fit_text($film['billing'], IG_FONT_BODY, 20, $textMaxWidth));
+        $y += 34;
+    }
+
     $deckParts = [];
     if (!empty($film['year']))    $deckParts[] = $film['year'];
     if (!empty($film['genres']))  $deckParts[] = $film['genres'];
