@@ -62,6 +62,35 @@ function ctx_year($raw) {
 }
 
 /**
+ * The two kinds of bolted-on billing worth surfacing rather than just
+ * discarding: a live-score accompanist, or the org a screening is
+ * presented with/by. Each pattern is anchored to the end of the raw title
+ * and checked independently — not tied to whichever connective
+ * ctx_clean_title() actually cut on — so "TENDER MERCIES ft. "Welcome to
+ * Dollar Country" presented with End of an Ear" still surfaces "Presented
+ * with End of an Ear" even though "ft." is the earlier, unrelated match
+ * that strips the title down to "TENDER MERCIES".
+ *
+ * The other connectives (ft./featuring, in person, with director, w/)
+ * stay silent strips — they're either a co-billed short (already folded
+ * into the title text before this point) or a Q&A appearance too minor to
+ * warrant its own line.
+ */
+function ctx_billing($raw) {
+    $raw = trim((string)$raw);
+    if (preg_match('/\bwith\s+live\s+score\s+by\s+(.+)$/i', $raw, $m)) {
+        return 'Live score by ' . trim($m[1]);
+    }
+    if (preg_match('/\bwith\s+live\s+score\s*$/i', $raw)) {
+        return 'Live score';
+    }
+    if (preg_match('/\bpresented\s+(with|by)\s+(.+)$/i', $raw, $m)) {
+        return 'Presented ' . strtolower($m[1]) . ' ' . trim($m[2]);
+    }
+    return null;
+}
+
+/**
  * Adds `series`, `display_title`, and — for entries the raw lookup missed —
  * a second-chance poster from the cleaned title.
  *
@@ -75,6 +104,7 @@ function ctx_enrich(array $films) {
     foreach ($films as &$f) {
         $raw = (string)($f['title'] ?? '');
         $f['series']        = null;
+        $f['billing']       = ctx_billing($raw);
         $f['display_title'] = $raw;
         $f['year']          = $f['year']     ?? null;
         $f['runtime']       = $f['runtime']  ?? null;
@@ -125,6 +155,7 @@ function ctx_bits($s, $venue = true) {
     $bits = [];
     if (!empty($s['year']))    $bits[] = (string)$s['year'];
     if (!empty($s['runtime'])) $bits[] = (int)$s['runtime'] . 'm';
+    if (!empty($s['billing'])) $bits[] = $s['billing'];
     if ($venue && !empty($s['venue'])) {
         // Alamo runs the same film at the same minute in five cinemas, so
         // without the location two rows are indistinguishable. Only the row
@@ -518,6 +549,7 @@ function ctx_deep_card($s, $now) {
     $bits = [];
     if (!empty($s['year']))     $bits[] = (string)$s['year'];
     if (!empty($s['runtime']))  $bits[] = (int)$s['runtime'] . 'm';
+    if (!empty($s['billing']))  $bits[] = $s['billing'];
     if (!empty($s['director'])) $bits[] = $s['director'];
     if (!empty($s['genres']))   $bits[] = $s['genres'];
     ?>
