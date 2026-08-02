@@ -945,11 +945,11 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     imagealphablending($im, true);
 
     $bg          = ig_hex($im, '#150829');
+    $stripe      = ig_hex($im, '#1A0E2E');
     $cyan        = ig_hex($im, '#2DE2E6');
     $pink        = ig_hex($im, '#FF2E9A');
     $ink         = ig_hex($im, '#F5F0FF');
     $muted       = ig_hex($im, '#8B7FA8');
-    $divider     = ig_hex($im, '#3A2B5C');
     $placeholder = ig_hex($im, '#241243');
     $gold        = ig_hex($im, '#F2C14E');
     $dark        = $bg;
@@ -998,8 +998,15 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
     }
 
-    $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Zebra banding — every other row gets a faintly lighter strip
+        // behind it, the same trick a spreadsheet uses to keep a dense list
+        // readable. No separate rule line between rows any more; the bands
+        // themselves are the divider.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -1047,9 +1054,6 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
         imagettftext($im, 22, 0, $textX, $y + 104, $pink, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
-        if ($i < $lastIndex) {
-            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
-        }
     }
 
     $totalMore = $extra + $moreCount;
