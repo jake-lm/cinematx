@@ -29,6 +29,12 @@ define('IG_FONT_MARQUEE_TITLE', dirname(__DIR__) . '/assets/fonts/Anton-Regular.
 // used here (measured) are close enough to Fraunces' that zine reuses the
 // paper theme's exact spacing constants rather than needing its own.
 define('IG_FONT_ZINE_TITLE', dirname(__DIR__) . '/assets/fonts/SpecialElite-Regular.ttf');
+// Newsprint's title face — a bold slab serif, extracted as a static Bold
+// instance from Roboto Slab's variable source (fonttools, same as
+// Fraunces/Instrument Sans originally were). Also carries the masthead
+// nameplate, not just film titles, since the wordmark needed the same
+// "printed newspaper name" character.
+define('IG_FONT_NEWSPRINT_TITLE', dirname(__DIR__) . '/assets/fonts/RobotoSlab-Bold.ttf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -212,6 +218,14 @@ function ig_duotone($im, $tintR, $tintG, $tintB, $tintAlpha = 75) {
     imagefilledrectangle($im, 0, 0, imagesx($im), imagesy($im), $tint);
 }
 
+// Grayscale with no color wash — newsprint's own photo reproduction, black
+// ink on gray paper, distinct from zine's tinted duotone. Mutates $im in
+// place, same call pattern as ig_duotone().
+function ig_grayscale_print($im, $contrast = -15) {
+    imagefilter($im, IMG_FILTER_GRAYSCALE);
+    imagefilter($im, IMG_FILTER_CONTRAST, $contrast);
+}
+
 // A torn-paper edge instead of a ruled line — short segments alternating up
 // and down rather than one straight stroke.
 function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) {
@@ -311,9 +325,10 @@ function ig_paginate(array $films, $maxPerPage) {
 // assumes) stays identical across themes for now, so composition modes and
 // pagination don't need to know which theme is active.
 const IG_THEMES = [
-    'paper'   => 'Paper',
-    'marquee' => 'Marquee',
-    'zine'    => 'Zine',
+    'paper'     => 'Paper',
+    'marquee'   => 'Marquee',
+    'zine'      => 'Zine',
+    'newsprint' => 'Newsprint',
 ];
 
 // $moreCount is screenings that exist on a *later* list page — not this
@@ -322,17 +337,19 @@ const IG_THEMES = [
 // it's what turns the quiet "+N more" line into a "keep swiping" one.
 function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 0) {
     switch ($theme) {
-        case 'marquee': return ig_build_list_page_marquee($films, $date, $moreCount);
-        case 'zine':    return ig_build_list_page_zine($films, $date, $moreCount);
-        default:        return ig_build_list_page_paper($films, $date, $moreCount);
+        case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount);
+        case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
+        case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
+        default:          return ig_build_list_page_paper($films, $date, $moreCount);
     }
 }
 
 function ig_build_feature_page(array $film, $date, $theme = 'paper') {
     switch ($theme) {
-        case 'marquee': return ig_build_feature_page_marquee($film, $date);
-        case 'zine':    return ig_build_feature_page_zine($film, $date);
-        default:        return ig_build_feature_page_paper($film, $date);
+        case 'marquee':   return ig_build_feature_page_marquee($film, $date);
+        case 'zine':      return ig_build_feature_page_zine($film, $date);
+        case 'newsprint': return ig_build_feature_page_newsprint($film, $date);
+        default:          return ig_build_feature_page_paper($film, $date);
     }
 }
 
@@ -699,6 +716,115 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
             $tw  = $box[2] - $box[0];
             $ax  = $margin + $tw + 22;
             ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $pink);
+        }
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// A real newspaper listings page: gray newsprint stock, black ink, red used
+// once and sparingly (showtimes only) rather than as a running accent.
+// Posters run grayscale, no color wash — actual newsprint photo
+// reproduction, not a Riso tint. The wordmark is a masthead nameplate with
+// a thick/thin double rule beneath it, the way a real paper's name sits
+// over its own folio rule, rather than a chip or a stamp. Labels are flat
+// rectangles, not rounded pills — newsprint has no rounded corners anywhere.
+function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $paper       = ig_hex($im, '#E8E4D5');
+    $red         = ig_hex($im, '#922E32');
+    $ink         = ig_hex($im, '#1C1B19');
+    $muted       = ig_hex($im, '#6B675C');
+    $rule        = ig_hex($im, '#B8B2A0');
+    $placeholder = ig_hex($im, '#D9D4C3');
+    $gold        = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $paper);
+
+    $margin = 80;
+
+    imagettftext($im, 46, 0, $margin, 108, $ink, IG_FONT_NEWSPRINT_TITLE, 'CINEMA, TX');
+    imagefilledrectangle($im, $margin, 126, $w - $margin, 130, $ink);
+    imagefilledrectangle($im, $margin, 136, $w - $margin, 137, $ink);
+
+    $y = 182;
+    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
+    $y += 46;
+    imagettftext($im, 34, 0, $margin, $y, $ink, IG_FONT_BODY, date('l, F j', $date));
+    $y += 34;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 2, $ink);
+    $y += 38;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            ig_grayscale_print($thumb);
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_NEWSPRINT_TITLE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
+        }
+
+        if (!empty($film['featured'])) {
+            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $ink);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 32, $textMaxWidth);
+        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_NEWSPRINT_TITLE, $title);
+
+        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $rule);
+        }
+    }
+
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
+        imagettftext($im, 28, 0, $margin, $textY, $red, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $red);
         }
     }
 
@@ -1108,6 +1234,121 @@ function ig_build_feature_page_zine(array $film, $date) {
 
     $y += 20;
     ig_torn_line($im, $margin, $w - $margin, $y, $divider);
+    $y += 36;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 26, $textMaxWidth, 4) as $line) {
+            imagettftext($im, 26, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 38;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
+    }
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// Newsprint's spotlight page: the hero runs grayscale, no color wash —
+// black ink photo reproduction rather than a Riso tint. Showtime and
+// Featured both draw as flat rectangles instead of ig_pill()'s rounded,
+// shadowed shape — a newspaper doesn't have soft UI chrome. Title-line
+// gap is a touch wider than paper/zine use (measured: Roboto Slab's
+// ascent at 56px runs to the same 56px, versus Fraunces' 52px).
+function ig_build_feature_page_newsprint(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $paper       = ig_hex($im, '#E8E4D5');
+    $red         = ig_hex($im, '#922E32');
+    $ink         = ig_hex($im, '#1C1B19');
+    $muted       = ig_hex($im, '#6B675C');
+    $rule        = ig_hex($im, '#B8B2A0');
+    $placeholder = ig_hex($im, '#D9D4C3');
+    $gold        = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $paper);
+
+    $margin = 80;
+    $heroH  = 700;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    if ($hero) {
+        ig_grayscale_print($hero);
+        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(120, 0, IG_FONT_NEWSPRINT_TITLE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 120, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
+    }
+
+    $fadeH = 120;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0xE8, 0xE4, 0xD5, $alpha);
+        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
+    }
+
+    imagefilledrectangle($im, 0, 0, $w, 8, $ink);
+
+    $labelFont = 30;
+    $labelPadX = 26;
+    $labelH    = 56;
+    $py        = 70;
+
+    if (!empty($film['featured'])) {
+        $label = 'FEATURED';
+        $box   = imagettfbbox($labelFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        imagefilledrectangle($im, $margin, $py, $margin + $tw + $labelPadX * 2, $py + $labelH, $gold);
+        imagettftext($im, $labelFont, 0, $margin + $labelPadX, $py + $labelH - 16, $ink, IG_FONT_BODY, $label);
+        $py += $labelH + 12;
+    }
+
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox($labelFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        imagefilledrectangle($im, $margin, $py, $margin + $tw + $labelPadX * 2, $py + $labelH, $red);
+        imagettftext($im, $labelFont, 0, $margin + $labelPadX, $py + $labelH - 16, $paper, IG_FONT_BODY, $label);
+        $py += $labelH + 12;
+    }
+
+    $textMaxWidth = $w - $margin * 2;
+    $y = $heroH + 50;
+
+    $kicker = strtoupper($film['venue'] ?? '');
+    if ($kicker !== '') {
+        imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $kicker);
+        $y += 68;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_NEWSPRINT_TITLE, $line);
+        $y += 76;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = $film['genres'];
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' min';
+    if ($deckParts) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, implode('  ·  ', $deckParts));
+        $y += 44;
+    }
+
+    $y += 20;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 2, $ink);
     $y += 36;
 
     if (!empty($film['overview'])) {
