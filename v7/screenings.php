@@ -17,8 +17,11 @@
 //  so a film genuinely called "Something: Something" is never mangled.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Phrases venues use to bolt extra billing onto a title.
-const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented\s+by|in\s+person|with\s+director|w\/)\s+.*$/i';
+// Phrases venues use to bolt extra billing onto a title. "THE CABINET OF DR.
+// CALIGARI with live score by David DiDonato" found TMDB nothing until this
+// one was added — a real, easily findable film with no poster because the
+// billing (not a re-release or a presenter credit) was still attached.
+const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented\s+by|in\s+person|with\s+director|with\s+live\s+score|w\/)\s+.*$/i';
 
 // Re-release billing: "… 55th Anniversary", "… 20th Anniversary - Studio
 // Ghibli Fest 2026". Distributors put the occasion in the title and TMDB then
