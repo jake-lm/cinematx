@@ -1044,35 +1044,37 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     return $im;
 }
 
-// A split-flap departure board: no photography at all (a real board doesn't
-// have posters), everything carried by the monospaced font, four literal
-// columns — TIME / TITLE / VENUE / STATUS — and a dim LED-dot bezel instead
-// of a themed border. STATUS is decorative flavor text rather than real
-// operational data (nothing here tracks delays), the same license the other
-// themes take with a REC dot or a torn-paper edge — Featured films read
-// "FEATURED" in gold there instead of the usual green "ON TIME", since this
-// theme has no poster corner to badge.
+// A split-flap departure board: monospaced font, four literal columns —
+// TIME / TITLE / VENUE / STATUS — a dim LED-dot bezel instead of a themed
+// border, and (unlike a real board) a poster thumbnail riding along in the
+// TITLE column, the same thumbnail size every other theme uses, for some
+// visual consistency across the picker. STATUS is decorative flavor text
+// rather than real operational data (nothing here tracks delays), the same
+// license the other themes take with a REC dot or a torn-paper edge —
+// Featured films get both the usual poster-corner badge and a gold
+// "FEATURED" in the STATUS column instead of green "ON TIME".
 function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
     imagealphablending($im, true);
 
-    $bg      = ig_hex($im, '#0B0C0E');
-    $ink     = ig_hex($im, '#EDEBE2');
-    $muted   = ig_hex($im, '#6B6E73');
-    $dim     = ig_hex($im, '#3A3D42');
-    $divider = ig_hex($im, '#26282C');
-    $green   = ig_hex($im, '#5FD68C');
-    $gold    = ig_hex($im, '#F2C14E');
+    $bg          = ig_hex($im, '#0B0C0E');
+    $ink         = ig_hex($im, '#EDEBE2');
+    $muted       = ig_hex($im, '#6B6E73');
+    $dim         = ig_hex($im, '#3A3D42');
+    $divider     = ig_hex($im, '#26282C');
+    $placeholder = ig_hex($im, '#1B1D20');
+    $green       = ig_hex($im, '#5FD68C');
+    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $bg);
     ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
 
     $margin = 80;
 
-    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'DEPARTURES', $muted, 8);
-    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'CINEMA, TX', $ink, 6);
+    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'CINEMA, TX', $muted, 8);
+    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'SHOWTIMES', $ink, 6);
 
     $y = 216;
     imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, strtoupper(date('l, F j', $date)));
@@ -1082,11 +1084,16 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $y += 44;
 
     // Column x-positions — the header row and every data row share these,
-    // so the whole page reads as one aligned table.
+    // so the whole page reads as one aligned table. TITLE's column carries
+    // the poster thumbnail too; TIME/VENUE/STATUS stay text-only.
+    $thumbW = 82;
+    $thumbH = 123;
+
     $colTime   = $margin;
-    $colTitle  = $margin + 150;
-    $colVenue  = $margin + 470;
-    $colStatus = $margin + 760;
+    $colPoster = $margin + 120;
+    $colTitle  = $colPoster + $thumbW + 20;
+    $colVenue  = $colTitle + 270 + 20;
+    $colStatus = $colVenue + 230 + 20;
 
     ig_tracked_text($im, 16, $colTime,   $y, IG_FONT_TERMINAL, 'TIME',   $dim, 4);
     ig_tracked_text($im, 16, $colTitle,  $y, IG_FONT_TERMINAL, 'TITLE',  $dim, 4);
@@ -1097,9 +1104,9 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     imagesetthickness($im, 2);
     imageline($im, $margin, $y, $w - $margin, $y, $divider);
     imagesetthickness($im, 1);
-    $y += 46;
+    $y += 30;
 
-    $rowHeight   = 78;
+    $rowHeight   = $thumbH + 30;
     $footerY     = $h - 60;
     $rowsAreaEnd = $footerY - 70;
     $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
@@ -1108,41 +1115,59 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $extra = count($films) - count($rows);
 
     if (empty($films)) {
-        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, 'NOTHING SCRAPED FOR TODAY — CHECK BACK LATER.');
+        imagettftext($im, 24, 0, $margin, $y + 40, $muted, IG_FONT_TERMINAL, 'NOTHING SCRAPED FOR TODAY — CHECK BACK LATER.');
     }
 
-    $timeMaxWidth   = $colTitle - $colTime - 20;
+    $timeMaxWidth   = $colPoster - $colTime - 20;
     $titleMaxWidth  = $colVenue - $colTitle - 20;
     $venueMaxWidth  = $colStatus - $colVenue - 20;
     $statusMaxWidth = ($w - $margin) - $colStatus;
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
-        $time = ig_fit_text(implode('/', array_map(fn($t) => date('g:iA', $t), $film['timestamps'] ?? [$film['timestamp']])), IG_FONT_TERMINAL, 22, $timeMaxWidth);
-        imagettftext($im, 22, 0, $colTime, $y, $ink, IG_FONT_TERMINAL, $time);
+        $textY = $y + (int) round($thumbH / 2) + 8;
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 24, $titleMaxWidth);
-        imagettftext($im, 24, 0, $colTitle, $y, $ink, IG_FONT_TERMINAL, $title);
+        $time = ig_fit_text(implode('/', array_map(fn($t) => date('g:iA', $t), $film['timestamps'] ?? [$film['timestamp']])), IG_FONT_TERMINAL, 18, $timeMaxWidth);
+        imagettftext($im, 18, 0, $colTime, $textY, $ink, IG_FONT_TERMINAL, $time);
 
-        $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, 16, $venueMaxWidth);
-        imagettftext($im, 16, 0, $colVenue, $y, $muted, IG_FONT_TERMINAL, $venue);
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $colPoster, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+            imagerectangle($im, $colPoster, $y, $colPoster + $thumbW, $y + $thumbH, $dim);
+        } else {
+            imagefilledrectangle($im, $colPoster, $y, $colPoster + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(24, 0, IG_FONT_TERMINAL, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 24, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_TERMINAL, $initial);
+        }
+        if (!empty($film['featured'])) {
+            ig_draw_featured_badge($im, $colPoster + 17, $y + 17, $gold, $bg);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 22, $titleMaxWidth);
+        imagettftext($im, 22, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
+
+        $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, 14, $venueMaxWidth);
+        imagettftext($im, 14, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
 
         if (!empty($film['featured'])) {
-            imagettftext($im, 18, 0, $colStatus, $y, $gold, IG_FONT_TERMINAL, ig_fit_text('FEATURED', IG_FONT_TERMINAL, 18, $statusMaxWidth));
+            imagettftext($im, 18, 0, $colStatus, $textY, $gold, IG_FONT_TERMINAL, ig_fit_text('FEATURED', IG_FONT_TERMINAL, 18, $statusMaxWidth));
         } else {
-            imagettftext($im, 18, 0, $colStatus, $y, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
+            imagettftext($im, 18, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
         }
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
-            imagefilledrectangle($im, $margin, $y - 30, $w - $margin, $y - 29, $divider);
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
         }
     }
 
     $totalMore = $extra + $moreCount;
     if ($totalMore > 0) {
         $label = "+{$totalMore} MORE";
-        $midY  = $y - 30 + (int) round(($footerY - 30 - ($y - 30)) / 2);
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
         $textY = $midY + 8;
         imagettftext($im, 26, 0, $margin, $textY, $ink, IG_FONT_TERMINAL, $label);
         if ($moreCount > 0) {
@@ -1826,21 +1851,64 @@ function ig_build_feature_page_terminal(array $film, $date) {
     $im = imagecreatetruecolor($w, $h);
     imagealphablending($im, true);
 
-    $bg      = ig_hex($im, '#0B0C0E');
-    $ink     = ig_hex($im, '#EDEBE2');
-    $muted   = ig_hex($im, '#6B6E73');
-    $dim     = ig_hex($im, '#3A3D42');
-    $divider = ig_hex($im, '#26282C');
-    $green   = ig_hex($im, '#5FD68C');
-    $gold    = ig_hex($im, '#F2C14E');
+    $bg          = ig_hex($im, '#0B0C0E');
+    $ink         = ig_hex($im, '#EDEBE2');
+    $muted       = ig_hex($im, '#6B6E73');
+    $dim         = ig_hex($im, '#3A3D42');
+    $divider     = ig_hex($im, '#26282C');
+    $placeholder = ig_hex($im, '#1B1D20');
+    $green       = ig_hex($im, '#5FD68C');
+    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $bg);
+
+    // The poster rides along the bottom edge instead of the full-bleed top
+    // hero every other theme uses — the rest of this page is a printed
+    // stub, so the photo reads as something tucked under it rather than
+    // the marquee attraction sitting above the type.
+    $posterH   = 450;
+    $posterTop = $h - $posterH;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $posterH);
+    if ($hero) {
+        imagecopy($im, $hero, 0, $posterTop, 0, 0, $w, $posterH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, $posterTop, $w, $h, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(84, 0, IG_FONT_TERMINAL, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 84, 0, (int) (($w - $iw) / 2), $posterTop + (int) ($posterH / 2) + 30, $muted, IG_FONT_TERMINAL, $initial);
+    }
+
+    // Fade where the poster meets the text above it — opaque background at
+    // the seam, fully transparent fadeH px in, so the photo emerges rather
+    // than cutting in on a hard edge.
+    $fadeH = 110;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * ($i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0x0B, 0x0C, 0x0E, $alpha);
+        imagefilledrectangle($im, 0, $posterTop + $i, $w, $posterTop + $i + 1, $band);
+    }
+
+    // A gradual scrim over the bottom of the photo so the footer stays
+    // legible sitting on top of it, regardless of what the poster looks
+    // like there — the same problem every theme's hero-image footer solves,
+    // just inverted since the image is at the bottom here instead of the top.
+    $scrimH   = 140;
+    $scrimTop = $h - $scrimH;
+    for ($i = 0; $i < $scrimH; $i++) {
+        $alpha = 127 - (int) round(64 * ($i / $scrimH));
+        $band  = imagecolorallocatealpha($im, 0, 0, 0, $alpha);
+        imagefilledrectangle($im, 0, $scrimTop + $i, $w, $scrimTop + $i + 1, $band);
+    }
+
     ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
 
     $margin = 80;
 
-    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'DEPARTURES', $muted, 8);
-    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'CINEMA, TX', $ink, 6);
+    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'CINEMA, TX', $muted, 8);
+    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'SHOWTIMES', $ink, 6);
 
     $y = 216;
     imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, strtoupper(date('l, F j', $date)));
@@ -1908,7 +1976,9 @@ function ig_build_feature_page_terminal(array $film, $date) {
     $y += 40;
 
     if (!empty($film['overview'])) {
-        foreach (ig_wrap_lines($film['overview'], IG_FONT_TERMINAL, 22, $textMaxWidth, 5) as $line) {
+        // 3 lines, not the 5 other themes' feature pages use — this page's
+        // bottom third is the poster now, not more room for body copy.
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_TERMINAL, 22, $textMaxWidth, 3) as $line) {
             imagettftext($im, 22, 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
             $y += 34;
         }
