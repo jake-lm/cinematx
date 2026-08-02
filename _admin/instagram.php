@@ -163,6 +163,19 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                     </svg>
                     <span>Marquee</span>
                   </a>
+                  <a class="ig-theme-swatch<?php echo $theme === 'zine' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'zine'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="96" height="120" fill="#F0EEE4"/>
+                      <rect width="96" height="6" fill="#161513"/>
+                      <rect x="10" y="14" width="30" height="8" fill="#FF3D8A"/>
+                      <rect x="10" y="34" width="50" height="6" fill="#161513"/>
+                      <rect x="10" y="46" width="70" height="16" fill="#E3DDD0"/>
+                      <rect x="10" y="70" width="60" height="6" fill="#161513"/>
+                      <rect x="10" y="80" width="40" height="4" fill="#8A8578"/>
+                      <rect x="10" y="88" width="30" height="4" fill="#FF3D8A"/>
+                    </svg>
+                    <span>Zine</span>
+                  </a>
                 </div>
               </div>
 
