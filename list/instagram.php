@@ -43,6 +43,11 @@ define('IG_FONT_NEWSPRINT_TITLE', dirname(__DIR__) . '/assets/fonts/RobotoSlab-B
 // rounded sans reads as neon just as well once glowed, and reads far
 // better as text — the glow is what's doing the "neon" work either way.
 define('IG_FONT_NEON_TITLE', dirname(__DIR__) . '/assets/fonts/Baloo2-Bold.ttf');
+// Terminal's face, for everything it draws — a monospaced pixel font built
+// for exactly this retro command-line/departure-board read, so the "board"
+// identity comes from the font itself rather than a drawn segment trick like
+// the star/arrow primitives elsewhere.
+define('IG_FONT_TERMINAL', dirname(__DIR__) . '/assets/fonts/DepartureMono-Regular.otf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -263,6 +268,45 @@ function ig_scanlines($im, $w, $h, $color, $spacing = 4) {
     }
 }
 
+// Text with manual letter-spacing — GD's imagettftext has no tracking
+// parameter, so wide-tracked labels (the one unmistakable "airport board"
+// typographic tell) are drawn one character at a time, each advanced by its
+// own width plus $tracking.
+function ig_tracked_text($im, $size, $x, $y, $font, $text, $color, $tracking = 6) {
+    $cx = $x;
+    foreach (preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+        imagettftext($im, $size, 0, (int) $cx, $y, $color, $font, $ch);
+        $box = imagettfbbox($size, 0, $font, $ch);
+        $cx += ($box[2] - $box[0]) + $tracking;
+    }
+    return $cx - $tracking;
+}
+
+// Small square indicator lights evenly spaced around a frame — the Terminal
+// theme's border, playing the same role Marquee's round glowing bulbs do,
+// but square and dim/monochrome: an information-display bezel rather than a
+// theatre marquee.
+function ig_led_border($im, $x1, $y1, $x2, $y2, $spacing, $color) {
+    $top   = $x2 - $x1;
+    $side  = $y2 - $y1;
+    $perim = 2 * $top + 2 * $side;
+    $n     = max(4, (int) round($perim / $spacing));
+
+    for ($i = 0; $i < $n; $i++) {
+        $d = ($i / $n) * $perim;
+        if ($d < $top) {
+            $x = $x1 + $d; $y = $y1;
+        } elseif ($d < $top + $side) {
+            $x = $x2; $y = $y1 + ($d - $top);
+        } elseif ($d < 2 * $top + $side) {
+            $x = $x2 - ($d - $top - $side); $y = $y2;
+        } else {
+            $x = $x1; $y = $y2 - ($d - 2 * $top - $side);
+        }
+        imagefilledrectangle($im, (int) $x - 2, (int) $y - 2, (int) $x + 2, (int) $y + 2, $color);
+    }
+}
+
 // A torn-paper edge instead of a ruled line — short segments alternating up
 // and down rather than one straight stroke.
 function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) {
@@ -367,6 +411,7 @@ const IG_THEMES = [
     'zine'      => 'Zine',
     'newsprint' => 'Newsprint',
     'neon'      => 'Neon',
+    'terminal'  => 'Terminal',
 ];
 
 // $moreCount is screenings that exist on a *later* list page — not this
@@ -379,6 +424,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
+        case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
         default:          return ig_build_list_page_paper($films, $date, $moreCount);
     }
 }
@@ -389,6 +435,7 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
         case 'zine':      return ig_build_feature_page_zine($film, $date);
         case 'newsprint': return ig_build_feature_page_newsprint($film, $date);
         case 'neon':      return ig_build_feature_page_neon($film, $date);
+        case 'terminal':  return ig_build_feature_page_terminal($film, $date);
         default:          return ig_build_feature_page_paper($film, $date);
     }
 }
@@ -993,6 +1040,120 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
+
+    return $im;
+}
+
+// A split-flap departure board: no photography at all (a real board doesn't
+// have posters), everything carried by the monospaced font, four literal
+// columns — TIME / TITLE / VENUE / STATUS — and a dim LED-dot bezel instead
+// of a themed border. STATUS is decorative flavor text rather than real
+// operational data (nothing here tracks delays), the same license the other
+// themes take with a REC dot or a torn-paper edge — Featured films read
+// "FEATURED" in gold there instead of the usual green "ON TIME", since this
+// theme has no poster corner to badge.
+function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg      = ig_hex($im, '#0B0C0E');
+    $ink     = ig_hex($im, '#EDEBE2');
+    $muted   = ig_hex($im, '#6B6E73');
+    $dim     = ig_hex($im, '#3A3D42');
+    $divider = ig_hex($im, '#26282C');
+    $green   = ig_hex($im, '#5FD68C');
+    $gold    = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $bg);
+    ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
+
+    $margin = 80;
+
+    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'DEPARTURES', $muted, 8);
+    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'CINEMA, TX', $ink, 6);
+
+    $y = 216;
+    imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, strtoupper(date('l, F j', $date)));
+    $y += 34;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 44;
+
+    // Column x-positions — the header row and every data row share these,
+    // so the whole page reads as one aligned table.
+    $colTime   = $margin;
+    $colTitle  = $margin + 150;
+    $colVenue  = $margin + 470;
+    $colStatus = $margin + 760;
+
+    ig_tracked_text($im, 16, $colTime,   $y, IG_FONT_TERMINAL, 'TIME',   $dim, 4);
+    ig_tracked_text($im, 16, $colTitle,  $y, IG_FONT_TERMINAL, 'TITLE',  $dim, 4);
+    ig_tracked_text($im, 16, $colVenue,  $y, IG_FONT_TERMINAL, 'VENUE',  $dim, 4);
+    ig_tracked_text($im, 16, $colStatus, $y, IG_FONT_TERMINAL, 'STATUS', $dim, 4);
+    $y += 20;
+
+    imagesetthickness($im, 2);
+    imageline($im, $margin, $y, $w - $margin, $y, $divider);
+    imagesetthickness($im, 1);
+    $y += 46;
+
+    $rowHeight   = 78;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, 'NOTHING SCRAPED FOR TODAY — CHECK BACK LATER.');
+    }
+
+    $timeMaxWidth   = $colTitle - $colTime - 20;
+    $titleMaxWidth  = $colVenue - $colTitle - 20;
+    $venueMaxWidth  = $colStatus - $colVenue - 20;
+    $statusMaxWidth = ($w - $margin) - $colStatus;
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $time = ig_fit_text(implode('/', array_map(fn($t) => date('g:iA', $t), $film['timestamps'] ?? [$film['timestamp']])), IG_FONT_TERMINAL, 22, $timeMaxWidth);
+        imagettftext($im, 22, 0, $colTime, $y, $ink, IG_FONT_TERMINAL, $time);
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 24, $titleMaxWidth);
+        imagettftext($im, 24, 0, $colTitle, $y, $ink, IG_FONT_TERMINAL, $title);
+
+        $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, 16, $venueMaxWidth);
+        imagettftext($im, 16, 0, $colVenue, $y, $muted, IG_FONT_TERMINAL, $venue);
+
+        if (!empty($film['featured'])) {
+            imagettftext($im, 18, 0, $colStatus, $y, $gold, IG_FONT_TERMINAL, ig_fit_text('FEATURED', IG_FONT_TERMINAL, 18, $statusMaxWidth));
+        } else {
+            imagettftext($im, 18, 0, $colStatus, $y, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
+        }
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 30, $w - $margin, $y - 29, $divider);
+        }
+    }
+
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $midY  = $y - 30 + (int) round(($footerY - 30 - ($y - 30)) / 2);
+        $textY = $midY + 8;
+        imagettftext($im, 26, 0, $margin, $textY, $ink, IG_FONT_TERMINAL, $label);
+        if ($moreCount > 0) {
+            $box = imagettfbbox(26, 0, IG_FONT_TERMINAL, $label);
+            $tw  = $box[2] - $box[0];
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $ink);
+        }
+    }
+
+    ig_tracked_text($im, 18, $margin, $footerY, IG_FONT_TERMINAL, 'FULL SCHEDULE AT CINEMATX.NET', $muted, 3);
 
     return $im;
 }
@@ -1650,6 +1811,114 @@ function ig_build_feature_page_neon(array $film, $date) {
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
+
+    return $im;
+}
+
+// A "gate card" for one film — no hero photo, same as the list page's no-
+// poster rule, so the whole page has to be carried by type: a big title,
+// then a row of bordered boarding-stub blocks (one per showtime, plus a
+// status block) standing in for the list page's TIME/STATUS columns now
+// that there's only one film to describe.
+function ig_build_feature_page_terminal(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg      = ig_hex($im, '#0B0C0E');
+    $ink     = ig_hex($im, '#EDEBE2');
+    $muted   = ig_hex($im, '#6B6E73');
+    $dim     = ig_hex($im, '#3A3D42');
+    $divider = ig_hex($im, '#26282C');
+    $green   = ig_hex($im, '#5FD68C');
+    $gold    = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $bg);
+    ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
+
+    $margin = 80;
+
+    ig_tracked_text($im, 20, $margin, 110, IG_FONT_TERMINAL, 'DEPARTURES', $muted, 8);
+    ig_tracked_text($im, 40, $margin, 168, IG_FONT_TERMINAL, 'CINEMA, TX', $ink, 6);
+
+    $y = 216;
+    imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_TERMINAL, strtoupper(date('l, F j', $date)));
+    $y += 34;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 60;
+
+    $textMaxWidth = $w - $margin * 2;
+
+    $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : ($film['venue'] ?? '');
+    if ($venue !== '') {
+        ig_tracked_text($im, 20, $margin, $y, IG_FONT_TERMINAL, mb_strtoupper($venue), $muted, 4);
+        $y += 56;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        imagettftext($im, 54, 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
+        $y += 66;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = mb_strtoupper($film['genres']);
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' MIN';
+    if ($deckParts) {
+        imagettftext($im, 22, 0, $margin, $y, $muted, IG_FONT_TERMINAL, implode('   ·   ', $deckParts));
+        $y += 40;
+    }
+
+    $y += 24;
+
+    // Boarding-stub blocks — bordered rectangles rather than the shared
+    // ig_pill() helper, since a rounded pill reads as software chrome and a
+    // square-cornered box reads as a printed stub. One per showtime, plus a
+    // status block carrying the same decorative Featured/On Time flavor text
+    // the list page's STATUS column uses.
+    $drawBlock = function ($im, $x, $y, $bw, $bh, $label, $value, $valueColor) use ($dim) {
+        imagesetthickness($im, 2);
+        imagerectangle($im, $x, $y, $x + $bw, $y + $bh, $dim);
+        imagesetthickness($im, 1);
+        ig_tracked_text($im, 13, $x + 16, $y + 28, IG_FONT_TERMINAL, $label, $dim, 3);
+        imagettftext($im, 26, 0, $x + 16, $y + $bh - 18, $valueColor, IG_FONT_TERMINAL, $value);
+    };
+
+    $blockH = 90;
+    $bx = $margin;
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $value = date('g:i A', $ts);
+        $box   = imagettfbbox(26, 0, IG_FONT_TERMINAL, $value);
+        $bw    = max(140, ($box[2] - $box[0]) + 32);
+        $drawBlock($im, $bx, $y, $bw, $blockH, 'TIME', $value, $ink);
+        $bx += $bw + 18;
+    }
+
+    $statusValue = !empty($film['featured']) ? 'FEATURED' : 'ON TIME';
+    $statusColor = !empty($film['featured']) ? $gold : $green;
+    $box = imagettfbbox(26, 0, IG_FONT_TERMINAL, $statusValue);
+    $bw  = ($box[2] - $box[0]) + 40;
+    $drawBlock($im, $bx, $y, $bw, $blockH, 'STATUS', $statusValue, $statusColor);
+    $y += $blockH + 44;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 40;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_TERMINAL, 22, $textMaxWidth, 5) as $line) {
+            imagettftext($im, 22, 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
+            $y += 34;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 18, 0, $margin, $footerY - 30, $muted, IG_FONT_TERMINAL, 'DIR. ' . mb_strtoupper($film['director']));
+    }
+    ig_tracked_text($im, 18, $margin, $footerY, IG_FONT_TERMINAL, 'FULL SCHEDULE AT CINEMATX.NET', $muted, 3);
 
     return $im;
 }

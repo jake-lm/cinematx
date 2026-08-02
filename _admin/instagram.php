@@ -204,6 +204,25 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                     </svg>
                     <span>Neon</span>
                   </a>
+                  <a class="ig-theme-swatch<?php echo $theme === 'terminal' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'terminal'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="96" height="120" fill="#0B0C0E"/>
+                      <rect x="4" y="4" width="88" height="112" fill="none" stroke="#3A3D42" stroke-width="2"/>
+                      <rect x="10" y="14" width="30" height="6" fill="#6B6E73"/>
+                      <rect x="10" y="26" width="50" height="8" fill="#EDEBE2"/>
+                      <rect x="10" y="42" width="76" height="1" fill="#26282C"/>
+                      <rect x="10" y="50" width="18" height="4" fill="#3A3D42"/>
+                      <rect x="34" y="50" width="18" height="4" fill="#3A3D42"/>
+                      <rect x="62" y="50" width="18" height="4" fill="#3A3D42"/>
+                      <rect x="10" y="62" width="20" height="6" fill="#EDEBE2"/>
+                      <rect x="34" y="62" width="26" height="6" fill="#EDEBE2"/>
+                      <rect x="66" y="62" width="16" height="6" fill="#5FD68C"/>
+                      <rect x="10" y="76" width="20" height="6" fill="#EDEBE2"/>
+                      <rect x="34" y="76" width="30" height="6" fill="#EDEBE2"/>
+                      <rect x="66" y="76" width="16" height="6" fill="#F2C14E"/>
+                    </svg>
+                    <span>Terminal</span>
+                  </a>
                 </div>
               </div>
 
