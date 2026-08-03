@@ -24,6 +24,11 @@ $now   = time();
 $films = ig_today_films($conn);
 $saved = ig_compose_read($now);
 
+$alamo_films    = ig_alamo_films($conn);
+$alamo_selected = ig_alamo_read($now);
+foreach ($alamo_films as &$af) { $af['checked'] = in_array(ig_alamo_key($af), $alamo_selected, true); }
+unset($af);
+
 $mode = $_GET['mode'] ?? $saved['mode'];
 if (!in_array($mode, ['default', 'auto', 'manual'], true)) $mode = 'default';
 $per_page = isset($_GET['per_page']) ? max(1, (int) $_GET['per_page']) : ($saved['per_page'] ?: 6);
@@ -356,14 +361,51 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           </section>
 
           <section class="card adm-card">
+            <div class="card__head">
+              <span class="card__title">Alamo Drafthouse</span>
+              <span class="adm-count"><?php echo count($alamo_films); ?></span>
+            </div>
+            <?php if ($alamo_films): ?>
+            <form action="/_admin/instagram_alamo.php" method="post">
+              <?php echo admin_csrf_field(); ?>
+              <div class="card__body card__body--flush">
+                <?php foreach ($alamo_films as $af): ?>
+                <label class="adm-row adm-row--check">
+                  <input type="checkbox" name="alamo[]" value="<?php echo $e(ig_alamo_key($af)); ?>"<?php echo $af['checked'] ? ' checked' : ''; ?>>
+                  <span class="adm-row__text">
+                    <span class="adm-row__title"><?php echo $e(mb_strtoupper($af['title'])); ?></span>
+                    <span class="adm-row__sub">
+                      Alamo Drafthouse<?php if ($af['director']): ?> &middot; dir. <?php echo $e($af['director']); ?><?php endif; ?>
+                    </span>
+                  </span>
+                  <span class="adm-row__when"><?php echo $e(ig_format_times($af['timestamps'])); ?></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+              <div class="card__body">
+                <div class="admin-note" style="margin:0 0 var(--s-3)">
+                  Left off the card by default &mdash; check any of today's Alamo screenings to fold
+                  them in. Every location and showtime for a title is combined into one line.
+                </div>
+                <button class="btn btn--quiet btn--sm" type="submit">Save Alamo picks</button>
+              </div>
+            </form>
+            <?php else: ?>
+            <div class="card__body card__body--flush">
+              <div class="adm-empty">Nothing scraped for today</div>
+            </div>
+            <?php endif; ?>
+          </section>
+
+          <section class="card adm-card">
             <div class="card__head"><span class="card__title">Where this comes from</span></div>
             <div class="card__body">
               <div class="admin-note" style="margin:0">
                 Today's screenings at <strong>Austin Film Society</strong>, the
                 <strong>Paramount</strong> and <strong>Hyperreal Film Club</strong>, from the same
-                scrape The List runs on. Chains and member-submitted events are left out on purpose.
-                The cron job posts this automatically each morning once it is enabled &mdash; until
-                then it waits for the button.
+                scrape The List runs on. Chains and member-submitted events are left out by default
+                &mdash; Alamo Drafthouse can be folded in per screening above. The cron job posts this
+                automatically each morning once it is enabled &mdash; until then it waits for the button.
               </div>
             </div>
           </section>

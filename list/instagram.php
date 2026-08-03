@@ -52,8 +52,10 @@ define('IG_FONT_TERMINAL', dirname(__DIR__) . '/assets/fonts/DepartureMono-Regul
 // ── Data ─────────────────────────────────────────────────────────────────
 
 // The three arthouse venues this post is meant to promote — not the chains
-// (Alamo Drafthouse, Fathom Events) and not member-submitted `events`.
+// (Alamo Drafthouse, Fathom Events) and not member-submitted `events`. Alamo
+// is still selectable on a per-day basis, though — see ig_alamo_films().
 const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club'];
+const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
 // Today's window in the project's own timezone (America/Chicago, set in
 // database.php). $force is false — this rides on whatever warm-cache.php
@@ -82,6 +84,22 @@ function ig_today_films($conn) {
 
     $films = ig_group_showtimes($films);
 
+    // Alamo is left out of IG_VENUES above (a chain, not the arthouse lineup
+    // this post is meant to promote) but can be opted into per day through
+    // the admin checklist — fold in whichever ones were checked. Only
+    // touches ig_alamo_films() (a second scrape-cache read, see
+    // list/cache.php — cheap, not a live re-scrape) when there's actually a
+    // selection to honor, so a day nobody checks anything on costs nothing.
+    $alamoSelected = ig_alamo_read($start);
+    if ($alamoSelected) {
+        $alamo = array_values(array_filter(
+            ig_alamo_films($conn),
+            fn($f) => in_array(ig_alamo_key($f), $alamoSelected, true)
+        ));
+        $films = array_merge($films, $alamo);
+        usort($films, fn($a, $b) => min($a['timestamps']) <=> min($b['timestamps']));
+    }
+
     $featured = ig_featured_read($start);
     foreach ($films as &$f) {
         $f['featured'] = in_array(ig_film_key($f), $featured, true);
@@ -89,6 +107,41 @@ function ig_today_films($conn) {
     unset($f);
 
     return $films;
+}
+
+/**
+ * Today's Alamo Drafthouse screenings, one row per film with every location
+ * and showtime folded together — Alamo books the same title into up to 5
+ * Austin cinemas, sometimes several times a night, and per-location rows
+ * would make the opt-in checklist unusably long. `location` is dropped
+ * entirely on the merged row rather than keeping whichever one was seen
+ * first: once two cinemas are folded into one line, no single location is
+ * accurate to show.
+ *
+ * Not filtered into the card by default — this is purely what the admin
+ * checklist offers. See ig_today_films() for where a day's selections
+ * actually get merged in.
+ */
+function ig_alamo_films($conn) {
+    $start = strtotime('today');
+    $end   = strtotime('tomorrow') - 1;
+    $films = fetch_all_screenings($conn, $start, $end, false);
+    $films = array_values(array_filter($films, fn($f) => ($f['venue'] ?? '') === IG_ALAMO_VENUE));
+    $films = ctx_enrich($films);
+    foreach ($films as &$f) {
+        if (!empty($f['display_title'])) $f['title'] = $f['display_title'];
+        $f['location'] = null;
+    }
+    unset($f);
+
+    return ig_group_showtimes($films, 'ig_alamo_key');
+}
+
+// Alamo's checklist identity — title only, deliberately coarser than
+// ig_film_key() (title+venue+location), since every Alamo location is
+// meant to collapse into the same checkbox rather than getting one each.
+function ig_alamo_key(array $film) {
+    return mb_strtolower(trim($film['title']));
 }
 
 // Same identity a film has for grouping repeat showtimes and for the
@@ -106,11 +159,15 @@ function ig_film_key(array $film) {
  * fetches one day) collapse into a single entry carrying a `timestamps`
  * array; every other field is kept from whichever showing was seen first,
  * since it comes from the same TMDB lookup either way.
+ *
+ * $keyFn defaults to ig_film_key() (title+venue+location) but takes
+ * ig_alamo_key() (title only) too, for folding every Alamo location into
+ * one row instead of one per location.
  */
-function ig_group_showtimes(array $films) {
+function ig_group_showtimes(array $films, $keyFn = 'ig_film_key') {
     $groups = [];
     foreach ($films as $film) {
-        $key = ig_film_key($film);
+        $key = $keyFn($film);
         if (isset($groups[$key])) {
             $groups[$key]['timestamps'][] = $film['timestamp'];
         } else {
@@ -119,7 +176,17 @@ function ig_group_showtimes(array $films) {
         }
     }
 
-    $out = array_values($groups);
+    $out = [];
+    foreach ($groups as $g) {
+        // Folding several Alamo locations together can carry in the same
+        // showtime twice (two cinemas running the same 7:00 print) — a
+        // plain ig_film_key() grouping never hits this since one venue+
+        // location doesn't repeat a showing, but it costs nothing to guard
+        // here for both.
+        $g['timestamps'] = array_values(array_unique($g['timestamps']));
+        sort($g['timestamps']);
+        $out[] = $g;
+    }
     usort($out, fn($a, $b) => min($a['timestamps']) <=> min($b['timestamps']));
     return $out;
 }
@@ -2185,6 +2252,26 @@ function ig_featured_write($date, array $keys) {
     $dir = dirname(__DIR__) . '/uploads/social';
     if (!is_dir($dir)) mkdir($dir, 0775, true);
     file_put_contents(ig_featured_path($date), json_encode(array_values($keys)));
+}
+
+// Which Alamo films today's admin opted into the card — same read/write
+// shape as Featured, but keyed by ig_alamo_key() (title only) rather than
+// ig_film_key(), since the checklist itself is one row per title.
+function ig_alamo_path($date) {
+    return dirname(__DIR__) . '/uploads/social/alamo-' . date('Y-m-d', $date) . '.json';
+}
+
+function ig_alamo_read($date) {
+    $file = ig_alamo_path($date);
+    if (!file_exists($file)) return [];
+    $data = json_decode(file_get_contents($file), true);
+    return is_array($data) ? $data : [];
+}
+
+function ig_alamo_write($date, array $keys) {
+    $dir = dirname(__DIR__) . '/uploads/social';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    file_put_contents(ig_alamo_path($date), json_encode(array_values($keys)));
 }
 
 /**
