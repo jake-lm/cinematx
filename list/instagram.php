@@ -903,6 +903,7 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
     imagealphablending($im, true);
 
     $paper       = ig_hex($im, '#E8E4D5');
+    $stripe      = ig_hex($im, '#DFDBCC');
     $red         = ig_hex($im, '#922E32');
     $ink         = ig_hex($im, '#1C1B19');
     $muted       = ig_hex($im, '#6B675C');
@@ -914,7 +915,7 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 
     $margin = 80;
 
-    imagettftext($im, 46, 0, $margin, 108, $ink, IG_FONT_NEWSPRINT_TITLE, 'CINEMA, TX');
+    imagettftext($im, 34, 0, $margin, 108, $ink, IG_FONT_NEWSPRINT_TITLE, 'CINEMA, TX');
     imagefilledrectangle($im, $margin, 126, $w - $margin, 130, $ink);
     imagefilledrectangle($im, $margin, 136, $w - $margin, 137, $ink);
 
@@ -945,6 +946,12 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Zebra banding, same quiet trick as Neon's list page — every other
+        // row gets a faintly darker strip behind it.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             ig_grayscale_print($thumb);
