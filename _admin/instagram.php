@@ -228,6 +228,26 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                     </svg>
                     <span>Terminal</span>
                   </a>
+                  <a class="ig-theme-swatch<?php echo $theme === 'darkroom' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'darkroom'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <rect width="96" height="120" fill="#120D0A"/>
+                      <rect x="0" y="0" width="8" height="120" fill="#1D1611"/>
+                      <rect x="88" y="0" width="8" height="120" fill="#1D1611"/>
+                      <g fill="#120D0A">
+                        <rect x="2" y="6" width="4" height="7" rx="2"/><rect x="2" y="20" width="4" height="7" rx="2"/><rect x="2" y="34" width="4" height="7" rx="2"/><rect x="2" y="48" width="4" height="7" rx="2"/><rect x="2" y="62" width="4" height="7" rx="2"/><rect x="2" y="76" width="4" height="7" rx="2"/><rect x="2" y="90" width="4" height="7" rx="2"/><rect x="2" y="104" width="4" height="7" rx="2"/>
+                        <rect x="90" y="6" width="4" height="7" rx="2"/><rect x="90" y="20" width="4" height="7" rx="2"/><rect x="90" y="34" width="4" height="7" rx="2"/><rect x="90" y="48" width="4" height="7" rx="2"/><rect x="90" y="62" width="4" height="7" rx="2"/><rect x="90" y="76" width="4" height="7" rx="2"/><rect x="90" y="90" width="4" height="7" rx="2"/><rect x="90" y="104" width="4" height="7" rx="2"/>
+                      </g>
+                      <rect x="16" y="14" width="24" height="6" fill="#F0E6D8"/>
+                      <circle cx="76" cy="16" r="6" fill="none" stroke="#E08A3E" stroke-width="1.5"/>
+                      <rect x="16" y="34" width="30" height="6" fill="#E08A3E"/>
+                      <rect x="16" y="46" width="50" height="10" fill="#F0E6D8"/>
+                      <rect x="16" y="66" width="16" height="24" fill="#3A2A1C"/>
+                      <rect x="36" y="70" width="34" height="6" fill="#E08A3E"/>
+                      <rect x="36" y="80" width="26" height="4" fill="#8A7D6E"/>
+                      <rect x="36" y="88" width="20" height="4" fill="#B33B1E"/>
+                    </svg>
+                    <span>Darkroom</span>
+                  </a>
                 </div>
               </div>
 

@@ -48,6 +48,10 @@ define('IG_FONT_NEON_TITLE', dirname(__DIR__) . '/assets/fonts/Baloo2-Bold.ttf')
 // identity comes from the font itself rather than a drawn segment trick like
 // the star/arrow primitives elsewhere.
 define('IG_FONT_TERMINAL', dirname(__DIR__) . '/assets/fonts/DepartureMono-Regular.otf');
+// Darkroom's title face — a clean single-weight stencil, the way a film can
+// or a darkroom equipment label is actually lettered. All-caps only, which
+// suits it: stencils don't have a lowercase to skip.
+define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStencil-Regular.ttf');
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
@@ -401,6 +405,75 @@ function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) 
     }
 }
 
+// A 35mm filmstrip's sprocket-hole edge — a side margin the full height of
+// the card, punched with evenly spaced perforations, the same rect+circle-
+// ends construction ig_pill() uses for a rounded shape, just oriented as a
+// short vertical stadium instead of a wide horizontal one.
+function ig_sprocket_edge($im, $x, $h, $stripW, $stripColor, $holeColor, $spacing = 64) {
+    imagefilledrectangle($im, $x, 0, $x + $stripW, $h, $stripColor);
+
+    $holeW = (int) round($stripW * 0.5);
+    $holeH = (int) round($holeW * 1.5);
+    $cx    = $x + (int) round($stripW / 2);
+    $r     = (int) round($holeW / 2);
+
+    for ($cy = (int) round($spacing / 2); $cy < $h; $cy += $spacing) {
+        $top = $cy - (int) round($holeH / 2) + $r;
+        $bot = $cy + (int) round($holeH / 2) - $r;
+        imagefilledrectangle($im, $cx - $r, $top, $cx + $r, $bot, $holeColor);
+        imagefilledellipse($im, $cx, $top, $holeW, $holeW, $holeColor);
+        imagefilledellipse($im, $cx, $bot, $holeW, $holeW, $holeColor);
+    }
+}
+
+// A hand-drawn grease-pencil circle — an editor's mark circling a keeper
+// frame on a workprint, not a clean CAD-perfect ring. Built from short
+// straight segments around the circle with a small random radius jitter
+// per segment, and a few segments of overshoot past a full turn so it never
+// quite closes clean, the way an actual hand-drawn circle never does.
+function ig_grease_circle($im, $cx, $cy, $r, $color, $thickness = 5) {
+    imagesetthickness($im, $thickness);
+    $segments = 28;
+    $overshoot = 3;
+    $px = null; $py = null;
+    for ($i = 0; $i <= $segments + $overshoot; $i++) {
+        $angle  = ($i / $segments) * 2 * M_PI - M_PI / 2;
+        $jitter = $r * (mt_rand(-6, 6) / 100);
+        $x = $cx + ($r + $jitter) * cos($angle);
+        $y = $cy + ($r + $jitter) * sin($angle);
+        if ($px !== null) imageline($im, (int) $px, (int) $py, (int) $x, (int) $y, $color);
+        $px = $x; $py = $y;
+    }
+    imagesetthickness($im, 1);
+}
+
+// The circle-and-tick countdown leader a 35mm print used to open with — a
+// small decorative corner mark, the same role Neon's REC dot or Marquee's
+// bulb corner plays: one unmistakable "this is film" flourish. Four ticks
+// read as a dial without trying to be a literal stopwatch face.
+function ig_leader_mark($im, $cx, $cy, $r, $color) {
+    imagesetthickness($im, 2);
+    imageellipse($im, $cx, $cy, $r * 2, $r * 2, $color);
+    imageellipse($im, $cx, $cy, (int) ($r * 1.15), (int) ($r * 1.15), $color);
+    for ($i = 0; $i < 4; $i++) {
+        $angle = $i * (M_PI / 2);
+        $x1 = $cx + ($r * 0.55) * cos($angle);
+        $y1 = $cy + ($r * 0.55) * sin($angle);
+        $x2 = $cx + $r * cos($angle);
+        $y2 = $cy + $r * sin($angle);
+        imageline($im, (int) $x1, (int) $y1, (int) $x2, (int) $y2, $color);
+    }
+    imagesetthickness($im, 1);
+}
+
+// A splice mark instead of a ruled line — the dashed cut-guide a film
+// editor's tape splicer prints across the frame line, not a printer's rule.
+function ig_dashed_line($im, $x1, $x2, $y, $color, $dash = 10, $gap = 8) {
+    for ($x = $x1; $x < $x2; $x += $dash + $gap) {
+        imageline($im, (int) $x, (int) $y, (int) min($x2, $x + $dash), (int) $y, $color);
+    }
+}
+
 // Downloads a poster (TMDB, w300) once and caches it — the same handful of
 // repertory titles recur night after night, no reason to refetch. Returns a
 // cropped-to-cover GD image sized exactly $w x $h, or null on any miss/failure
@@ -490,6 +563,7 @@ const IG_THEMES = [
     'newsprint' => 'Newsprint',
     'neon'      => 'Neon',
     'terminal'  => 'Terminal',
+    'darkroom'  => 'Darkroom',
 ];
 
 // $moreCount is screenings that exist on a *later* list page — not this
@@ -503,6 +577,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
+        case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount);
         default:          return ig_build_list_page_paper($films, $date, $moreCount);
     }
 }
@@ -514,6 +589,7 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
         case 'newsprint': return ig_build_feature_page_newsprint($film, $date);
         case 'neon':      return ig_build_feature_page_neon($film, $date);
         case 'terminal':  return ig_build_feature_page_terminal($film, $date);
+        case 'darkroom':  return ig_build_feature_page_darkroom($film, $date);
         default:          return ig_build_feature_page_paper($film, $date);
     }
 }
@@ -1286,6 +1362,123 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     }
 
     ig_tracked_text($im, 18, $margin, $footerY, IG_FONT_TERMINAL, 'FULL SCHEDULE AT CINEMATX.NET', $muted, 3);
+
+    return $im;
+}
+
+// A darkroom at safelight — near-black and warm rather than neon's cool
+// purple-black, sprocket-hole filmstrip edges instead of a bordering frame,
+// a stencilled title face like a film can's own lettering, and everything
+// in one warm red/amber/cream family rather than a multi-hue palette: a
+// real safelight only ever shows one color — but posters stay untinted, full
+// color, like Neon's (unlike Zine's pink duotone or Newsprint's grayscale),
+// since a printed still isn't what's under the safelight, the film is.
+// Featured swaps the star-badge every other theme uses for a hand-drawn grease-
+// pencil circle around the poster — an editor circling a keeper frame —
+// still in the same fixed gold every theme's Featured mark uses.
+function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#120D0A');
+    $strip       = ig_hex($im, '#1D1611');
+    $ink         = ig_hex($im, '#F0E6D8');
+    $amber       = ig_hex($im, '#E08A3E');
+    $rust        = ig_hex($im, '#B33B1E');
+    $muted       = ig_hex($im, '#8A7D6E');
+    $placeholder = ig_hex($im, '#241C15');
+    $gold        = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $bg);
+    ig_sprocket_edge($im, 0, $h, 56, $strip, $bg);
+    ig_sprocket_edge($im, $w - 56, $h, 56, $strip, $bg);
+
+    $margin = 100;
+
+    imagettftext($im, 28, 0, $margin, 110, $ink, IG_FONT_DARKROOM_TITLE, 'CINEMA, TX');
+    $stampBox = imagettfbbox(28, 0, IG_FONT_DARKROOM_TITLE, 'CINEMA, TX');
+    imagefilledrectangle($im, $margin, 122, $margin + ($stampBox[2] - $stampBox[0]), 124, $amber);
+
+    ig_leader_mark($im, $w - $margin - 30, 70, 28, $amber);
+
+    $y = 175;
+    imagettftext($im, 24, 0, $margin, $y, $amber, IG_FONT_BODY, strtoupper("Today's Reel"));
+    $y += 50;
+    $amberGlow = imagecolorallocatealpha($im, 0xE0, 0x8A, 0x3E, 105);
+    ig_neon_text($im, 44, $margin, $y, IG_FONT_DARKROOM_TITLE, date('l, F j', $date), $ink, $amberGlow);
+    $y += 36;
+    ig_dashed_line($im, $margin, $w - $margin, $y, $rust, 12, 8);
+    $y += 40;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_DARKROOM_TITLE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_DARKROOM_TITLE, $initial);
+        }
+
+        if (!empty($film['featured'])) {
+            ig_grease_circle($im, $margin + (int) ($thumbW / 2), $y + (int) ($thumbH / 2), 63, $gold, 5);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 30, $textMaxWidth);
+        imagettftext($im, 30, 0, $textX, $y + 40, $amber, IG_FONT_DARKROOM_TITLE, $title);
+
+        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $rust, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            ig_dashed_line($im, $margin, $w - $margin, $y - 15, $strip, 12, 8);
+        }
+    }
+
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
+        imagettftext($im, 28, 0, $margin, $textY, $amber, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $amber);
+        }
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     return $im;
 }
@@ -2104,6 +2297,131 @@ function ig_build_feature_page_terminal(array $film, $date) {
         imagettftext($im, 18, 0, $margin, $footerY - 30, $muted, IG_FONT_TERMINAL, 'DIR. ' . mb_strtoupper($film['director']));
     }
     ig_tracked_text($im, 18, $margin, $footerY, IG_FONT_TERMINAL, 'FULL SCHEDULE AT CINEMATX.NET', $muted, 3);
+
+    return $im;
+}
+
+// One film's frame under the safelight — full-bleed hero (same as Paper/
+// Zine/Newsprint/Neon, unlike Terminal's bottom-anchored band), sprocket
+// edges running the full height on top of everything including the hero,
+// and rubber-stamped rectangles for showtimes/Featured rather than a pill —
+// a pill reads as software chrome, a bordered stamp reads as something
+// pressed onto a workprint can.
+function ig_build_feature_page_darkroom(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $bg          = ig_hex($im, '#120D0A');
+    $strip       = ig_hex($im, '#1D1611');
+    $ink         = ig_hex($im, '#F0E6D8');
+    $amber       = ig_hex($im, '#E08A3E');
+    $rust        = ig_hex($im, '#B33B1E');
+    $muted       = ig_hex($im, '#8A7D6E');
+    $placeholder = ig_hex($im, '#241C15');
+    $gold        = ig_hex($im, '#F2C14E');
+    $amberGlow   = imagecolorallocatealpha($im, 0xE0, 0x8A, 0x3E, 105);
+
+    imagefill($im, 0, 0, $bg);
+
+    $margin = 100;
+    $heroH  = 650;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    if ($hero) {
+        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(90, 0, IG_FONT_DARKROOM_TITLE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        ig_neon_text($im, 90, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 32, IG_FONT_DARKROOM_TITLE, $initial, $muted, $amberGlow);
+    }
+
+    $fadeH = 130;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0x12, 0x0D, 0x0A, $alpha);
+        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
+    }
+
+    ig_sprocket_edge($im, 0, $h, 56, $strip, $bg);
+    ig_sprocket_edge($im, $w - 56, $h, 56, $strip, $bg);
+
+    // No "CINEMA, TX" wordmark or leader mark here — full-color hero art
+    // underneath means no guaranteed contrast for plain text the way the
+    // list page's solid background gives it. The list page (always page 1)
+    // already establishes the brand mark once per carousel; this page's
+    // real estate goes to the stamps, same reasoning Paper's feature page
+    // already uses for the same tradeoff.
+    $drawStamp = function ($im, $x, $y, $bw, $bh, $label, $color) {
+        imagesetthickness($im, 2);
+        imagerectangle($im, $x, $y, $x + $bw, $y + $bh, $color);
+        imagesetthickness($im, 1);
+        imagettftext($im, 24, 0, $x + 18, $y + $bh - 17, $color, IG_FONT_BODY, $label);
+    };
+
+    $sx = $margin;
+    $sy = $heroH + 30;
+    $stampH = 50;
+
+    if (!empty($film['featured'])) {
+        $box = imagettfbbox(24, 0, IG_FONT_BODY, 'FEATURED');
+        $bw  = ($box[2] - $box[0]) + 36;
+        $drawStamp($im, $sx, $sy, $bw, $stampH, 'FEATURED', $gold);
+        $sx += $bw + 16;
+    }
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox(24, 0, IG_FONT_BODY, $label);
+        $bw    = ($box[2] - $box[0]) + 36;
+        $drawStamp($im, $sx, $sy, $bw, $stampH, $label, $amber);
+        $sx += $bw + 16;
+    }
+
+    $textMaxWidth = $w - $margin * 2;
+    $y = $sy + $stampH + 46;
+
+    $kicker = strtoupper($film['venue'] ?? '');
+    if ($kicker !== '') {
+        imagettftext($im, 24, 0, $margin, $y, $amber, IG_FONT_BODY, $kicker);
+        $y += 66;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        ig_neon_text($im, 50, $margin, $y, IG_FONT_DARKROOM_TITLE, $line, $ink, $amberGlow);
+        $y += 62;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = $film['genres'];
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' min';
+    if ($deckParts) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, implode('  ·  ', $deckParts));
+        $y += 44;
+    }
+
+    $y += 16;
+    ig_dashed_line($im, $margin, $w - $margin, $y, $rust, 12, 8);
+    $y += 36;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 26, $textMaxWidth, 4) as $line) {
+            imagettftext($im, 26, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 38;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
+    }
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     return $im;
 }
