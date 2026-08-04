@@ -61,10 +61,12 @@ define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStenci
 const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club'];
 const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
-// Today's window in the project's own timezone (America/Chicago, set in
-// database.php). $force is false — this rides on whatever warm-cache.php
-// has already scraped, same as a normal page request.
-function ig_today_films($conn) {
+// Today's raw arthouse lineup (IG_VENUES) — always the full day, regardless
+// of what a prior save excluded, the same "full day, independent of the
+// selection" shape ig_alamo_films() uses. ig_today_films() is what actually
+// applies exclusions; this is what the admin checklist offers to exclude
+// from, so unchecking something is always reversible.
+function ig_arthouse_films($conn) {
     $start = strtotime('today');
     $end   = strtotime('tomorrow') - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
@@ -86,7 +88,24 @@ function ig_today_films($conn) {
     }
     unset($f);
 
-    $films = ig_group_showtimes($films);
+    return ig_group_showtimes($films);
+}
+
+// Today's window in the project's own timezone (America/Chicago, set in
+// database.php). $force is false — this rides on whatever warm-cache.php
+// has already scraped, same as a normal page request.
+function ig_today_films($conn) {
+    $start = strtotime('today');
+
+    // Every arthouse screening is on the card by default — the admin
+    // checklist is opt-*out*, the mirror image of Alamo's opt-in below, so
+    // an empty/absent exclude-list (every day nobody's touched) reproduces
+    // today's exact current behavior.
+    $excluded = ig_excluded_read($start);
+    $films = array_values(array_filter(
+        ig_arthouse_films($conn),
+        fn($f) => !in_array(ig_film_key($f), $excluded, true)
+    ));
 
     // Alamo is left out of IG_VENUES above (a chain, not the arthouse lineup
     // this post is meant to promote) but can be opted into per day through
@@ -104,6 +123,9 @@ function ig_today_films($conn) {
         usort($films, fn($a, $b) => min($a['timestamps']) <=> min($b['timestamps']));
     }
 
+    // Featured never needs its own inclusion logic — it just flags whatever
+    // survived the two filters above, so it always matches what's actually
+    // going on the card.
     $featured = ig_featured_read($start);
     foreach ($films as &$f) {
         $f['featured'] = in_array(ig_film_key($f), $featured, true);
@@ -2597,6 +2619,28 @@ function ig_alamo_write($date, array $keys) {
     $dir = dirname(__DIR__) . '/uploads/social';
     if (!is_dir($dir)) mkdir($dir, 0775, true);
     file_put_contents(ig_alamo_path($date), json_encode(array_values($keys)));
+}
+
+// Which arthouse films today's admin opted *out* of the card — the mirror
+// of Alamo's opt-in list above, keyed by ig_film_key() same as Featured
+// since this checklist is the same one-row-per-venue-screening granularity.
+// Empty/absent means nothing excluded, i.e. today's default: every arthouse
+// screening included.
+function ig_excluded_path($date) {
+    return dirname(__DIR__) . '/uploads/social/excluded-' . date('Y-m-d', $date) . '.json';
+}
+
+function ig_excluded_read($date) {
+    $file = ig_excluded_path($date);
+    if (!file_exists($file)) return [];
+    $data = json_decode(file_get_contents($file), true);
+    return is_array($data) ? $data : [];
+}
+
+function ig_excluded_write($date, array $keys) {
+    $dir = dirname(__DIR__) . '/uploads/social';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    file_put_contents(ig_excluded_path($date), json_encode(array_values($keys)));
 }
 
 /**

@@ -29,6 +29,11 @@ $alamo_selected = ig_alamo_read($now);
 foreach ($alamo_films as &$af) { $af['checked'] = in_array(ig_alamo_key($af), $alamo_selected, true); }
 unset($af);
 
+$arthouse_films = ig_arthouse_films($conn);
+$excluded_keys  = ig_excluded_read($now);
+foreach ($arthouse_films as &$rf) { $rf['included'] = !in_array(ig_film_key($rf), $excluded_keys, true); }
+unset($rf);
+
 $mode = $_GET['mode'] ?? $saved['mode'];
 if (!in_array($mode, ['default', 'auto', 'manual'], true)) $mode = 'default';
 $per_page = isset($_GET['per_page']) ? max(1, (int) $_GET['per_page']) : ($saved['per_page'] ?: 6);
@@ -342,6 +347,43 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 </form>
               <?php endif; ?>
             </div>
+          </section>
+
+          <section class="card adm-card">
+            <div class="card__head">
+              <span class="card__title">Today's Screenings</span>
+              <span class="adm-count"><?php echo count($arthouse_films); ?></span>
+            </div>
+            <?php if ($arthouse_films): ?>
+            <form action="/_admin/instagram_exclude.php" method="post">
+              <?php echo admin_csrf_field(); ?>
+              <div class="card__body card__body--flush">
+                <?php foreach ($arthouse_films as $rf): ?>
+                <label class="adm-row adm-row--check">
+                  <input type="checkbox" name="included[]" value="<?php echo $e(ig_film_key($rf)); ?>"<?php echo $rf['included'] ? ' checked' : ''; ?>>
+                  <span class="adm-row__text">
+                    <span class="adm-row__title"><?php echo $e(mb_strtoupper($rf['title'])); ?></span>
+                    <span class="adm-row__sub">
+                      <?php echo $e($rf['venue']); ?><?php if ($rf['director']): ?> &middot; dir. <?php echo $e($rf['director']); ?><?php endif; ?>
+                    </span>
+                  </span>
+                  <span class="adm-row__when"><?php echo $e(ig_format_times($rf['timestamps'])); ?></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+              <div class="card__body">
+                <div class="admin-note" style="margin:0 0 var(--s-3)">
+                  Every arthouse screening is on the card by default &mdash; uncheck any you'd
+                  rather leave off today (say, swapping one in from Alamo below instead).
+                </div>
+                <button class="btn btn--quiet btn--sm" type="submit">Save lineup</button>
+              </div>
+            </form>
+            <?php else: ?>
+            <div class="card__body card__body--flush">
+              <div class="adm-empty">Nothing scraped for today</div>
+            </div>
+            <?php endif; ?>
           </section>
 
           <section class="card adm-card">
