@@ -323,21 +323,9 @@ function ig_draw_arrow($im, $x1, $y, $x2, $color, $thickness = 3, $headSize = 9)
     ], $color);
 }
 
-// Grayscale, boost contrast, wash in one spot color — the closest GD gets to
-// an actual Risograph print, which physically only lays down flat spot-color
-// ink over a master screen, never full-color photography. Mutates $im (a
-// poster thumb or hero image) in place; call it after ig_fetch_thumb(),
-// before compositing onto the card.
-function ig_duotone($im, $tintR, $tintG, $tintB, $tintAlpha = 75) {
-    imagefilter($im, IMG_FILTER_GRAYSCALE);
-    imagefilter($im, IMG_FILTER_CONTRAST, -25);
-    $tint = imagecolorallocatealpha($im, $tintR, $tintG, $tintB, $tintAlpha);
-    imagefilledrectangle($im, 0, 0, imagesx($im), imagesy($im), $tint);
-}
-
 // Grayscale with no color wash — newsprint's own photo reproduction, black
-// ink on gray paper, distinct from zine's tinted duotone. Mutates $im in
-// place, same call pattern as ig_duotone().
+// ink on gray paper. Mutates $im (a poster thumb or hero image) in place;
+// call it after ig_fetch_thumb(), before compositing onto the card.
 function ig_grayscale_print($im, $contrast = -15) {
     imagefilter($im, IMG_FILTER_GRAYSCALE);
     imagefilter($im, IMG_FILTER_CONTRAST, $contrast);
@@ -873,10 +861,12 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
 }
 
 // A photocopied zine flyer: cream stock, near-black ink, one loud spot
-// color standing in for a Risograph's single ink drum, posters duotoned
-// rather than shown in full color (a real Riso print physically can't lay
-// down full-color photography), torn-paper dividers instead of ruled lines,
-// and a typewriter face for titles. Row geometry matches paper/marquee.
+// color standing in for a Risograph's single ink drum, torn-paper dividers
+// instead of ruled lines, and a typewriter face for titles. Posters stay
+// full color rather than duotoned (an earlier pass tinted them the way a
+// real Riso print physically has to — it can't lay down full-color
+// photography — but posters are meant to read at a glance, and the wash
+// worked against that). Row geometry matches paper/marquee.
 function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
@@ -936,7 +926,6 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     foreach ($rows as $i => $film) {
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
-            ig_duotone($thumb, 0xFF, 0x3D, 0x8A);
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
             imagedestroy($thumb);
         } else {
@@ -1836,7 +1825,6 @@ function ig_build_feature_page_zine(array $film, $date) {
 
     $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
     if ($hero) {
-        ig_duotone($hero, 0xFF, 0x3D, 0x8A);
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
     } else {
