@@ -396,6 +396,28 @@ function ig_glow_circle($im, $cx, $cy, $r, $color, $glowColor) {
     imagefilledellipse($im, $cx, $cy, $r * 2, $r * 2, $color);
 }
 
+// A softer, more natural glow than ig_glow_circle()'s flat-color rings —
+// finer-grained falloff (16 steps, not 5, so the rings blend rather than
+// band) and a color shift from a bright near-white core out to a warm edge
+// tone, the way a real setting sun actually reads hot at the center rather
+// than one flat color throughout.
+function ig_glow_sun($im, $cx, $cy, $r, $coreColor, $edgeColor) {
+    $core = imagecolorsforindex($im, $coreColor);
+    $edge = imagecolorsforindex($im, $edgeColor);
+    $steps = 16;
+    for ($i = $steps; $i >= 1; $i--) {
+        $t  = $i / $steps;
+        $rr = (int) round($r * (1 + $t * 2.4));
+        $alpha = (int) round(118 * $t);
+        $rC = (int) round($edge['red']   + ($core['red']   - $edge['red'])   * (1 - $t));
+        $gC = (int) round($edge['green'] + ($core['green'] - $edge['green']) * (1 - $t));
+        $bC = (int) round($edge['blue']  + ($core['blue']  - $edge['blue'])  * (1 - $t));
+        $c  = imagecolorallocatealpha($im, $rC, $gC, $bC, $alpha);
+        imagefilledellipse($im, $cx, $cy, $rr * 2, $rr * 2, $c);
+    }
+    imagefilledellipse($im, $cx, $cy, $r * 2, $r * 2, $coreColor);
+}
+
 // Text with manual letter-spacing — GD's imagettftext has no tracking
 // parameter, so wide-tracked labels (the one unmistakable "airport board"
 // typographic tell) are drawn one character at a time, each advanced by its
@@ -448,75 +470,6 @@ function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) 
         $x  = $nx;
         $py = $ny;
         $up = !$up;
-    }
-}
-
-// A flat silhouette skyline — the UT Tower, the Frost Bank "Owl" Tower, The
-// Independent ("the Jenga Tower"), and the Capitol dome, plus a few plain
-// filler buildings between them. Everything drawn as solid shapes rather
-// than an actual illustration, so it reads identically over the light or
-// dark sky gradient behind it.
-function ig_austin_skyline($im, $x1, $x2, $yBase, $color) {
-    $w = $x2 - $x1;
-
-    $fillers = [
-        [0.02, 0.05, 90], [0.09, 0.04, 60], [0.29, 0.05, 110],
-        [0.46, 0.04, 70], [0.63, 0.05, 95], [0.81, 0.04, 65], [0.91, 0.05, 100],
-    ];
-    foreach ($fillers as [$xf, $wf, $h]) {
-        $bx = $x1 + $w * $xf;
-        $bw = $w * $wf;
-        imagefilledrectangle($im, (int) $bx, $yBase - $h, (int) ($bx + $bw), $yBase, $color);
-    }
-
-    // The Capitol — base, dome, spire.
-    $cx = $x1 + $w * 0.17;
-    $cw = $w * 0.07;
-    $ch = 95;
-    imagefilledrectangle($im, (int) $cx, $yBase - $ch, (int) ($cx + $cw), $yBase, $color);
-    $domeR = (int) ($cw * 0.55);
-    imagefilledellipse($im, (int) ($cx + $cw / 2), $yBase - $ch, $domeR * 2, $domeR * 2, $color);
-    imagefilledrectangle($im, (int) ($cx + $cw / 2 - 2), $yBase - $ch - $domeR - 16, (int) ($cx + $cw / 2 + 2), $yBase - $ch - $domeR, $color);
-
-    // The UT Tower — narrow, tall, stepped crown.
-    $tx = $x1 + $w * 0.37;
-    $tw = $w * 0.032;
-    $th = 160;
-    imagefilledrectangle($im, (int) $tx, $yBase - $th, (int) ($tx + $tw), $yBase, $color);
-    imagefilledrectangle($im, (int) ($tx - 3), $yBase - $th - 13, (int) ($tx + $tw + 3), $yBase - $th, $color);
-    imagefilledrectangle($im, (int) ($tx - 6), $yBase - $th - 20, (int) ($tx + $tw + 6), $yBase - $th - 13, $color);
-
-    // The Independent — a staggered stack, alternating offsets for the
-    // mid-pull "Jenga tower" silhouette it's actually nicknamed for.
-    $jx  = $x1 + $w * 0.55;
-    $jw  = $w * 0.06;
-    $seg = 25;
-    for ($i = 0; $i < 6; $i++) {
-        $off = ($i % 2 === 0) ? 0 : $jw * 0.3;
-        imagefilledrectangle($im, (int) ($jx + $off), $yBase - $seg * ($i + 1), (int) ($jx + $off + $jw), $yBase - $seg * $i, $color);
-    }
-
-    // Frost Bank Tower — the angled crown it's nicknamed "the Owl" for.
-    $fx = $x1 + $w * 0.73;
-    $fw = $w * 0.06;
-    $fh = 145;
-    imagefilledrectangle($im, (int) $fx, $yBase - $fh, (int) ($fx + $fw), $yBase, $color);
-    imagefilledpolygon($im, [
-        (int) $fx, $yBase - $fh,
-        (int) ($fx + $fw / 2), $yBase - $fh - 28,
-        (int) ($fx + $fw), $yBase - $fh,
-    ], $color);
-}
-
-// Congress Avenue Bridge's own row of arches, home to the famous bat
-// colony — a thin deck line with a run of small arcs hanging beneath it.
-function ig_congress_bridge($im, $x1, $x2, $y, $color) {
-    imagesetthickness($im, 3);
-    imageline($im, $x1, $y, $x2, $y, $color);
-    imagesetthickness($im, 1);
-    $archW = 34;
-    for ($x = $x1 + 10; $x < $x2 - 10; $x += $archW) {
-        imagearc($im, (int) ($x + $archW / 2), $y, $archW - 6, 22, 0, 180, $color);
     }
 }
 
@@ -1615,10 +1568,12 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
 // Evening in Austin, golden-hour half — the only theme where the list page
 // and the spotlight page intentionally use different palettes rather than
 // one shared one: this is the light end of a sunset that the spotlight
-// pages carry into full dark. A sky/skyline band across the top carries the
-// whole scene (gradient, sun, skyline) with no text on it; everything below
-// sits on solid warm card stock for guaranteed legibility, the same reason
-// Darkroom's spotlight page stopped putting its wordmark over the hero.
+// pages carry into full dark. A thin sky accent across the top (gradient
+// and a setting sun, no buildings — drawn architecture reads as generic
+// rather than specifically Austin, so it's just the sky) with no text on
+// it; everything below sits on solid warm card stock for guaranteed
+// legibility, the same reason Darkroom's spotlight page stopped putting
+// its wordmark over the hero.
 function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
@@ -1639,12 +1594,20 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     imagefill($im, 0, 0, $cream);
 
     $margin = 80;
-    $skyH   = 190;
+    $skyH   = 110;
 
     ig_gradient_fill($im, 0, 0, $w - 1, $skyH, $skyTop, $skyBottom);
-    $sunGlow = imagecolorallocatealpha($im, 0xF6, 0xC1, 0x5C, 95);
-    ig_glow_circle($im, $w - $margin - 160, $skyH - 55, 30, ig_hex($im, '#F6C15C'), $sunGlow);
-    ig_austin_skyline($im, $margin, $w - $margin, $skyH, $plum);
+    ig_glow_sun($im, $w - $margin - 110, $skyH - 20, 20, ig_hex($im, '#FFF3D6'), $skyBottom);
+    ig_bat_mark($im, $margin + 60, 34, 18, $plum);
+    ig_bat_mark($im, $margin + 130, 22, 15, $plum);
+    ig_bat_mark($im, $margin + 100, 56, 13, $plum);
+
+    // The horizon has to occlude the sun, not sit in front of it — the sun
+    // is drawn into the sky first, then the ground redrawn on top so
+    // anything the glow bled past $skyH gets clipped at a hard edge, the
+    // way a real setting sun disappears behind the horizon rather than
+    // glowing through it.
+    imagefilledrectangle($im, 0, $skyH, $w, $h, $cream);
 
     $chipText = 'CINEMA, TX';
     $chipBox  = imagettfbbox(20, 0, IG_FONT_BODY, $chipText);
@@ -2681,12 +2644,13 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     return $im;
 }
 
-// Evening in Austin, after-dark half — same skyline shapes as the list
-// page, further along the sunset: a full-color poster hero (no tint, same
+// Evening in Austin, after-dark half — the same setting sun the list page
+// uses, further along the sunset: a full-color poster hero (no tint, same
 // call every theme makes now) fades into a two-stage dusk gradient — deep
-// indigo down to a thin warm afterglow right at the skyline's feet, the
-// last of the sunset the list page already showed in full. Bats only
-// appear here, never on the golden-hour list page — dusk is when they fly.
+// indigo down to a thin warm afterglow at the bottom, the last of the
+// sunset the list page already showed in full. A few bats fly past the
+// sun; they only ever appear here, never on the golden-hour list page —
+// dusk is when they fly.
 function ig_build_feature_page_austin(array $film, $date) {
     $w = 1080;
     $h = 1350;
@@ -2754,24 +2718,22 @@ function ig_build_feature_page_austin(array $film, $date) {
         $py += $pillH + 12;
     }
 
-    // The dusk band — same skyline shapes the list page uses, further along
-    // the sunset: indigo at the top, warming sharply to a thin amber
-    // afterglow right at the skyline's feet.
+    // The dusk band — an accent strip, not a full section: the same
+    // setting sun the list page uses, further along the sunset, indigo at
+    // the top warming to a thin amber afterglow at the bottom. Bats only
+    // ever appear here, never on the golden-hour list page — dusk is when
+    // they fly.
     $bandY1 = $heroH;
-    $bandY2 = $heroH + 170;
-    $midY   = $bandY1 + 120;
+    $bandY2 = $heroH + 110;
+    $midY   = $bandY1 + 75;
     ig_gradient_fill($im, 0, $bandY1, $w - 1, $midY, $nightTop, $nightMid);
     ig_gradient_fill($im, 0, $midY, $w - 1, $bandY2, $nightMid, $horizonGlow);
 
-    $moonGlow = imagecolorallocatealpha($im, 0xF2, 0xE9, 0xC9, 95);
-    ig_glow_circle($im, $margin + 100, $bandY1 + 55, 24, ig_hex($im, '#F2E9C9'), $moonGlow);
-
     $silhouette = ig_hex($im, '#140A12');
-    ig_austin_skyline($im, $margin, $w - $margin, $bandY2, $silhouette);
-    ig_congress_bridge($im, $margin, $w - $margin, $bandY2 + 8, $silhouette);
-    ig_bat_mark($im, $w - $margin - 220, $bandY1 + 90, 24, $silhouette);
-    ig_bat_mark($im, $w - $margin - 180, $bandY1 + 70, 18, $silhouette);
-    ig_bat_mark($im, $w - $margin - 260, $bandY1 + 110, 16, $silhouette);
+    ig_glow_sun($im, (int) ($w / 2), $bandY2 - 25, 20, ig_hex($im, '#FFF3D6'), $horizonGlow);
+    ig_bat_mark($im, (int) ($w / 2) - 120, $bandY1 + 40, 22, $silhouette);
+    ig_bat_mark($im, (int) ($w / 2) + 95, $bandY1 + 55, 18, $silhouette);
+    ig_bat_mark($im, (int) ($w / 2) - 35, $bandY1 + 24, 15, $silhouette);
 
     imagefilledrectangle($im, 0, $bandY2, $w, $h, $nightGround);
 
@@ -2781,7 +2743,7 @@ function ig_build_feature_page_austin(array $film, $date) {
     $kicker = strtoupper($film['venue'] ?? '');
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $terracotta, IG_FONT_BODY, $kicker);
-        $y += 50;
+        $y += 66;
     }
 
     $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth, 2);
