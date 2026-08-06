@@ -360,6 +360,42 @@ function ig_scanlines($im, $w, $h, $color, $spacing = 4) {
     }
 }
 
+// A row-by-row interpolated vertical gradient — GD has no linear-gradient
+// primitive, so every theme so far has hand-rolled a single-purpose alpha
+// fade for one hardcoded pair of colors (the hero-to-background fades,
+// ig_neon_text()'s glow). This is the general form: any two RGB colors,
+// top to bottom, for anything that needs an actual gradient rather than a
+// fade-to-one-color.
+function ig_gradient_fill($im, $x1, $y1, $x2, $y2, $topColor, $bottomColor) {
+    $h = max(1, $y2 - $y1);
+    $top = imagecolorsforindex($im, $topColor);
+    $bot = imagecolorsforindex($im, $bottomColor);
+    for ($i = 0; $i <= $h; $i++) {
+        $t = $i / $h;
+        $r = (int) round($top['red']   + ($bot['red']   - $top['red'])   * $t);
+        $g = (int) round($top['green'] + ($bot['green'] - $top['green']) * $t);
+        $b = (int) round($top['blue']  + ($bot['blue']  - $top['blue'])  * $t);
+        $row = imagecolorallocate($im, $r, $g, $b);
+        imagefilledrectangle($im, $x1, $y1 + $i, $x2, $y1 + $i, $row);
+    }
+}
+
+// A soft radial glow — concentric circles fading in alpha from center to
+// edge, the same halo trick ig_neon_text() uses for type, applied to a
+// point instead: a sun, a moon, a firefly, anything that should read as a
+// light source rather than a flat drawn shape.
+function ig_glow_circle($im, $cx, $cy, $r, $color, $glowColor) {
+    $rgb = imagecolorsforindex($im, $glowColor);
+    $steps = 5;
+    for ($i = $steps; $i >= 1; $i--) {
+        $rr = (int) round($r * (1 + $i * 0.35));
+        $alpha = (int) round(115 - ($steps - $i) * 6);
+        $c = imagecolorallocatealpha($im, $rgb['red'], $rgb['green'], $rgb['blue'], max(70, $alpha));
+        imagefilledellipse($im, $cx, $cy, $rr * 2, $rr * 2, $c);
+    }
+    imagefilledellipse($im, $cx, $cy, $r * 2, $r * 2, $color);
+}
+
 // Text with manual letter-spacing — GD's imagettftext has no tracking
 // parameter, so wide-tracked labels (the one unmistakable "airport board"
 // typographic tell) are drawn one character at a time, each advanced by its
@@ -413,6 +449,85 @@ function ig_torn_line($im, $x1, $x2, $y, $color, $amplitude = 4, $segment = 14) 
         $py = $ny;
         $up = !$up;
     }
+}
+
+// A flat silhouette skyline — the UT Tower, the Frost Bank "Owl" Tower, The
+// Independent ("the Jenga Tower"), and the Capitol dome, plus a few plain
+// filler buildings between them. Everything drawn as solid shapes rather
+// than an actual illustration, so it reads identically over the light or
+// dark sky gradient behind it.
+function ig_austin_skyline($im, $x1, $x2, $yBase, $color) {
+    $w = $x2 - $x1;
+
+    $fillers = [
+        [0.02, 0.05, 90], [0.09, 0.04, 60], [0.29, 0.05, 110],
+        [0.46, 0.04, 70], [0.63, 0.05, 95], [0.81, 0.04, 65], [0.91, 0.05, 100],
+    ];
+    foreach ($fillers as [$xf, $wf, $h]) {
+        $bx = $x1 + $w * $xf;
+        $bw = $w * $wf;
+        imagefilledrectangle($im, (int) $bx, $yBase - $h, (int) ($bx + $bw), $yBase, $color);
+    }
+
+    // The Capitol — base, dome, spire.
+    $cx = $x1 + $w * 0.17;
+    $cw = $w * 0.07;
+    $ch = 95;
+    imagefilledrectangle($im, (int) $cx, $yBase - $ch, (int) ($cx + $cw), $yBase, $color);
+    $domeR = (int) ($cw * 0.55);
+    imagefilledellipse($im, (int) ($cx + $cw / 2), $yBase - $ch, $domeR * 2, $domeR * 2, $color);
+    imagefilledrectangle($im, (int) ($cx + $cw / 2 - 2), $yBase - $ch - $domeR - 16, (int) ($cx + $cw / 2 + 2), $yBase - $ch - $domeR, $color);
+
+    // The UT Tower — narrow, tall, stepped crown.
+    $tx = $x1 + $w * 0.37;
+    $tw = $w * 0.032;
+    $th = 160;
+    imagefilledrectangle($im, (int) $tx, $yBase - $th, (int) ($tx + $tw), $yBase, $color);
+    imagefilledrectangle($im, (int) ($tx - 3), $yBase - $th - 13, (int) ($tx + $tw + 3), $yBase - $th, $color);
+    imagefilledrectangle($im, (int) ($tx - 6), $yBase - $th - 20, (int) ($tx + $tw + 6), $yBase - $th - 13, $color);
+
+    // The Independent — a staggered stack, alternating offsets for the
+    // mid-pull "Jenga tower" silhouette it's actually nicknamed for.
+    $jx  = $x1 + $w * 0.55;
+    $jw  = $w * 0.06;
+    $seg = 25;
+    for ($i = 0; $i < 6; $i++) {
+        $off = ($i % 2 === 0) ? 0 : $jw * 0.3;
+        imagefilledrectangle($im, (int) ($jx + $off), $yBase - $seg * ($i + 1), (int) ($jx + $off + $jw), $yBase - $seg * $i, $color);
+    }
+
+    // Frost Bank Tower — the angled crown it's nicknamed "the Owl" for.
+    $fx = $x1 + $w * 0.73;
+    $fw = $w * 0.06;
+    $fh = 145;
+    imagefilledrectangle($im, (int) $fx, $yBase - $fh, (int) ($fx + $fw), $yBase, $color);
+    imagefilledpolygon($im, [
+        (int) $fx, $yBase - $fh,
+        (int) ($fx + $fw / 2), $yBase - $fh - 28,
+        (int) ($fx + $fw), $yBase - $fh,
+    ], $color);
+}
+
+// Congress Avenue Bridge's own row of arches, home to the famous bat
+// colony — a thin deck line with a run of small arcs hanging beneath it.
+function ig_congress_bridge($im, $x1, $x2, $y, $color) {
+    imagesetthickness($im, 3);
+    imageline($im, $x1, $y, $x2, $y, $color);
+    imagesetthickness($im, 1);
+    $archW = 34;
+    for ($x = $x1 + 10; $x < $x2 - 10; $x += $archW) {
+        imagearc($im, (int) ($x + $archW / 2), $y, $archW - 6, 22, 0, 180, $color);
+    }
+}
+
+// One bat in flight — two shallow arcs meeting at a center point, the same
+// minimalist shorthand real bat-silhouette icons use. Dusk is when they
+// actually fly, so this is only ever called on the after-dark tone.
+function ig_bat_mark($im, $x, $y, $size, $color) {
+    imagesetthickness($im, 2);
+    imagearc($im, (int) ($x - $size * 0.4), (int) $y, $size, $size, 200, 340, $color);
+    imagearc($im, (int) ($x + $size * 0.4), (int) $y, $size, $size, 200, 340, $color);
+    imagesetthickness($im, 1);
 }
 
 // A 35mm filmstrip's sprocket-hole edge — a side margin the full height of
@@ -574,6 +689,7 @@ const IG_THEMES = [
     'neon'      => 'Neon',
     'terminal'  => 'Terminal',
     'darkroom'  => 'Darkroom',
+    'austin'    => 'Evening in Austin',
 ];
 
 // $moreCount is screenings that exist on a *later* list page — not this
@@ -588,6 +704,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
         case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount);
+        case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount);
         default:          return ig_build_list_page_paper($films, $date, $moreCount);
     }
 }
@@ -600,6 +717,7 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
         case 'neon':      return ig_build_feature_page_neon($film, $date);
         case 'terminal':  return ig_build_feature_page_terminal($film, $date);
         case 'darkroom':  return ig_build_feature_page_darkroom($film, $date);
+        case 'austin':    return ig_build_feature_page_austin($film, $date);
         default:          return ig_build_feature_page_paper($film, $date);
     }
 }
@@ -1486,6 +1604,133 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
             $tw  = $box[2] - $box[0];
             $ax  = $margin + $tw + 22;
             ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $amber);
+        }
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// Evening in Austin, golden-hour half — the only theme where the list page
+// and the spotlight page intentionally use different palettes rather than
+// one shared one: this is the light end of a sunset that the spotlight
+// pages carry into full dark. A sky/skyline band across the top carries the
+// whole scene (gradient, sun, skyline) with no text on it; everything below
+// sits on solid warm card stock for guaranteed legibility, the same reason
+// Darkroom's spotlight page stopped putting its wordmark over the hero.
+function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $cream       = ig_hex($im, '#FAF1DE');
+    $skyTop      = ig_hex($im, '#F7E1B5');
+    $skyBottom   = ig_hex($im, '#E8834E');
+    $plum        = ig_hex($im, '#4A2338');
+    $red         = ig_hex($im, '#922E32');
+    $muted       = ig_hex($im, '#8C7562');
+    $terracotta  = ig_hex($im, '#C0562B');
+    $divider     = ig_hex($im, '#E4D5BC');
+    $placeholder = ig_hex($im, '#EDE1C8');
+    $gold        = ig_hex($im, '#F2C14E');
+
+    imagefill($im, 0, 0, $cream);
+
+    $margin = 80;
+    $skyH   = 190;
+
+    ig_gradient_fill($im, 0, 0, $w - 1, $skyH, $skyTop, $skyBottom);
+    $sunGlow = imagecolorallocatealpha($im, 0xF6, 0xC1, 0x5C, 95);
+    ig_glow_circle($im, $w - $margin - 160, $skyH - 55, 30, ig_hex($im, '#F6C15C'), $sunGlow);
+    ig_austin_skyline($im, $margin, $w - $margin, $skyH, $plum);
+
+    $chipText = 'CINEMA, TX';
+    $chipBox  = imagettfbbox(20, 0, IG_FONT_BODY, $chipText);
+    $chipW    = $chipBox[2] - $chipBox[0];
+    ig_pill($im, $margin, $skyH + 18, $margin + $chipW + 48, $skyH + 58, $red);
+    imagettftext($im, 20, 0, $margin + 24, $skyH + 45, $cream, IG_FONT_BODY, $chipText);
+
+    $y = $skyH + 100;
+    imagettftext($im, 22, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
+    $y += 50;
+    imagettftext($im, 46, 0, $margin, $y, $plum, IG_FONT_HEADLINE, date('l, F j', $date));
+    $y += 42;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 36;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $textMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = $h - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($films, 0, $maxRows);
+    $extra = count($films) - count($rows);
+
+    if (empty($films)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
+        }
+
+        // Featured — a cluster of firefly glow-dots near the poster's
+        // corner instead of the star badge every other theme uses, an
+        // authentic Texas-evening detail rather than a generic mark. Still
+        // the same fixed Featured gold.
+        if (!empty($film['featured'])) {
+            $fireflyGlow = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+            ig_glow_circle($im, $margin + $thumbW - 8, $y + 10, 4, $gold, $fireflyGlow);
+            ig_glow_circle($im, $margin + $thumbW + 6, $y + 24, 3, $gold, $fireflyGlow);
+            ig_glow_circle($im, $margin + $thumbW - 4, $y + 36, 3, $gold, $fireflyGlow);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 30, $textMaxWidth);
+        imagettftext($im, 30, 0, $textX, $y + 40, $plum, IG_FONT_HEADLINE, $title);
+
+        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $terracotta, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
+    }
+
+    $totalMore = $extra + $moreCount;
+    if ($totalMore > 0) {
+        $label = "+{$totalMore} MORE";
+        $midY  = $y + (int) round(($footerY - 30 - $y) / 2);
+        $textY = $midY + 8;
+        imagettftext($im, 28, 0, $margin, $textY, $red, IG_FONT_BODY, $label);
+        if ($moreCount > 0) {
+            $box = imagettfbbox(28, 0, IG_FONT_BODY, $label);
+            $tw  = $box[2] - $box[0];
+            $ax  = $margin + $tw + 22;
+            ig_draw_arrow($im, $ax, $textY - 12, $ax + 34, $red);
         }
     }
 
@@ -2418,6 +2663,152 @@ function ig_build_feature_page_darkroom(array $film, $date) {
 
     $y += 16;
     ig_dashed_line($im, $margin, $w - $margin, $y, $rust, 12, 8);
+    $y += 36;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 26, $textMaxWidth, 4) as $line) {
+            imagettftext($im, 26, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 38;
+        }
+    }
+
+    $footerY = $h - 60;
+    if (!empty($film['director'])) {
+        imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
+    }
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    return $im;
+}
+
+// Evening in Austin, after-dark half — same skyline shapes as the list
+// page, further along the sunset: a full-color poster hero (no tint, same
+// call every theme makes now) fades into a two-stage dusk gradient — deep
+// indigo down to a thin warm afterglow right at the skyline's feet, the
+// last of the sunset the list page already showed in full. Bats only
+// appear here, never on the golden-hour list page — dusk is when they fly.
+function ig_build_feature_page_austin(array $film, $date) {
+    $w = 1080;
+    $h = 1350;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $nightTop    = ig_hex($im, '#160F24');
+    $nightMid    = ig_hex($im, '#341A2E');
+    $horizonGlow = ig_hex($im, '#E0803F');
+    $nightGround = ig_hex($im, '#1B0F1F');
+    $ink         = ig_hex($im, '#F5EFE3');
+    $muted       = ig_hex($im, '#B29E8C');
+    $terracotta  = ig_hex($im, '#E8935A');
+    $divider     = ig_hex($im, '#3E2A38');
+    $placeholder = ig_hex($im, '#241826');
+    $gold        = ig_hex($im, '#F2C14E');
+    $dark        = $nightGround;
+
+    imagefill($im, 0, 0, $nightGround);
+
+    $margin = 80;
+    $heroH  = 650;
+
+    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    if ($hero) {
+        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
+        imagedestroy($hero);
+    } else {
+        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
+        $ibox = imagettfbbox(120, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 120, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 40, $muted, IG_FONT_HEADLINE, $initial);
+    }
+
+    $fadeH = 130;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0x16, 0x0F, 0x24, $alpha);
+        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
+    }
+
+    // Firefly cluster instead of a "FEATURED" pill — same fixed Featured
+    // gold, but not a badge, tucked in the hero's upper-right so it never
+    // fights the showtime pills at upper-left.
+    if (!empty($film['featured'])) {
+        $fireflyGlow = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+        ig_glow_circle($im, $w - 150, 60, 5, $gold, $fireflyGlow);
+        ig_glow_circle($im, $w - 110, 100, 4, $gold, $fireflyGlow);
+        ig_glow_circle($im, $w - 170, 120, 4, $gold, $fireflyGlow);
+        ig_glow_circle($im, $w - 90, 150, 3, $gold, $fireflyGlow);
+    }
+
+    $pillFont = 28;
+    $pillPadX = 28;
+    $pillH    = 56;
+    $py       = 60;
+    foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
+        if (!$ts) continue;
+        $label = date('g:i A', $ts);
+        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+        $tw    = $box[2] - $box[0];
+        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $terracotta);
+        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 16, $dark, IG_FONT_BODY, $label);
+        $py += $pillH + 12;
+    }
+
+    // The dusk band — same skyline shapes the list page uses, further along
+    // the sunset: indigo at the top, warming sharply to a thin amber
+    // afterglow right at the skyline's feet.
+    $bandY1 = $heroH;
+    $bandY2 = $heroH + 170;
+    $midY   = $bandY1 + 120;
+    ig_gradient_fill($im, 0, $bandY1, $w - 1, $midY, $nightTop, $nightMid);
+    ig_gradient_fill($im, 0, $midY, $w - 1, $bandY2, $nightMid, $horizonGlow);
+
+    $moonGlow = imagecolorallocatealpha($im, 0xF2, 0xE9, 0xC9, 95);
+    ig_glow_circle($im, $margin + 100, $bandY1 + 55, 24, ig_hex($im, '#F2E9C9'), $moonGlow);
+
+    $silhouette = ig_hex($im, '#140A12');
+    ig_austin_skyline($im, $margin, $w - $margin, $bandY2, $silhouette);
+    ig_congress_bridge($im, $margin, $w - $margin, $bandY2 + 8, $silhouette);
+    ig_bat_mark($im, $w - $margin - 220, $bandY1 + 90, 24, $silhouette);
+    ig_bat_mark($im, $w - $margin - 180, $bandY1 + 70, 18, $silhouette);
+    ig_bat_mark($im, $w - $margin - 260, $bandY1 + 110, 16, $silhouette);
+
+    imagefilledrectangle($im, 0, $bandY2, $w, $h, $nightGround);
+
+    $textMaxWidth = $w - $margin * 2;
+    $y = $bandY2 + 50;
+
+    $kicker = strtoupper($film['venue'] ?? '');
+    if ($kicker !== '') {
+        imagettftext($im, 24, 0, $margin, $y, $terracotta, IG_FONT_BODY, $kicker);
+        $y += 50;
+    }
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        imagettftext($im, 52, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $y += 58;
+    }
+
+    // Live-score/presented-with-or-by billing, same quiet treatment Neon's
+    // spotlight page established — plain text, no glow, right under the
+    // title.
+    if (!empty($film['billing'])) {
+        imagettftext($im, 20, 0, $margin, $y, $muted, IG_FONT_BODY, ig_fit_text($film['billing'], IG_FONT_BODY, 20, $textMaxWidth));
+        $y += 32;
+    }
+
+    $deckParts = [];
+    if (!empty($film['year']))    $deckParts[] = $film['year'];
+    if (!empty($film['genres']))  $deckParts[] = $film['genres'];
+    if (!empty($film['runtime'])) $deckParts[] = round($film['runtime']) . ' min';
+    if ($deckParts) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, implode('  ·  ', $deckParts));
+        $y += 40;
+    }
+
+    $y += 20;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 36;
 
     if (!empty($film['overview'])) {

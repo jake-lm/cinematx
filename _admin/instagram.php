@@ -253,6 +253,37 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                     </svg>
                     <span>Darkroom</span>
                   </a>
+                  <a class="ig-theme-swatch<?php echo $theme === 'austin' ? ' is-on' : ''; ?>" href="?<?php echo $e($qs(['theme' => 'austin'])); ?>">
+                    <svg class="ig-theme-swatch__art" viewBox="0 0 96 120" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <linearGradient id="austinSky" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0" stop-color="#F7E1B5"/>
+                          <stop offset="1" stop-color="#E8834E"/>
+                        </linearGradient>
+                      </defs>
+                      <rect width="96" height="120" fill="#FAF1DE"/>
+                      <rect width="96" height="24" fill="url(#austinSky)"/>
+                      <circle cx="74" cy="16" r="6" fill="#F6C15C" opacity="0.8"/>
+                      <g fill="#4A2338">
+                        <rect x="6" y="10" width="6" height="14"/>
+                        <rect x="16" y="4" width="5" height="20"/>
+                        <rect x="24" y="12" width="6" height="12"/>
+                        <rect x="34" y="2" width="4" height="22"/>
+                        <rect x="42" y="8" width="8" height="16"/>
+                        <rect x="54" y="6" width="6" height="18"/>
+                        <polygon points="64,10 68,2 72,10"/>
+                        <rect x="64" y="10" width="8" height="14"/>
+                        <rect x="82" y="8" width="7" height="16"/>
+                      </g>
+                      <rect x="10" y="32" width="30" height="8" rx="4" fill="#922E32"/>
+                      <rect x="10" y="50" width="50" height="6" fill="#4A2338"/>
+                      <rect x="10" y="62" width="16" height="24" fill="#EDE1C8"/>
+                      <rect x="30" y="66" width="34" height="6" fill="#4A2338"/>
+                      <rect x="30" y="76" width="26" height="4" fill="#8C7562"/>
+                      <rect x="30" y="84" width="20" height="4" fill="#C0562B"/>
+                    </svg>
+                    <span>Evening in Austin</span>
+                  </a>
                 </div>
               </div>
 
