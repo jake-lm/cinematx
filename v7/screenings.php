@@ -459,7 +459,12 @@ function ctx_fold_children($s, $view) {
           <?php if (!empty($f['poster'])): ?>
           <img src="<?php echo $e($f['poster']); ?>" alt="<?php echo $e($f['display_title']); ?>" loading="lazy" />
           <?php else: ?><span class="shot__blank"><?php echo $e($f['display_title']); ?></span><?php endif; ?>
+          <?php // A count only tells you something when there's more than
+                // one — "1 ×" is just noise on a poster that's already,
+                // visibly, one card. ?>
+          <?php if (count($f['showings']) > 1): ?>
           <span class="shot__time"><?php echo count($f['showings']); ?> &times;</span>
+          <?php endif; ?>
         </span>
         <span class="shot__title"><?php echo $e($f['display_title']); ?></span>
         <span class="shot__venue"><?php echo $e($times); ?></span>
