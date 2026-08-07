@@ -26,9 +26,12 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         // Five Austin locations under one venue name, so the filter bar gets
         // one chip rather than five. Which location is carried per screening.
         ['films' => filter_screenings(fetch_alamo_films($force),     $now, $end), 'venue' => 'Alamo Drafthouse'],
-        // A distributor, not a cinema — one booking lands in six chains at
-        // once, so it folds the same way Alamo does.
-        ['films' => filter_screenings(fetch_fathom_films($force),    $now, $end), 'venue' => 'Fathom Events'],
+        // Fathom Events — parked, not removed. Uncomment to bring it back;
+        // everything downstream (ctx_fold_venue('Fathom Events', …) in
+        // v7/index.php and list/index.php, scraper_fathom.php itself) is
+        // untouched and ready — this array entry was always the single
+        // point deciding whether Fathom's screenings exist at all.
+        // ['films' => filter_screenings(fetch_fathom_films($force), $now, $end), 'venue' => 'Fathom Events'],
     ];
     $all_films = [];
     foreach ($sources as $src) {
