@@ -209,11 +209,7 @@ require __DIR__ . '/_chrome.php';
               $lead_images = ctx_post_images($lead);
             ?>
             <article class="lead">
-              <?php // The image earns its place by replacing the truncated
-                    // excerpt below, not by sitting on top of it — this card
-                    // already overflows its box. A picture teases a piece
-                    // better than four clipped lines of it anyway.
-                    // Two or three images fade between each other for the same
+              <?php // Two or three images fade between each other for the same
                     // reason the alamo stack exists — motion earns a glance a
                     // static card would not get. ?>
               <?php if ($lead_images): ?>
@@ -238,12 +234,10 @@ require __DIR__ . '/_chrome.php';
                 <a href="/users/profile.php?id=<?php echo (int)$lead['uid']; ?>"><?php echo $e($lead['author_name']); ?></a>
                 <?php endif; ?>
               </div>
-              <?php if (!$lead_images): ?>
               <div class="lead__wrap">
                 <div class="lead__body"><?php echo nl2br($e($lead['content'])); ?></div>
                 <div class="lead__fade"></div>
               </div>
-              <?php endif; ?>
               <div class="lead__foot"><a class="btn btn--quiet" href="<?php echo $e($lead_url); ?>">Read in full</a></div>
             </article>
             <?php endif; ?>

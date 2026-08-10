@@ -978,11 +978,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // ── 02 · The Journal — rank 2 ──────────────────────────────────────────────
 
-.lead { padding: var(--s-5); }
+// A flex column filling .card__body's full (concrete, one-screen-locked)
+// height, so .lead__wrap below can claim exactly whatever the image/
+// kicker/title/deck/byline/button above it don't need — see .lead__wrap.
+.lead { padding: var(--s-5); display: flex; flex-direction: column; height: 100%; }
 
 // Fixed height rather than an aspect ratio: the card's height is spoken for by
 // the one-screen layout, so the picture crops to a budget instead of setting
-// one. It stands in for the clipped excerpt when a piece has an image.
+// one.
 .lead__art {
   display: block;
   margin-bottom: var(--s-4);
@@ -1058,9 +1061,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 .lead__body {
-  position: relative;
-  max-height: 8.5em;
-  overflow: hidden;
   font-family: var(--f-read);
   font-size: var(--t-sm);
   line-height: 1.66;
@@ -1072,8 +1072,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(to bottom, transparent, var(--surface));
   pointer-events: none;
 }
-.lead__wrap { position: relative; }
-.lead__foot { margin-top: var(--s-4); display: flex; justify-content: flex-end; }
+// The clip moved here from .lead__body itself, and from a fixed 8.5em to
+// flex: 1 — .lead is a column filling the card's real, one-screen-locked
+// height, so this claims whatever's left after the image/title/deck/byline
+// above and the "Read in full" button below, rather than guessing a fixed
+// number of lines that's right for no particular article or card height.
+// A floor, not just min-height: 0 — a long title/deck can otherwise eat the
+// entire flex-1 allowance and leave literally nothing for the excerpt on a
+// shorter viewport. 3.5em matches .lead__fade's own height, so there's
+// always at least a legible sliver of text emerging from under the fade.
+.lead__wrap { position: relative; flex: 1; min-height: 3.5em; overflow: hidden; }
+.lead__foot { flex: none; margin-top: var(--s-4); display: flex; justify-content: flex-end; }
 
 .strip { border-top: 1px solid var(--line); }
 .strip__head { padding: var(--s-3) var(--s-5); @include label; }

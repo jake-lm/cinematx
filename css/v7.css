@@ -1366,6 +1366,9 @@ button, input, select, textarea {
 
 .lead {
   padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .lead__art {
@@ -1482,9 +1485,6 @@ button, input, select, textarea {
 }
 
 .lead__body {
-  position: relative;
-  max-height: 8.5em;
-  overflow: hidden;
   font-family: var(--f-read);
   font-size: var(--t-sm);
   line-height: 1.66;
@@ -1503,9 +1503,13 @@ button, input, select, textarea {
 
 .lead__wrap {
   position: relative;
+  flex: 1;
+  min-height: 3.5em;
+  overflow: hidden;
 }
 
 .lead__foot {
+  flex: none;
   margin-top: var(--s-4);
   display: flex;
   justify-content: flex-end;
