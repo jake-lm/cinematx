@@ -323,14 +323,6 @@ function ig_draw_arrow($im, $x1, $y, $x2, $color, $thickness = 3, $headSize = 9)
     ], $color);
 }
 
-// Grayscale with no color wash — newsprint's own photo reproduction, black
-// ink on gray paper. Mutates $im (a poster thumb or hero image) in place;
-// call it after ig_fetch_thumb(), before compositing onto the card.
-function ig_grayscale_print($im, $contrast = -15) {
-    imagefilter($im, IMG_FILTER_GRAYSCALE);
-    imagefilter($im, IMG_FILTER_CONTRAST, $contrast);
-}
-
 // A soft halo behind crisp text — eight low-alpha copies at a small radius,
 // then the real text on top. GD has no blur to reach for, so this is the
 // glow: cheap, and convincing at the sizes these cards render at.
@@ -1112,7 +1104,6 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
-            ig_grayscale_print($thumb);
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
             imagedestroy($thumb);
         } else {
@@ -2147,7 +2138,6 @@ function ig_build_feature_page_newsprint(array $film, $date) {
 
     $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
     if ($hero) {
-        ig_grayscale_print($hero);
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
     } else {
