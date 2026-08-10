@@ -1,7 +1,8 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — front page
-//  Weight order: 1 The List · 2 The Journal · 3 The Theatre · 4 The Directory
+//  Weight order: 1 The List · 2 The Journal · 3 The Theatre
+//  (4 The Directory is parked — see "04 · The Directory" below)
 //  The only surface locked to a single screen.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_lib.php';
@@ -64,7 +65,9 @@ $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
 
-$dir     = ctx_members($conn, 7);
+// The Directory card is parked below (search "04 · The Directory") — no
+// point paying for this query while nothing renders it.
+// $dir = ctx_members($conn, 7);
 
 // Shell configuration
 $ctx_title   = 'Cinema, TX';
@@ -293,6 +296,11 @@ require __DIR__ . '/_chrome.php';
           <?php endif; ?>
         </section>
 
+        <?php // 04 · The Directory — parked, not removed. Flip to `if (true)`
+              // to bring it back; .side's grid-template-rows (css/v7.scss)
+              // was widened to give the Journal the space this used to take,
+              // and would need a third row again too. ?>
+        <?php if (false): ?>
         <!-- 04 · The Directory -->
         <section class="card">
           <div class="card__head">
@@ -332,6 +340,7 @@ require __DIR__ . '/_chrome.php';
             <?php endif; ?>
           </div>
         </section>
+        <?php endif; ?>
 
       </div>
     </div>

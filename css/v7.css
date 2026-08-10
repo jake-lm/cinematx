@@ -1359,7 +1359,7 @@ button, input, select, textarea {
 
 .side {
   display: grid;
-  grid-template-rows: minmax(0, 1.25fr) auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--s-6);
   min-height: 0;
 }
@@ -4108,7 +4108,7 @@ button, input, select, textarea {
     grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr);
   }
   .side {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: minmax(0, 1fr);
   }
   .theatre-card--live .theatre-card__poster {

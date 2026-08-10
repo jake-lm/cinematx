@@ -962,12 +962,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  SIDE — ranks 2, 3, 4
+//  SIDE — ranks 2, 3 (4 The Directory is parked — see v7/index.php)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Two rows now, not three: the Journal is the sole flexible row, so it
+// absorbs the space The Directory's own minmax(0, 1fr) used to claim. The
+// Theatre stays auto — sized to its own content, which is what puts it
+// last and small rather than sharing the remaining height.
 .side {
   display: grid;
-  grid-template-rows: minmax(0, 1.25fr) auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--s-6);
   min-height: 0;
 }
@@ -2572,9 +2576,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 @media (max-width: 980px) {
   .canvas__in { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1.5fr) minmax(0, 1fr); }
-  .side { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+  .side { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
 
-  // Three cards across leaves no room for a widened thumbnail — back to the
+  // Two cards across leaves no room for a widened thumbnail — back to the
   // compact poster shape here.
   .theatre-card--live .theatre-card__poster { width: 58px; aspect-ratio: 2 / 3; }
 
