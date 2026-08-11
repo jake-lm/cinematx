@@ -749,7 +749,26 @@ function ctx_calendar_grid(array $entries, DateTime $month_start, DateTimeZone $
         $key = (new DateTime('@' . $f['timestamp']))->setTimezone($tz)->format('Ymd');
         $byDay[$key][] = $f;
     }
-    foreach ($byDay as &$films) usort($films, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    foreach ($byDay as &$films) {
+        usort($films, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+
+        // The same film at the same exact minute is almost always Alamo's
+        // five cinemas or Fathom's chains booking one release at once, not
+        // two genuinely different screenings — since $entries here is
+        // deliberately unfolded (see list/index.php), that shows up as a
+        // repeated row rather than the one folded card it would in every
+        // other view. Collapsed to a single link; which of the identical
+        // showings it happens to keep doesn't matter; a different film that
+        // just happens to share a start time is untouched, since the key is
+        // the (title, time) pair, not the time alone.
+        $seen  = [];
+        $films = array_values(array_filter($films, function ($f) use (&$seen) {
+            $key = ($f['display_title'] ?? $f['title']) . '|' . $f['timestamp'];
+            if (isset($seen[$key])) return false;
+            $seen[$key] = true;
+            return true;
+        }));
+    }
     unset($films);
 
     $today_key = (new DateTime('today', $tz))->format('Ymd');
