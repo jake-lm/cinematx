@@ -261,14 +261,31 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <?php if ($day['count']):
             $day_label = (new DateTime($day['key']))->format('l, j F');
             $ctx_extra_sheets .= ctx_calendar_sheet($day, $day_label);
+            // A folded venue/festival entry's own display_title is already
+            // its venue/festival name (see ctx_fold_venue()/ctx_fold_festival()),
+            // so this needs no special-casing to read sensibly in the list.
+            $preview = array_slice($day['films'], 0, 3);
+            $more    = $day['count'] - count($preview);
           ?>
           <button class="<?php echo $day_classes; ?>" data-open="cal-<?php echo $e($day['key']); ?>">
-            <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
-            <span class="cal-day__count"><?php echo $day['count']; ?></span>
+            <span class="cal-day__head">
+              <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+              <span class="cal-day__count"><?php echo $day['count']; ?></span>
+            </span>
+            <span class="cal-day__list">
+              <?php foreach ($preview as $f): ?>
+              <span class="cal-day__item"><?php echo $e($f['display_title'] ?? $f['title']); ?></span>
+              <?php endforeach; ?>
+              <?php if ($more > 0): ?>
+              <span class="cal-day__more">+<?php echo $more; ?> more</span>
+              <?php endif; ?>
+            </span>
           </button>
           <?php else: ?>
           <div class="<?php echo $day_classes; ?>">
-            <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+            <span class="cal-day__head">
+              <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+            </span>
           </div>
           <?php endif; ?>
           <?php endforeach; ?>

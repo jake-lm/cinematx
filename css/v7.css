@@ -5440,12 +5440,13 @@ button, input, select, textarea {
 }
 
 .cal-day {
-  aspect-ratio: 1/1;
+  min-height: 112px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-1);
+  align-items: stretch;
+  text-align: left;
+  gap: 3px;
+  padding: var(--s-2);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -5469,6 +5470,13 @@ button.cal-day:hover {
   border-color: var(--red-hi);
 }
 
+.cal-day__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
 .cal-day__num {
   font-family: var(--f-title);
   font-size: var(--t-md);
@@ -5486,8 +5494,38 @@ button.cal-day:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.cal-day__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cal-day__item {
+  font-size: var(--t-3xs);
+  line-height: 1.3;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-day__more {
+  font-size: var(--t-3xs);
+  line-height: 1.3;
+  color: var(--text-4);
+}
+
 @media (max-width: 640px) {
-  .cal-day__count {
+  .cal-day {
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  .cal-day__head {
+    justify-content: center;
+  }
+  .cal-day__count, .cal-day__list {
     display: none;
   }
   .cal-grid__week, .cal-grid__dow {
