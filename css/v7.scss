@@ -3301,10 +3301,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 //  button, since picking it navigates to a different page state instead of
 //  toggling a class) — .seg__btn.is-on already styles it as active, nothing
 //  calendar-specific needed there. Prev/next-month nav is plain links too,
-//  not JS — see list/index.php. Day cells are the same "compact summary,
-//  click opens a sheet" shape as a folded venue/festival card
-//  (.shot--fold etc.) — data-open="cal-<Ymd>" resolves via the exact same
-//  initOverlays() mechanism, no new JS.
+//  not JS — see list/index.php.
+//
+//  Every showing that day is listed in full, each its own link straight to
+//  its ticket — deliberately not folded (a folded "Alamo Drafthouse"
+//  placeholder has no ticket of its own to link to; see list/index.php).
+//  A day cell is a plain, non-interactive container now — there's nothing
+//  left for a click on the cell itself to do once every film inside it is
+//  already its own link — so the click-to-open-sheet mechanism this used
+//  to have is gone too, on purpose, not an oversight.
 // ═══════════════════════════════════════════════════════════════════════════
 
 .cal-nav { display: flex; align-items: center; gap: var(--s-2); }
@@ -3326,54 +3331,56 @@ button, input, select, textarea { font: inherit; color: inherit; }
   margin-bottom: var(--s-2);
 }
 
-// No longer a square — a fixed aspect-ratio left no room for the title
-// preview below the date, so this is a min-height column instead. Every
-// cell (including empty ones) shares the same rule, so the grid still
-// reads as even rows even though nothing forces them to match exactly.
+// A floor, not a target — full-height flex-column so a full showing list
+// (as many rows as the day actually has, no cap) grows the cell downward
+// as needed. Grid's default align-items: stretch already matches every
+// cell in a week to its busiest neighbor, so weeks still read as even rows
+// without this having to guess a size.
 .cal-day {
-  min-height: 112px;
+  min-height: 56px;
   display: flex; flex-direction: column;
   align-items: stretch; text-align: left;
-  gap: 3px;
+  gap: var(--s-1);
   padding: var(--s-2);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font: inherit;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-// Only a day with something on is a <button> (see list/index.php) — an
-// empty day is a plain, non-interactive <div> in the same shape.
-button.cal-day {
-  cursor: pointer;
-  &:hover { background: var(--surface-2); border-color: var(--line-2); }
 }
 // Lead/trail days from the adjacent month — present so the grid's weeks
 // stay full rows, quieted so they read as context, not this month's data.
 .cal-day--pad { opacity: 0.4; }
 .cal-day--today { border-color: var(--red-hi); }
 
-.cal-day__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.cal-day__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); flex: none; }
 .cal-day__num { font-family: var(--f-title); font-size: var(--t-md); font-weight: 600; color: var(--text); }
 .cal-day__count { @include label(var(--t-3xs), var(--red-hi)); }
 
-// The first few showings, one per line — enough to read at a glance
-// without opening the day's sheet, same idea as ctx_fold_titles()'s
-// "name, name + N more" for a folded card, just one name per line instead
-// of comma-joined since a ~130px-wide cell has no room for a run-on line.
 .cal-day__list { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cal-day__item {
+  display: flex; align-items: baseline; gap: 5px;
+  min-width: 0;
+  padding: 1px 0;
+  color: var(--text-2);
+  border-radius: 4px;
+  transition: color var(--t-fast) var(--ease);
+  &:hover { color: var(--red-hi); }
+}
+.cal-day__time {
+  flex: none;
+  font-size: var(--t-3xs);
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+.cal-day__title {
   font-size: var(--t-3xs);
   line-height: 1.3;
-  color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.cal-day__more { font-size: var(--t-3xs); line-height: 1.3; color: var(--text-4); }
 
 @media (max-width: 640px) {
-  // Numbers only past this width — a ~50px cell has no room for a title
-  // preview or a count label, so both are the first things to go before
-  // the grid itself needs to change shape.
+  // Numbers only past this width — a ~50px-wide column has no room for a
+  // showing list or a count label, so both are the first things to go
+  // before the grid itself needs to change shape.
   .cal-day { min-height: 0; align-items: center; justify-content: center; }
   .cal-day__head { justify-content: center; }
   .cal-day__count, .cal-day__list { display: none; }

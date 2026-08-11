@@ -5440,26 +5440,16 @@ button, input, select, textarea {
 }
 
 .cal-day {
-  min-height: 112px;
+  min-height: 56px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   text-align: left;
-  gap: 3px;
+  gap: var(--s-1);
   padding: var(--s-2);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  font: inherit;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-button.cal-day {
-  cursor: pointer;
-}
-button.cal-day:hover {
-  background: var(--surface-2);
-  border-color: var(--line-2);
 }
 
 .cal-day--pad {
@@ -5475,6 +5465,7 @@ button.cal-day:hover {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-2);
+  flex: none;
 }
 
 .cal-day__num {
@@ -5502,18 +5493,32 @@ button.cal-day:hover {
 }
 
 .cal-day__item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 1px 0;
+  color: var(--text-2);
+  border-radius: 4px;
+  transition: color var(--t-fast) var(--ease);
+}
+.cal-day__item:hover {
+  color: var(--red-hi);
+}
+
+.cal-day__time {
+  flex: none;
+  font-size: var(--t-3xs);
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-day__title {
   font-size: var(--t-3xs);
   line-height: 1.3;
-  color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.cal-day__more {
-  font-size: var(--t-3xs);
-  line-height: 1.3;
-  color: var(--text-4);
 }
 
 @media (max-width: 640px) {

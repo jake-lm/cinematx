@@ -39,12 +39,12 @@ if ($view === 'calendar') {
     $range_start = (clone $month_start)->modify('first day of this month')->setTime(0, 0, 0);
     $range_end   = (clone $month_start)->modify('last day of this month')->setTime(23, 59, 59);
 
-    $films   = ctx_enrich(fetch_all_screenings($conn, $range_start->getTimestamp(), $range_end->getTimestamp()));
-    $entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
-    $entries = ctx_fold_venue($entries, 'Fathom Events', 3);
-    $entries = ctx_fold_festival($entries);
+    // Unfolded, on purpose — a day cell lists every showing with its own
+    // ticket link, and a folded "Alamo Drafthouse" placeholder has no
+    // ticket of its own to send that link to.
+    $films = ctx_enrich(fetch_all_screenings($conn, $range_start->getTimestamp(), $range_end->getTimestamp()));
 
-    $weeks        = ctx_calendar_grid($entries, $month_start, $tz);
+    $weeks        = ctx_calendar_grid($films, $month_start, $tz);
     $n_screenings = count($films);
     $prev_month   = (clone $month_start)->modify('-1 month')->format('Y-m');
     $next_month   = (clone $month_start)->modify('+1 month')->format('Y-m');
@@ -150,24 +150,6 @@ function ctx_screening($s, $view) {
     <?php }
 }
 
-/** The panel a calendar day cell opens — that day's screenings, row view. */
-function ctx_calendar_sheet(array $day, $label) {
-    $e = 'ctx_e';
-    ob_start(); ?>
-<aside class="sheet sheet--side" id="sheet-cal-<?php echo $e($day['key']); ?>">
-  <div class="sheet__head">
-    <span class="sheet__title"><?php echo $e($label); ?></span>
-    <button class="ibtn sheet__x" data-close title="Close"><i class="fa-solid fa-xmark"></i></button>
-  </div>
-  <div class="sheet__body">
-    <?php if (!$day['films']): ?>
-    <p class="empty">Nothing listed.</p>
-    <?php else: foreach ($day['films'] as $s) ctx_screening($s, 'rows'); endif; ?>
-  </div>
-</aside>
-<?php return ob_get_clean();
-}
-
 require dirname(__DIR__) . '/v7/_head.php';
 require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
@@ -258,36 +240,25 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               . (!$day['in_month'] ? ' cal-day--pad' : '')
               . ($day['is_today'] ? ' cal-day--today' : '');
           ?>
-          <?php if ($day['count']):
-            $day_label = (new DateTime($day['key']))->format('l, j F');
-            $ctx_extra_sheets .= ctx_calendar_sheet($day, $day_label);
-            // A folded venue/festival entry's own display_title is already
-            // its venue/festival name (see ctx_fold_venue()/ctx_fold_festival()),
-            // so this needs no special-casing to read sensibly in the list.
-            $preview = array_slice($day['films'], 0, 3);
-            $more    = $day['count'] - count($preview);
-          ?>
-          <button class="<?php echo $day_classes; ?>" data-open="cal-<?php echo $e($day['key']); ?>">
-            <span class="cal-day__head">
-              <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
-              <span class="cal-day__count"><?php echo $day['count']; ?></span>
-            </span>
-            <span class="cal-day__list">
-              <?php foreach ($preview as $f): ?>
-              <span class="cal-day__item"><?php echo $e($f['display_title'] ?? $f['title']); ?></span>
-              <?php endforeach; ?>
-              <?php if ($more > 0): ?>
-              <span class="cal-day__more">+<?php echo $more; ?> more</span>
-              <?php endif; ?>
-            </span>
-          </button>
-          <?php else: ?>
           <div class="<?php echo $day_classes; ?>">
             <span class="cal-day__head">
               <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+              <?php if ($day['count']): ?><span class="cal-day__count"><?php echo $day['count']; ?></span><?php endif; ?>
             </span>
+            <?php if ($day['count']): ?>
+            <div class="cal-day__list">
+              <?php foreach ($day['films'] as $f):
+                $member = ($f['source'] ?? '') === 'user';
+                $href   = !empty($f['url']) ? $f['url'] : '#';
+              ?>
+              <a class="cal-day__item" href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
+                <span class="cal-day__time"><?php echo date('g:ia', $f['timestamp']); ?></span>
+                <span class="cal-day__title"><?php echo $e($f['display_title'] ?? $f['title']); ?></span>
+              </a>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
           </div>
-          <?php endif; ?>
           <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
