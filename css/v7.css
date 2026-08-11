@@ -5394,12 +5394,6 @@ button, input, select, textarea {
   border-color: var(--gold);
 }
 
-.cal-toggle.is-on {
-  background: var(--red-wash);
-  border-color: var(--red-wash);
-  color: var(--red-hi);
-}
-
 .cal-nav {
   display: flex;
   align-items: center;

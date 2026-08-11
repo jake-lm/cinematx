@@ -199,7 +199,16 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <span class="cal-nav__label"><?php echo $e($month_start->format('F Y')); ?></span>
             <a class="ibtn" href="?view=calendar&amp;month=<?php echo $e($next_month); ?>" title="Next month"><i class="fa-solid fa-chevron-right"></i></a>
           </div>
-          <a class="ibtn cal-toggle is-on" href="/list" title="Back to list"><i class="fa-solid fa-list"></i></a>
+
+          <?php // Posters/List have no meaning against a month grid, so both
+                // just lead back to /list — the same "leave Calendar" job
+                // the old standalone toggle did, just folded into this
+                // segment instead of sitting beside it. ?>
+          <div class="seg">
+            <a class="seg__btn" href="/list" title="Posters"><i class="fa-solid fa-grip"></i></a>
+            <a class="seg__btn" href="/list" title="List"><i class="fa-solid fa-list"></i></a>
+            <a class="seg__btn is-on" href="?view=calendar" title="Calendar"><i class="fa-solid fa-calendar-days"></i></a>
+          </div>
           <?php else: ?>
           <div class="seg">
             <button class="seg__btn is-on" data-when="week">Week</button>
@@ -207,14 +216,14 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <button class="seg__btn" data-when="tmrw">Tomorrow</button>
           </div>
 
-          <?php // A standalone control, not a fourth segment — Calendar is a
-                // different page state (its own month-wide fetch), not
-                // another filter over the same seven days. ?>
-          <a class="ibtn cal-toggle" href="?view=calendar" title="Calendar"><i class="fa-solid fa-calendar-days"></i></a>
-
+          <?php // Calendar sits in the same segment as Posters/List — a link
+                // rather than a data-view button, since picking it leaves
+                // for a different page state (its own month-wide fetch)
+                // instead of toggling a class over the same seven days. ?>
           <div class="seg">
             <button class="seg__btn is-on" data-view="grid" title="Posters"><i class="fa-solid fa-grip"></i></button>
             <button class="seg__btn" data-view="rows" title="List"><i class="fa-solid fa-list"></i></button>
+            <a class="seg__btn" href="?view=calendar" title="Calendar"><i class="fa-solid fa-calendar-days"></i></a>
           </div>
 
           <!-- Venue and member-submitted collapse into one narrowing control,

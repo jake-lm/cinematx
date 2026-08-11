@@ -3296,17 +3296,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  CALENDAR — The List's second, opt-in view (?view=calendar). A plain link
-//  toggle and plain prev/next-month links, not JS — see list/index.php.
-//  Day cells are the same "compact summary, click opens a sheet" shape as a
-//  folded venue/festival card (.shot--fold etc.) — data-open="cal-<Ymd>"
-//  resolves via the exact same initOverlays() mechanism, no new JS.
+//  CALENDAR — The List's second, opt-in view (?view=calendar). Its toggle
+//  sits in the same .seg as Posters/List (an <a> rather than a data-view
+//  button, since picking it navigates to a different page state instead of
+//  toggling a class) — .seg__btn.is-on already styles it as active, nothing
+//  calendar-specific needed there. Prev/next-month nav is plain links too,
+//  not JS — see list/index.php. Day cells are the same "compact summary,
+//  click opens a sheet" shape as a folded venue/festival card
+//  (.shot--fold etc.) — data-open="cal-<Ymd>" resolves via the exact same
+//  initOverlays() mechanism, no new JS.
 // ═══════════════════════════════════════════════════════════════════════════
-
-// Not a fourth segment inside .seg — Calendar is a different page state
-// (its own month-wide fetch), not another filter over the same seven days,
-// so it gets its own small standalone control instead.
-.cal-toggle.is-on { background: var(--red-wash); border-color: var(--red-wash); color: var(--red-hi); }
 
 .cal-nav { display: flex; align-items: center; gap: var(--s-2); }
 .cal-nav__label { min-width: 9em; text-align: center; @include label(var(--t-2xs), var(--text-2)); }
