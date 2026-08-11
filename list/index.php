@@ -13,46 +13,79 @@ require dirname(__DIR__) . '/v7/_lib.php';
 
 $now = $CTX_NOW;
 $tz  = new DateTimeZone('America/Chicago');
-$end = $now + 7 * 86400;
 
-$films = ctx_enrich(fetch_all_screenings($conn, $now, $end));
+// Calendar is a second, opt-in way to browse the same data — a plain query
+// param rather than a client-side toggle, since it needs a month's worth of
+// screenings that Week/Today/Tomorrow's 7-day fetch never has in the page
+// at all. See v7/screenings.php's ctx_calendar_grid().
+$view = ($_GET['view'] ?? '') === 'calendar' ? 'calendar' : 'list';
 
-// Chips and the header count screenings. Folding happens after, so a venue
-// that collapses into one card still reports how much it is actually showing.
-$venues     = ctx_venues($films);
-$counts     = ctx_venue_counts($films);
-$by_member  = count(array_filter($films, fn($f) => ($f['source'] ?? '') === 'user'));
-$n_screenings = count($films);
-
-// Alamo runs five cinemas and books the same film across them; a day of it is
-// a schedule rather than a listing. See ctx_fold_venue().
-$entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
-// Fathom books one title into every chain at once, so a single release is six
-// rows at the same minute — the same shape, folded the same way.
-$entries = ctx_fold_venue($entries, 'Fathom Events', 3);
-
-// A named AFS festival (Pan African Film Festival, etc.) — see
-// ctx_fold_festival() for why its threshold counts distinct films rather
-// than raw showings, and why it isn't called with a specific name like the
-// two folds above are.
-$entries = ctx_fold_festival($entries);
-
-// Every folded card opens a panel; they are collected as we render.
+// Every folded card (venue, festival, or a calendar day) opens a panel;
+// they are collected as we render, in either view.
 $ctx_extra_sheets = '';
 
-// Group by calendar day, preserving chronological order.
-$days = [];
-foreach ($entries as $f) {
-    $dt  = (new DateTime('@' . $f['timestamp']))->setTimezone($tz);
-    $key = $dt->format('Ymd');
-    if (!isset($days[$key])) {
-        $days[$key] = ['label' => $dt->format('l, j F'), 'films' => []];
+if ($view === 'calendar') {
+    $month_param = $_GET['month'] ?? '';
+    $month_start = preg_match('/^(\d{4})-(\d{2})$/', $month_param, $m)
+        ? DateTime::createFromFormat('!Y-n-j', $m[1] . '-' . (int)$m[2] . '-1', $tz)
+        : new DateTime('first day of this month', $tz);
+    // An out-of-range month (bad input, or a m[2] like "13") falls back to
+    // the current month rather than producing a DateTime that then feeds a
+    // year of "last day of this month" arithmetic somewhere unexpected.
+    if (!$month_start || (int)$month_start->format('n') !== (int)($m[2] ?? $month_start->format('n'))) {
+        $month_start = new DateTime('first day of this month', $tz);
     }
-    $days[$key]['films'][] = $f;
-}
 
-$today_key = (new DateTime('today', $tz))->format('Ymd');
-$tmrw_key  = (new DateTime('tomorrow', $tz))->format('Ymd');
+    $range_start = (clone $month_start)->modify('first day of this month')->setTime(0, 0, 0);
+    $range_end   = (clone $month_start)->modify('last day of this month')->setTime(23, 59, 59);
+
+    $films   = ctx_enrich(fetch_all_screenings($conn, $range_start->getTimestamp(), $range_end->getTimestamp()));
+    $entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
+    $entries = ctx_fold_venue($entries, 'Fathom Events', 3);
+    $entries = ctx_fold_festival($entries);
+
+    $weeks        = ctx_calendar_grid($entries, $month_start, $tz);
+    $n_screenings = count($films);
+    $prev_month   = (clone $month_start)->modify('-1 month')->format('Y-m');
+    $next_month   = (clone $month_start)->modify('+1 month')->format('Y-m');
+} else {
+    $end = $now + 7 * 86400;
+    $films = ctx_enrich(fetch_all_screenings($conn, $now, $end));
+
+    // Chips and the header count screenings. Folding happens after, so a venue
+    // that collapses into one card still reports how much it is actually showing.
+    $venues     = ctx_venues($films);
+    $counts     = ctx_venue_counts($films);
+    $by_member  = count(array_filter($films, fn($f) => ($f['source'] ?? '') === 'user'));
+    $n_screenings = count($films);
+
+    // Alamo runs five cinemas and books the same film across them; a day of it is
+    // a schedule rather than a listing. See ctx_fold_venue().
+    $entries = ctx_fold_venue($films, 'Alamo Drafthouse', 3);
+    // Fathom books one title into every chain at once, so a single release is six
+    // rows at the same minute — the same shape, folded the same way.
+    $entries = ctx_fold_venue($entries, 'Fathom Events', 3);
+
+    // A named AFS festival (Pan African Film Festival, etc.) — see
+    // ctx_fold_festival() for why its threshold counts distinct films rather
+    // than raw showings, and why it isn't called with a specific name like the
+    // two folds above are.
+    $entries = ctx_fold_festival($entries);
+
+    // Group by calendar day, preserving chronological order.
+    $days = [];
+    foreach ($entries as $f) {
+        $dt  = (new DateTime('@' . $f['timestamp']))->setTimezone($tz);
+        $key = $dt->format('Ymd');
+        if (!isset($days[$key])) {
+            $days[$key] = ['label' => $dt->format('l, j F'), 'films' => []];
+        }
+        $days[$key]['films'][] = $f;
+    }
+
+    $today_key = (new DateTime('today', $tz))->format('Ymd');
+    $tmrw_key  = (new DateTime('tomorrow', $tz))->format('Ymd');
+}
 
 // Shell
 $ctx_title  = 'The List — Cinema, TX';
@@ -117,31 +150,67 @@ function ctx_screening($s, $view) {
     <?php }
 }
 
+/** The panel a calendar day cell opens — that day's screenings, row view. */
+function ctx_calendar_sheet(array $day, $label) {
+    $e = 'ctx_e';
+    ob_start(); ?>
+<aside class="sheet sheet--side" id="sheet-cal-<?php echo $e($day['key']); ?>">
+  <div class="sheet__head">
+    <span class="sheet__title"><?php echo $e($label); ?></span>
+    <button class="ibtn sheet__x" data-close title="Close"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="sheet__body">
+    <?php if (!$day['films']): ?>
+    <p class="empty">Nothing listed.</p>
+    <?php else: foreach ($day['films'] as $s) ctx_screening($s, 'rows'); endif; ?>
+  </div>
+</aside>
+<?php return ob_get_clean();
+}
+
 require dirname(__DIR__) . '/v7/_head.php';
 require dirname(__DIR__) . '/v7/_chrome.php';
 ?>
 
   <main class="canvas">
-    <div class="listing" id="listing" data-today="<?php echo $today_key; ?>" data-tmrw="<?php echo $tmrw_key; ?>">
+    <div class="listing" id="listing"<?php if ($view !== 'calendar'): ?> data-today="<?php echo $today_key; ?>" data-tmrw="<?php echo $tmrw_key; ?>"<?php endif; ?>>
 
       <div class="listing__head">
         <div class="listing__title">
           <span class="card__n">01</span>
           <h1 class="listing__h">The List</h1>
+          <?php if ($view === 'calendar'): ?>
+          <span class="listing__sub"><?php echo $n_screenings; ?> <?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?>
+            &middot; <?php echo $e($month_start->format('F Y')); ?></span>
+          <?php else: ?>
           <?php // The scope word is driven by the Week/Today/Tomorrow control,
                 // not baked in — it used to keep saying "next seven days" while
                 // the number beside it changed to today's. ?>
           <span class="listing__sub"><span id="list-count"><?php echo $n_screenings; ?></span>
             <span id="list-noun"><?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?></span>
             &middot; <span id="list-scope">next seven days</span></span>
+          <?php endif; ?>
         </div>
 
         <div class="listing__controls">
+          <?php if ($view === 'calendar'): ?>
+          <div class="cal-nav">
+            <a class="ibtn" href="?view=calendar&amp;month=<?php echo $e($prev_month); ?>" title="Previous month"><i class="fa-solid fa-chevron-left"></i></a>
+            <span class="cal-nav__label"><?php echo $e($month_start->format('F Y')); ?></span>
+            <a class="ibtn" href="?view=calendar&amp;month=<?php echo $e($next_month); ?>" title="Next month"><i class="fa-solid fa-chevron-right"></i></a>
+          </div>
+          <a class="ibtn cal-toggle is-on" href="/list" title="Back to list"><i class="fa-solid fa-list"></i></a>
+          <?php else: ?>
           <div class="seg">
             <button class="seg__btn is-on" data-when="week">Week</button>
             <button class="seg__btn" data-when="today">Today</button>
             <button class="seg__btn" data-when="tmrw">Tomorrow</button>
           </div>
+
+          <?php // A standalone control, not a fourth segment — Calendar is a
+                // different page state (its own month-wide fetch), not
+                // another filter over the same seven days. ?>
+          <a class="ibtn cal-toggle" href="?view=calendar" title="Calendar"><i class="fa-solid fa-calendar-days"></i></a>
 
           <div class="seg">
             <button class="seg__btn is-on" data-view="grid" title="Posters"><i class="fa-solid fa-grip"></i></button>
@@ -161,10 +230,44 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <button class="chip chip--member" data-narrow="source:user">By members<span class="chip__n"><?php echo $by_member; ?></span></button>
             <?php endif; ?>
           </div>
+          <?php endif; ?>
         </div>
       </div>
 
-      <?php if (!$days): ?>
+      <?php if ($view === 'calendar'): ?>
+
+      <div class="cal-grid">
+        <div class="cal-grid__dow">
+          <?php foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dow): ?>
+          <span><?php echo $dow; ?></span>
+          <?php endforeach; ?>
+        </div>
+        <?php foreach ($weeks as $week): ?>
+        <div class="cal-grid__week">
+          <?php foreach ($week as $day):
+            $day_classes = 'cal-day'
+              . (!$day['in_month'] ? ' cal-day--pad' : '')
+              . ($day['is_today'] ? ' cal-day--today' : '');
+          ?>
+          <?php if ($day['count']):
+            $day_label = (new DateTime($day['key']))->format('l, j F');
+            $ctx_extra_sheets .= ctx_calendar_sheet($day, $day_label);
+          ?>
+          <button class="<?php echo $day_classes; ?>" data-open="cal-<?php echo $e($day['key']); ?>">
+            <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+            <span class="cal-day__count"><?php echo $day['count']; ?></span>
+          </button>
+          <?php else: ?>
+          <div class="<?php echo $day_classes; ?>">
+            <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
+          </div>
+          <?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+        <?php endforeach; ?>
+      </div>
+
+      <?php elseif (!$days): ?>
         <p class="empty">Nothing listed in the next seven days.</p>
       <?php else: foreach ($days as $key => $day): ?>
       <section class="day" data-day="<?php echo $key; ?>">

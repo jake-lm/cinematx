@@ -3294,3 +3294,67 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .line__time { color: var(--gold); }
   .deep__time { color: var(--gold); border-color: var(--gold); }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CALENDAR — The List's second, opt-in view (?view=calendar). A plain link
+//  toggle and plain prev/next-month links, not JS — see list/index.php.
+//  Day cells are the same "compact summary, click opens a sheet" shape as a
+//  folded venue/festival card (.shot--fold etc.) — data-open="cal-<Ymd>"
+//  resolves via the exact same initOverlays() mechanism, no new JS.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Not a fourth segment inside .seg — Calendar is a different page state
+// (its own month-wide fetch), not another filter over the same seven days,
+// so it gets its own small standalone control instead.
+.cal-toggle.is-on { background: var(--red-wash); border-color: var(--red-wash); color: var(--red-hi); }
+
+.cal-nav { display: flex; align-items: center; gap: var(--s-2); }
+.cal-nav__label { min-width: 9em; text-align: center; @include label(var(--t-2xs), var(--text-2)); }
+
+.cal-grid { padding-bottom: var(--s-6); }
+
+.cal-grid__dow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: var(--s-2);
+  span { text-align: center; @include label(var(--t-3xs), var(--text-3)); }
+}
+
+.cal-grid__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--s-2);
+  margin-bottom: var(--s-2);
+}
+
+.cal-day {
+  aspect-ratio: 1 / 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+// Only a day with something on is a <button> (see list/index.php) — an
+// empty day is a plain, non-interactive <div> in the same shape.
+button.cal-day {
+  cursor: pointer;
+  &:hover { background: var(--surface-2); border-color: var(--line-2); }
+}
+// Lead/trail days from the adjacent month — present so the grid's weeks
+// stay full rows, quieted so they read as context, not this month's data.
+.cal-day--pad { opacity: 0.4; }
+.cal-day--today { border-color: var(--red-hi); }
+
+.cal-day__num { font-family: var(--f-title); font-size: var(--t-md); font-weight: 600; color: var(--text); }
+.cal-day__count { @include label(var(--t-3xs), var(--red-hi)); }
+
+@media (max-width: 640px) {
+  // Numbers only past this width — a count label under a 1-digit date in a
+  // ~40px cell is the first thing to go before the grid itself needs to.
+  .cal-day__count { display: none; }
+  .cal-grid__week, .cal-grid__dow { gap: var(--s-1); }
+  .cal-nav__label { min-width: 0; }
+}

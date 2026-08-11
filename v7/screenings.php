@@ -711,3 +711,66 @@ function ctx_screening_hover($s) {
 function ctx_slug($s) {
     return trim(preg_replace('/[^a-z0-9]+/', '-', mb_strtolower((string)$s)), '-');
 }
+
+/**
+ * A month laid out as full Sunday–Saturday weeks, including the lead/trail
+ * days from adjacent months needed to fill the first and last rows — a
+ * calendar grid, not just "the days in August."
+ *
+ * $entries is expected to already be folded the same way The List's own
+ * day-grouped view folds them (ctx_fold_venue(), ctx_fold_festival()), so a
+ * day's sheet ends up showing the exact same shape of card the row view
+ * would — this function only buckets by day and pads the grid, nothing
+ * about a screening's own shape changes.
+ *
+ * Returns an array of weeks, each a 7-entry array of day cells:
+ *   key       'Ymd'
+ *   day_num   1..31 (of whichever month the cell actually falls in)
+ *   in_month  false for lead/trail padding from the adjacent month
+ *   is_today  bool
+ *   films     that day's screenings, chronological
+ *   count     count($films) — 0 for a day with nothing on
+ */
+function ctx_calendar_grid(array $entries, DateTime $month_start, DateTimeZone $tz) {
+    $first = clone $month_start;
+    $first->modify('first day of this month')->setTime(0, 0, 0);
+    $last = clone $month_start;
+    $last->modify('last day of this month')->setTime(0, 0, 0);
+
+    // Sunday-start grid: back up to the Sunday on/before the 1st, and
+    // forward to the Saturday on/after the last day.
+    $grid_start = clone $first;
+    $grid_start->modify('-' . (int)$first->format('w') . ' days');
+    $grid_end = clone $last;
+    $grid_end->modify('+' . (6 - (int)$last->format('w')) . ' days');
+
+    $byDay = [];
+    foreach ($entries as $f) {
+        $key = (new DateTime('@' . $f['timestamp']))->setTimezone($tz)->format('Ymd');
+        $byDay[$key][] = $f;
+    }
+    foreach ($byDay as &$films) usort($films, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    unset($films);
+
+    $today_key = (new DateTime('today', $tz))->format('Ymd');
+    $month_num = (int)$first->format('n');
+
+    $weeks = [];
+    $week  = [];
+    $cursor = clone $grid_start;
+    while ($cursor <= $grid_end) {
+        $key = $cursor->format('Ymd');
+        $week[] = [
+            'key'      => $key,
+            'day_num'  => (int)$cursor->format('j'),
+            'in_month' => (int)$cursor->format('n') === $month_num,
+            'is_today' => $key === $today_key,
+            'films'    => $byDay[$key] ?? [],
+            'count'    => count($byDay[$key] ?? []),
+        ];
+        if (count($week) === 7) { $weeks[] = $week; $week = []; }
+        $cursor->modify('+1 day');
+    }
+
+    return $weeks;
+}
