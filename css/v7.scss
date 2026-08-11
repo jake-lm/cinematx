@@ -3355,25 +3355,34 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .cal-day__num { font-family: var(--f-title); font-size: var(--t-md); font-weight: 600; color: var(--text); }
 .cal-day__count { @include label(var(--t-3xs), var(--red-hi)); }
 
-.cal-day__list { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cal-day__item {
-  display: flex; align-items: baseline; gap: 5px;
-  min-width: 0;
-  padding: 1px 0;
-  color: var(--text-2);
-  border-radius: 4px;
-  transition: color var(--t-fast) var(--ease);
-  &:hover { color: var(--red-hi); }
+.cal-day__list { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
+
+// One block per film, not per showing (list/index.php groups them) — its
+// times in a small two-up grid on the left, the title once on the right,
+// rather than repeating "Practical Magic" once per showtime.
+.cal-day__item { display: flex; align-items: center; gap: 5px; min-width: 0; }
+
+// grid-template-columns with no row template wraps to a new row every two
+// items on its own — literally "every two times, a new row" without
+// tracking a counter to do it.
+.cal-day__times {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0 5px;
 }
 .cal-day__time {
-  flex: none;
   font-size: var(--t-3xs);
   color: var(--text-4);
   font-variant-numeric: tabular-nums;
+  transition: color var(--t-fast) var(--ease);
+  &:hover { color: var(--red-hi); }
 }
 .cal-day__title {
+  min-width: 0;
   font-size: var(--t-3xs);
   line-height: 1.3;
+  color: var(--text-2);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 

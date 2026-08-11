@@ -245,16 +245,32 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <span class="cal-day__num"><?php echo $day['day_num']; ?></span>
               <?php if ($day['count']): ?><span class="cal-day__count"><?php echo $day['count']; ?></span><?php endif; ?>
             </span>
-            <?php if ($day['count']): ?>
+            <?php if ($day['count']):
+              // One block per title, not per showing — its times gathered
+              // into a small two-up grid to its left, the title once to
+              // the right. $day['films'] is already chronological (see
+              // ctx_calendar_grid()), so the first time a title is met here
+              // is its earliest showing, which is also the order these
+              // blocks render in — no separate sort needed.
+              $groups = [];
+              foreach ($day['films'] as $f) {
+                $title = $f['display_title'] ?? $f['title'];
+                $groups[$title][] = $f;
+              }
+            ?>
             <div class="cal-day__list">
-              <?php foreach ($day['films'] as $f):
-                $member = ($f['source'] ?? '') === 'user';
-                $href   = !empty($f['url']) ? $f['url'] : '#';
-              ?>
-              <a class="cal-day__item" href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
-                <span class="cal-day__time"><?php echo date('g:ia', $f['timestamp']); ?></span>
-                <span class="cal-day__title"><?php echo $e($f['display_title'] ?? $f['title']); ?></span>
-              </a>
+              <?php foreach ($groups as $title => $showings): ?>
+              <div class="cal-day__item">
+                <div class="cal-day__times">
+                  <?php foreach ($showings as $f):
+                    $member = ($f['source'] ?? '') === 'user';
+                    $href   = !empty($f['url']) ? $f['url'] : '#';
+                  ?>
+                  <a class="cal-day__time" href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>><?php echo date('g:ia', $f['timestamp']); ?></a>
+                  <?php endforeach; ?>
+                </div>
+                <span class="cal-day__title"><?php echo $e($title); ?></span>
+              </div>
               <?php endforeach; ?>
             </div>
             <?php endif; ?>
