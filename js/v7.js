@@ -1113,6 +1113,57 @@
     window.addEventListener('resize', closeAll);
   }
 
+  // ══ Instagram admin — poster crop ═══════════════════════════════════════
+  // Adjust crop toggle/slider/save live outside the Featured <label> on
+  // purpose (see css/v7.scss's .adm-crop-row comment) — nothing here can
+  // accidentally flip that checkbox. object-position and $vBias in
+  // list/instagram.php share the same 0–100% top/bottom meaning, so the
+  // live preview here matches what the saved PNG will actually crop to.
+
+  function initPosterCrop() {
+    $$('[data-crop-toggle]').forEach(function (btn) {
+      var panel = btn.nextElementSibling;
+      if (!panel) return;
+      btn.addEventListener('click', function () {
+        panel.classList.toggle('is-open');
+      });
+    });
+
+    $$('[data-crop-slider]').forEach(function (slider) {
+      var preview = slider.closest('[data-crop-panel]').querySelector('[data-crop-preview]');
+      slider.addEventListener('input', function () {
+        preview.style.backgroundPosition = '50% ' + slider.value + '%';
+      });
+    });
+
+    $$('[data-crop-save]').forEach(function (btn) {
+      var panel  = btn.closest('[data-crop-panel]');
+      var slider = panel.querySelector('[data-crop-slider]');
+      var status = panel.querySelector('[data-crop-status]');
+      var form   = btn.closest('form');
+      var csrf   = form ? form.querySelector('input[name="csrf"]') : null;
+
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        status.textContent = 'Saving…';
+        status.classList.add('is-visible');
+
+        post('/_admin/instagram_poster_crop.php', {
+          poster_url: btn.getAttribute('data-poster-url'),
+          bias: (parseInt(slider.value, 10) / 100).toFixed(2),
+          csrf: csrf ? csrf.value : ''
+        }).then(function (res) {
+          btn.disabled = false;
+          status.textContent = (res && res.ok) ? 'Saved' : 'Failed to save';
+          setTimeout(function () { status.classList.remove('is-visible'); }, 1800);
+        }).catch(function () {
+          btn.disabled = false;
+          status.textContent = 'Failed to save';
+        });
+      });
+    });
+  }
+
   function initLetterboxdConnect() {
     var input = $('#lb-input'), save = $('#lb-save');
     if (!input || !save) return;
@@ -1348,7 +1399,7 @@
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
     initProfileFaceUpload(); initProfileBannerUpload(); initLetterboxdConnect(); initYouMenu();
-    initRoleGroup(); initRoleDrop();
+    initRoleGroup(); initRoleDrop(); initPosterCrop();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

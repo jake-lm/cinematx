@@ -426,17 +426,34 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <form action="/_admin/instagram_featured.php" method="post">
               <?php echo admin_csrf_field(); ?>
               <div class="card__body card__body--flush">
-                <?php foreach ($films as $f): ?>
-                <label class="adm-row adm-row--check">
-                  <input type="checkbox" name="featured[]" value="<?php echo $e(ig_film_key($f)); ?>"<?php echo !empty($f['featured']) ? ' checked' : ''; ?>>
-                  <span class="adm-row__text">
-                    <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
-                    <span class="adm-row__sub">
-                      <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
+                <?php foreach ($films as $f):
+                  $heroUrl  = $f['poster'] ? ig_hero_url($f['poster']) : null;
+                  $cropBias = $heroUrl ? ig_poster_crop_bias($heroUrl) : 0.5;
+                ?>
+                <div class="adm-crop-row">
+                  <label class="adm-row adm-row--check">
+                    <input type="checkbox" name="featured[]" value="<?php echo $e(ig_film_key($f)); ?>"<?php echo !empty($f['featured']) ? ' checked' : ''; ?>>
+                    <span class="adm-row__text">
+                      <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
+                      <span class="adm-row__sub">
+                        <?php echo $e($f['venue']); ?><?php if ($f['director']): ?> &middot; dir. <?php echo $e($f['director']); ?><?php endif; ?>
+                      </span>
                     </span>
-                  </span>
-                  <span class="adm-row__when"><?php echo $e(ig_format_times($f['timestamps'] ?? [$f['timestamp']])); ?></span>
-                </label>
+                    <span class="adm-row__when"><?php echo $e(ig_format_times($f['timestamps'] ?? [$f['timestamp']])); ?></span>
+                  </label>
+                  <?php if ($heroUrl): ?>
+                  <button type="button" class="adm-crop-toggle" data-crop-toggle>Adjust crop</button>
+                  <div class="adm-crop-panel" data-crop-panel>
+                    <div class="adm-crop-preview" data-crop-preview
+                         style="background-image:url('<?php echo $e($heroUrl); ?>'); background-position: 50% <?php echo round($cropBias * 100); ?>%;"></div>
+                    <input type="range" class="adm-crop-slider" data-crop-slider min="0" max="100" step="1" value="<?php echo round($cropBias * 100); ?>">
+                    <div class="adm-crop-actions">
+                      <button type="button" class="btn btn--quiet btn--sm" data-crop-save data-poster-url="<?php echo $e($heroUrl); ?>">Save crop</button>
+                      <span class="adm-crop-status" data-crop-status></span>
+                    </div>
+                  </div>
+                  <?php endif; ?>
+                </div>
                 <?php endforeach; ?>
               </div>
               <div class="card__body">

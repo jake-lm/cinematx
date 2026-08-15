@@ -2897,6 +2897,79 @@ button, input, select, textarea {
   accent-color: var(--red);
 }
 
+.adm-crop-row {
+  border-bottom: 1px solid var(--line);
+}
+.adm-crop-row:last-child {
+  border-bottom: none;
+}
+
+.adm-crop-row .adm-row {
+  border-bottom: none;
+}
+
+.adm-crop-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0 var(--s-4) var(--s-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.adm-crop-toggle:hover {
+  color: var(--red-hi);
+}
+
+.adm-crop-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--t-mid) var(--ease);
+}
+.adm-crop-panel.is-open {
+  max-height: 360px;
+}
+
+.adm-crop-preview {
+  margin: 0 var(--s-4);
+  aspect-ratio: 1080/650;
+  border-radius: 6px;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border: 1px solid var(--line);
+}
+
+.adm-crop-slider {
+  display: block;
+  width: calc(100% - var(--s-4) * 2);
+  margin: var(--s-3) var(--s-4) 0;
+  accent-color: var(--red);
+}
+
+.adm-crop-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-3) var(--s-4) var(--s-4);
+}
+
+.adm-crop-status {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.adm-crop-status.is-visible {
+  opacity: 1;
+}
+
 .vis {
   --vis-h: 96px;
   --vis-gap: 5px;

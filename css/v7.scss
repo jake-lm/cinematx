@@ -1906,6 +1906,68 @@ button, input, select, textarea { font: inherit; color: inherit; }
   input[type="checkbox"] { flex: none; accent-color: var(--red); }
 }
 
+// ── Poster crop (spotlight-hero repositioning, "On the card") ──────────────
+// The toggle sits outside .adm-row's own <label> on purpose — nested inside
+// it, a click would also flip the Featured checkbox the label wraps.
+.adm-crop-row { border-bottom: 1px solid var(--line); &:last-child { border-bottom: none; } }
+.adm-crop-row .adm-row { border-bottom: none; }
+
+.adm-crop-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0 var(--s-4) var(--s-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  @include label(var(--t-3xs), var(--text-3));
+  &:hover { color: var(--red-hi); }
+}
+
+// Collapsed via max-height, not display:none — the same smooth expand
+// pattern used elsewhere, and one a fixed cap (not a measured scrollHeight)
+// suits fine here since the panel's contents never vary in height.
+.adm-crop-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--t-mid) var(--ease);
+  &.is-open { max-height: 360px; }
+}
+
+// object-position/background-position share the same 0–100% top/bottom
+// semantics ig_fetch_thumb()'s $vBias implements in GD, so this preview and
+// the eventual baked PNG crop the same way.
+.adm-crop-preview {
+  margin: 0 var(--s-4);
+  aspect-ratio: 1080 / 650;
+  border-radius: 6px;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border: 1px solid var(--line);
+}
+
+.adm-crop-slider {
+  display: block;
+  width: calc(100% - var(--s-4) * 2);
+  margin: var(--s-3) var(--s-4) 0;
+  accent-color: var(--red);
+}
+
+.adm-crop-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin: var(--s-3) var(--s-4) var(--s-4);
+}
+
+.adm-crop-status {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+  &.is-visible { opacity: 1; }
+}
+
 // ── Visitor graph ───────────────────────────────────────────────────────────
 // A stack, not an overlay: unique visitors at the base, the repeat visits they
 // generated above it. The column total is connections, so the red block reads

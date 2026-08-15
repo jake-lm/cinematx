@@ -548,7 +548,15 @@ function ig_dashed_line($im, $x1, $x2, $y, $color, $dash = 10, $gap = 8) {
 // repertory titles recur night after night, no reason to refetch. Returns a
 // cropped-to-cover GD image sized exactly $w x $h, or null on any miss/failure
 // so the caller can fall back to a placeholder rather than breaking the row.
-function ig_fetch_thumb($url, $w, $h) {
+//
+// $vBias controls where the vertical crop window sits when the source is
+// taller than the target (the common case: a portrait poster against a
+// landscape spotlight hero) — 0.0 is the top of the poster, 1.0 the bottom,
+// 0.5 (the default) is dead center, i.e. today's exact prior behavior for
+// every caller that doesn't pass one. Horizontal cropping always stays
+// centered; posters are essentially always portrait, so that axis was never
+// the problem ig_poster_crop_bias() exists to fix.
+function ig_fetch_thumb($url, $w, $h, $vBias = 0.5) {
     if (!$url) return null;
 
     $cacheDir = dirname(__DIR__) . '/list/poster_cache';
@@ -581,10 +589,45 @@ function ig_fetch_thumb($url, $w, $h) {
         imagecopyresampled($thumb, $src, 0, 0, (int) (($srcW - $cropW) / 2), 0, $w, $h, $cropW, $srcH);
     } else {
         $cropH = (int) round($srcW * $h / $w);
-        imagecopyresampled($thumb, $src, 0, 0, 0, (int) (($srcH - $cropH) / 2), $w, $h, $srcW, $cropH);
+        $offsetY = (int) (($srcH - $cropH) * $vBias);
+        imagecopyresampled($thumb, $src, 0, 0, 0, $offsetY, $w, $h, $srcW, $cropH);
     }
     imagedestroy($src);
     return $thumb;
+}
+
+// Where today's admin has manually repositioned a poster's spotlight-hero
+// crop — keyed by the hero URL itself (md5, same identity ig_fetch_thumb()'s
+// own cache file uses) rather than by date or film, since the preference
+// belongs to the poster image and should carry forward every time that
+// film's poster is used again, not just for today's screening of it.
+// Absent key returns 0.5 (dead center, today's prior behavior) so a poster
+// nobody has touched renders pixel-identical to before this existed.
+function ig_poster_crop_path() {
+    return dirname(__DIR__) . '/uploads/social/poster-crops.json';
+}
+
+function ig_poster_crop_read() {
+    $file = ig_poster_crop_path();
+    if (!file_exists($file)) return [];
+    $data = json_decode(file_get_contents($file), true);
+    return is_array($data) ? $data : [];
+}
+
+function ig_poster_crop_bias($posterUrl) {
+    if (!$posterUrl) return 0.5;
+    $crops = ig_poster_crop_read();
+    $key = md5($posterUrl);
+    return isset($crops[$key]) ? max(0, min(1, (float) $crops[$key])) : 0.5;
+}
+
+function ig_poster_crop_write($posterUrl, $bias) {
+    if (!$posterUrl) return;
+    $dir = dirname(__DIR__) . '/uploads/social';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+    $crops = ig_poster_crop_read();
+    $crops[md5($posterUrl)] = round(max(0, min(1, (float) $bias)), 3);
+    file_put_contents(ig_poster_crop_path(), json_encode($crops));
 }
 
 // ── Pagination ───────────────────────────────────────────────────────────
@@ -1770,7 +1813,8 @@ function ig_build_feature_page_paper(array $film, $date) {
     $margin = 80;
     $heroH  = 700;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -1900,7 +1944,8 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $margin = 80;
     $heroH  = 700;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -2022,7 +2067,8 @@ function ig_build_feature_page_zine(array $film, $date) {
     $margin = 80;
     $heroH  = 700;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -2136,7 +2182,8 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     $margin = 80;
     $heroH  = 700;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -2251,7 +2298,8 @@ function ig_build_feature_page_neon(array $film, $date) {
     $margin = 80;
     $heroH  = 700;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -2385,7 +2433,8 @@ function ig_build_feature_page_terminal(array $film, $date) {
     $posterH   = 450;
     $posterTop = $h - $posterH;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $posterH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $posterH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, $posterTop, 0, 0, $w, $posterH);
         imagedestroy($hero);
@@ -2536,7 +2585,8 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     $margin = 100;
     $heroH  = 650;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
@@ -2664,7 +2714,8 @@ function ig_build_feature_page_austin(array $film, $date) {
     $margin = 80;
     $heroH  = 650;
 
-    $hero = ig_fetch_thumb(ig_hero_url($film['poster']), $w, $heroH);
+    $heroUrl = ig_hero_url($film['poster']);
+    $hero = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
         imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
         imagedestroy($hero);
