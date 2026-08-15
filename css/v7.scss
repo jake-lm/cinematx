@@ -1925,13 +1925,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 
 // Collapsed via max-height, not display:none — the same smooth expand
-// pattern used elsewhere, and one a fixed cap (not a measured scrollHeight)
-// suits fine here since the panel's contents never vary in height.
+// pattern used elsewhere. A generous fixed cap, not a measured scrollHeight
+// — but generous actually matters here: this column is the wide side of
+// the two-column grid, and .adm-crop-preview's height scales with however
+// wide that ends up being (aspect-ratio 1080/650), so 360px clipped the
+// slider and Save button clean off on anything but a narrow browser window.
 .adm-crop-panel {
   max-height: 0;
   overflow: hidden;
   transition: max-height var(--t-mid) var(--ease);
-  &.is-open { max-height: 360px; }
+  &.is-open { max-height: 640px; }
 }
 
 // object-position/background-position share the same 0–100% top/bottom

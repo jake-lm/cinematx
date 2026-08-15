@@ -2934,7 +2934,7 @@ button, input, select, textarea {
   transition: max-height var(--t-mid) var(--ease);
 }
 .adm-crop-panel.is-open {
-  max-height: 360px;
+  max-height: 640px;
 }
 
 .adm-crop-preview {
