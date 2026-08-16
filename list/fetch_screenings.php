@@ -41,7 +41,9 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             $film['location'] = $film['location'] ?? null;
 
             if (empty($film['no_tmdb'])) {
-                $tmdb = fetch_tmdb($film['title']);
+                // AFS-only for now (see scraper_afs.php) — absent for every
+                // other venue, so this is a no-op there.
+                $tmdb = fetch_tmdb($film['title'], null, $film['director_hint'] ?? null);
                 $film['poster']   = $tmdb['poster'];
                 $film['year']     = $tmdb['year'];
                 $film['runtime']  = $tmdb['runtime'];

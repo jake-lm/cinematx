@@ -215,6 +215,15 @@ function fetch_afs_films_scrape() {
                     'director'     => $is_short ? 'Various'           : null,
                     'runtime'      => $is_short ? $detail['runtime']  : null,
                     'overview'     => $is_short ? $detail['overview'] : null,
+                    // AFS's own "Directed by X" line, carried through even
+                    // for a regular (non-shorts-program) film — fetch_tmdb()
+                    // uses it to break a tie between two search results that
+                    // both match the title exactly, which popularity alone
+                    // otherwise picks wrong: "MEANTIME" matched a 2022 short
+                    // over the real 1983 Mike Leigh film playing tonight,
+                    // because the short's TMDB popularity happened to be
+                    // slightly higher.
+                    'director_hint' => $detail['director'],
                 ];
             }
         }

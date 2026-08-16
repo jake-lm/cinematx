@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 5;
+const TMDB_CACHE_V = 6;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -64,8 +64,17 @@ function tmdb_query($title) {
  * keep TMDB's own ordering — a query with no exact match is one where its
  * relevance ranking is the best signal available, and sorting everything by
  * popularity would hand obscure searches to whatever blockbuster shares a word.
+ *
+ * Popularity itself can pick wrong between two exact matches, though:
+ * "MEANTIME" matched a 2022 short over the real 1983 Mike Leigh film playing
+ * that night, because the short's TMDB popularity edged out the real one's
+ * (2.2 vs 1.7 — both are "Meantime", nothing else in the search response
+ * tells them apart). When the caller knows who actually directed the film
+ * (AFS's own screening page says so — see scraper_afs.php), a genuine
+ * ambiguity like that is checked against each exact match's real director
+ * before falling back to popularity.
  */
-function tmdb_best(array $results, $query) {
+function tmdb_best(array $results, $query, $director_hint = null) {
     if (!$results) return null;
 
     $norm = function ($s) {
@@ -81,7 +90,28 @@ function tmdb_best(array $results, $query) {
     if (!$exact) return $results[0];
 
     usort($exact, fn($a, $b) => ($b['popularity'] ?? 0) <=> ($a['popularity'] ?? 0));
+
+    if (count($exact) > 1 && $director_hint) {
+        $want = trim(mb_strtolower($director_hint));
+        foreach ($exact as $candidate) {
+            if (empty($candidate['id'])) continue;
+            $have = tmdb_movie_director((int)$candidate['id']);
+            if ($have && trim(mb_strtolower($have)) === $want) return $candidate;
+        }
+    }
+
     return $exact[0];
+}
+
+/** Just the director, for disambiguating between same-titled search results
+ *  — a much smaller request than the full detail fetch fetch_tmdb() makes
+ *  once a match is actually chosen. */
+function tmdb_movie_director($id) {
+    $credits = tmdb_get('https://api.themoviedb.org/3/movie/' . $id . '/credits?api_key=' . TMDB_API_KEY);
+    foreach ($credits['crew'] ?? [] as $c) {
+        if (($c['job'] ?? '') === 'Director' && !empty($c['name'])) return $c['name'];
+    }
+    return null;
 }
 
 function tmdb_get($url) {
@@ -100,8 +130,13 @@ function tmdb_get($url) {
 /**
  * Everything we know about a title. Returns the TMDB_EMPTY shape on a miss, so
  * callers can read ['year'] without checking for null first.
+ *
+ * $director_hint isn't part of the cache key — it only breaks a tie between
+ * two exact-title matches (see tmdb_best()), so a correctly-resolved entry
+ * is exactly as correct for a caller who doesn't have a hint to offer, and
+ * stays cached for them too.
  */
-function fetch_tmdb($title, $year = null) {
+function fetch_tmdb($title, $year = null, $director_hint = null) {
     if (!defined('TMDB_API_KEY') || !TMDB_API_KEY) return TMDB_EMPTY;
 
     $title      = tmdb_query($title);
@@ -121,7 +156,7 @@ function fetch_tmdb($title, $year = null) {
     );
     if ($search === null) return TMDB_EMPTY;   // transient failure — don't cache, retry next time
 
-    $hit = tmdb_best($search['results'] ?? [], $title);
+    $hit = tmdb_best($search['results'] ?? [], $title, $director_hint);
     $out = TMDB_EMPTY;
 
     if ($hit) {

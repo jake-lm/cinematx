@@ -131,7 +131,7 @@ function ctx_enrich(array $films) {
         $clean = ctx_clean_title($raw);
         if ($clean === '' || strcasecmp($clean, $raw) === 0) continue;
 
-        $tmdb = fetch_tmdb($clean, ctx_year($raw));
+        $tmdb = fetch_tmdb($clean, ctx_year($raw), $f['director_hint'] ?? null);
         if (!empty($tmdb['poster'])) {
             $f['poster']        = $tmdb['poster'];
             $f['display_title'] = $clean;
