@@ -30,16 +30,47 @@ const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented
 // actually called "The Anniversary" is untouched.
 const CTX_ANNIVERSARY = '/\s+\d{1,3}(?:st|nd|rd|th)\s+anniversary\b.*$/i';
 
+// A print/restoration name after a colon — "Manhunter: The Final Cut",
+// "Apocalypse Now: Redux". Shaped exactly like "Series: Title" but isn't:
+// the real film is on the *left*. Cleaning "Michael Mann's Manhunter: The
+// Final Cut" down to "The Final Cut" found TMDB's *other* film by that name
+// (Omar Naim, 2004) — a real film, just the wrong one, since it never got
+// the chance to fail and fall back to the raw title the way a genuine miss
+// would have.
+const CTX_EDITION_SUFFIX = '/^(?:the\s+)?(?:final|extended|theatrical|unrated|ultimate|complete|director\'?s?)\s+(?:cut|edition|version)$|^redux$/i';
+
+// A director's own attribution baked into the title — "Michael Mann's
+// Manhunter", "Tim Burton's Corpse Bride". TMDB's title search does not do
+// this fuzzy a match (searching the full "Michael Mann's Manhunter" finds
+// nothing at all), so this has to come off before the search, same as the
+// billing/anniversary text above.
+const CTX_DIRECTOR_PREFIX = '/^([A-Z][\w.]*(?:\s+[A-Z][\w.]*){0,2})\'s\s+/u';
+
 /** The series/programme a screening belongs to, if the title carries one. */
 function ctx_series($raw) {
     $raw = trim((string)$raw);
-    // "Discovery Zone: MIRACLE MILE" — but not "Blade Runner 2049: The Final Cut"
+    // "Discovery Zone: MIRACLE MILE" — but not "Manhunter: The Final Cut"
     // style suffixes, so require the left side to be short and the right non-empty.
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $raw, $m)) {
+        if (preg_match(CTX_EDITION_SUFFIX, trim($m[2]))) return null;
         $series = trim($m[1]);
         // A number-only or single-word-of-digits prefix is not a series.
         if ($series !== '' && !preg_match('/^\d+$/', $series)) return $series;
     }
+    return null;
+}
+
+/**
+ * A director name pulled from the title's own "X's Y" attribution, for
+ * exactly the tie-break tmdb_best() already does with an AFS-supplied
+ * director_hint — three different films are all just called "Manhunter",
+ * and this is a free, reliable way to say which one. A false read here
+ * (e.g. "America's Sweethearts" reading "America" as a director) is
+ * harmless: tmdb_best() only ever uses the hint to break a tie between
+ * exact-title matches, and simply finds no candidate to match against.
+ */
+function ctx_title_director_hint($raw) {
+    if (preg_match(CTX_DIRECTOR_PREFIX, trim((string)$raw), $m)) return trim($m[1]);
     return null;
 }
 
@@ -49,9 +80,15 @@ function ctx_clean_title($raw) {
     $t = preg_replace(CTX_CONNECTIVES, '', $t);              // "… ft. X"
     $t = preg_replace(CTX_ANNIVERSARY, '', $t);              // "… 35th Anniversary…"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
-    if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title"
-        if (!preg_match('/^\d+$/', trim($m[1]))) $t = $m[2];
+    if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
+        $left = trim($m[1]);
+        if (preg_match(CTX_EDITION_SUFFIX, trim($m[2]))) {
+            $t = $left;                                       // "Manhunter: The Final Cut" → left
+        } elseif (!preg_match('/^\d+$/', $left)) {
+            $t = $m[2];                                       // "Discovery Zone: MIRACLE MILE" → right
+        }
     }
+    $t = preg_replace(CTX_DIRECTOR_PREFIX, '', $t);           // "Michael Mann's Manhunter" → "Manhunter"
     return trim($t) !== '' ? trim($t) : trim((string)$raw);
 }
 
@@ -131,7 +168,12 @@ function ctx_enrich(array $films) {
         $clean = ctx_clean_title($raw);
         if ($clean === '' || strcasecmp($clean, $raw) === 0) continue;
 
-        $tmdb = fetch_tmdb($clean, ctx_year($raw), $f['director_hint'] ?? null);
+        // AFS's own screening page (scraper_afs.php) is the preferred
+        // source when it's there; the title's own "X's Y" attribution,
+        // stripped out by ctx_clean_title() above, is the fallback for
+        // every other venue.
+        $hint = $f['director_hint'] ?? ctx_title_director_hint($raw);
+        $tmdb = fetch_tmdb($clean, ctx_year($raw), $hint);
         if (!empty($tmdb['poster'])) {
             $f['poster']        = $tmdb['poster'];
             $f['display_title'] = $clean;
