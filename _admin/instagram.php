@@ -59,10 +59,7 @@ $pages   = ig_save_images($images, $now);
 $caption = ig_caption($films, $now);
 
 $posted_flag    = dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now);
-// DEV OVERRIDE (2026-07-30): the button ignores the flag so posting can be
-// re-tested repeatedly; instagram_post.php's own guard is disabled to match.
-// Re-enable both together — restore `$already_posted = file_exists($posted_flag);`.
-$already_posted = false;
+$already_posted = file_exists($posted_flag);
 $configured     = defined('IG_ACCESS_TOKEN') && IG_ACCESS_TOKEN
                 && defined('IG_BUSINESS_ACCOUNT_ID') && IG_BUSINESS_ACCOUNT_ID;
 

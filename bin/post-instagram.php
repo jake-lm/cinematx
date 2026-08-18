@@ -2,7 +2,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Daily Instagram poster — run from cron, never from the web
 //
-//    0 9 * * *  /usr/bin/php /path/to/cinematx/bin/post-instagram.php >> /var/log/cinematx-ig.log 2>&1
+//    30 7 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/log/cinematx-ig.log 2>&1
+//
+//  Installed in www-data's own crontab (`crontab -u www-data -e`), not
+//  root's — this writes into uploads/social/ alongside the admin panel's
+//  "Post to Instagram" button, and a root-owned file there can end up
+//  unwritable to www-data afterward.
 //
 //  Renders today's Austin screenings into a card and publishes it through
 //  the Instagram Graph API. Pass --dry-run to generate the image + caption
@@ -64,14 +69,12 @@ if ($dry_run) {
     // Shared with the admin panel's "Post to Instagram" button — whichever
     // posts first today wins, the other is a no-op rather than a duplicate.
     $flag = $root . '/uploads/social/.posted-' . date('Y-m-d', $now);
-    // DEV OVERRIDE (2026-07-30): guard disabled to match instagram_post.php
-    // while composition modes are being live-tested. Re-enable both together.
-    // if (file_exists($flag)) {
-    //     printf("%s ig: already posted today, skipping\n", date('c'));
-    //     flock($lock, LOCK_UN);
-    //     fclose($lock);
-    //     exit(0);
-    // }
+    if (file_exists($flag)) {
+        printf("%s ig: already posted today, skipping\n", date('c'));
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        exit(0);
+    }
 
     try {
         $media_id = ig_publish($pages, $caption);

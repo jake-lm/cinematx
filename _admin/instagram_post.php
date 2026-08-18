@@ -15,12 +15,10 @@ if (ig_admin_target_date() !== strtotime('today')) {
 $now   = time();
 $flag  = dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now);
 
-// DEV OVERRIDE (2026-07-30): double-post guard disabled for live testing.
-// Re-enable before this goes near a real posting schedule.
-// if (file_exists($flag)) {
-//     header('Location: /_admin/instagram.php?error=' . urlencode('already posted today'));
-//     exit;
-// }
+if (file_exists($flag)) {
+    header('Location: /_admin/instagram.php?error=' . urlencode('already posted today'));
+    exit;
+}
 
 $films   = ig_today_films($conn);
 $compose = ig_compose_read($now);
