@@ -159,10 +159,18 @@ function ig_today_films($conn, $date = null) {
  * Today's Alamo Drafthouse screenings, one row per film with every location
  * and showtime folded together — Alamo books the same title into up to 5
  * Austin cinemas, sometimes several times a night, and per-location rows
- * would make the opt-in checklist unusably long. `location` is dropped
- * entirely on the merged row rather than keeping whichever one was seen
- * first: once two cinemas are folded into one line, no single location is
- * accurate to show.
+ * would make the opt-in checklist unusably long.
+ *
+ * When every showing of a title happens to share one cinema, `venue` becomes
+ * that cinema's own name ("Alamo Village") instead of the generic chain
+ * name — the same way AFS, the Paramount, and Hyperreal already show their
+ * own names, so Alamo reads the same way whenever it can. The moment two
+ * different cinemas are folded into the same line, no single one of them is
+ * accurate, so it falls back to IG_ALAMO_VENUE. `location` itself is still
+ * dropped on the merged row either way, since the per-location detail
+ * already lives in `venue` when it survives the merge at all, and every
+ * card renderer already appends `location` after `venue` when it's set —
+ * appending it too here would double it up.
  *
  * Not filtered into the card by default — this is purely what the admin
  * checklist offers. See ig_today_films() for where a day's selections
@@ -176,11 +184,23 @@ function ig_alamo_films($conn, $date = null) {
     $films = ctx_enrich($films);
     foreach ($films as &$f) {
         if (!empty($f['display_title'])) $f['title'] = $f['display_title'];
-        $f['location'] = null;
     }
     unset($f);
 
-    return ig_group_showtimes($films, 'ig_alamo_key');
+    $locationsByKey = [];
+    foreach ($films as $f) {
+        $locationsByKey[ig_alamo_key($f)][$f['location']] = true;
+    }
+
+    $grouped = ig_group_showtimes($films, 'ig_alamo_key');
+    foreach ($grouped as &$g) {
+        $locs = array_keys($locationsByKey[ig_alamo_key($g)] ?? []);
+        $g['venue']    = (count($locs) === 1 && $locs[0] !== '') ? 'Alamo ' . $locs[0] : IG_ALAMO_VENUE;
+        $g['location'] = null;
+    }
+    unset($g);
+
+    return $grouped;
 }
 
 // Alamo's checklist identity — title only, deliberately coarser than

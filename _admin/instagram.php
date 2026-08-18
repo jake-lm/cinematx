@@ -507,7 +507,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                   <span class="adm-row__text">
                     <span class="adm-row__title"><?php echo $e(mb_strtoupper($af['title'])); ?></span>
                     <span class="adm-row__sub">
-                      Alamo Drafthouse<?php if ($af['director']): ?> &middot; dir. <?php echo $e($af['director']); ?><?php endif; ?>
+                      <?php echo $e($af['venue']); ?><?php if ($af['director']): ?> &middot; dir. <?php echo $e($af['director']); ?><?php endif; ?>
                     </span>
                   </span>
                   <span class="adm-row__when"><?php echo $e(ig_format_times($af['timestamps'])); ?></span>
