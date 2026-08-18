@@ -2,12 +2,15 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Daily Instagram poster — run from cron, never from the web
 //
-//    30 7 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/log/cinematx-ig.log 2>&1
+//    30 7 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/www/cinematx/uploads/social/cinematx-ig.log 2>&1
 //
 //  Installed in www-data's own crontab (`crontab -u www-data -e`), not
 //  root's — this writes into uploads/social/ alongside the admin panel's
 //  "Post to Instagram" button, and a root-owned file there can end up
-//  unwritable to www-data afterward.
+//  unwritable to www-data afterward. The log lives in that same directory
+//  for the same reason: /var/log itself isn't www-data-writable, and
+//  uploads/social/ is already where every other runtime state file
+//  (.posted-<date>, compose-<date>.json, ...) lives.
 //
 //  Renders today's Austin screenings into a card and publishes it through
 //  the Instagram Graph API. Pass --dry-run to generate the image + caption
