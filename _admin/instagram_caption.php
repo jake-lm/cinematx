@@ -11,7 +11,7 @@ require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now   = time();
+$now   = ig_admin_target_date();
 $file  = dirname(__DIR__) . '/uploads/social/caption-' . date('Y-m-d', $now) . '.txt';
 $action = $_POST['action'] ?? '';
 

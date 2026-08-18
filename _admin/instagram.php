@@ -20,16 +20,23 @@ require __DIR__ . '/_guard.php';
 require dirname(__DIR__) . '/v7/_lib.php';
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now   = time();
-$films = ig_today_films($conn);
+// $now is the admin's own "today" — past the 10pm cutover this is tomorrow's
+// date, so the whole page (and every save handler it posts to) previews and
+// edits tomorrow's post instead. $today stays the literal calendar day, only
+// used to tell whether that rollover is currently in effect.
+$now   = ig_admin_target_date();
+$today = strtotime('today');
+$prep_mode = $now !== $today;
+
+$films = ig_today_films($conn, $now);
 $saved = ig_compose_read($now);
 
-$alamo_films    = ig_alamo_films($conn);
+$alamo_films    = ig_alamo_films($conn, $now);
 $alamo_selected = ig_alamo_read($now);
 foreach ($alamo_films as &$af) { $af['checked'] = in_array(ig_alamo_key($af), $alamo_selected, true); }
 unset($af);
 
-$arthouse_films = ig_arthouse_films($conn);
+$arthouse_films = ig_arthouse_films($conn, $now);
 $excluded_keys  = ig_excluded_read($now);
 foreach ($arthouse_films as &$rf) { $rf['included'] = !in_array(ig_film_key($rf), $excluded_keys, true); }
 unset($rf);
@@ -83,10 +90,19 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <div class="adm__head">
         <h1 class="adm__title">Instagram</h1>
         <span class="adm__meta"><?php echo date('l, j F', $now); ?></span>
-        <span class="post-status <?php echo $already_posted ? 'status-live' : 'status-draft'; ?>">
-          <?php echo $already_posted ? 'Posted' : 'Pending'; ?>
+        <span class="post-status <?php echo $prep_mode ? 'status-prep' : ($already_posted ? 'status-live' : 'status-draft'); ?>">
+          <?php echo $prep_mode ? 'Preparing' : ($already_posted ? 'Posted' : 'Pending'); ?>
         </span>
       </div>
+
+      <?php if ($prep_mode): ?>
+        <div class="adm-prep-note">
+          It's past 10pm, so this page has rolled forward to <strong><?php echo date('l, j F', $now); ?></strong> &mdash;
+          everything below previews and edits <strong>tomorrow's</strong> post. Save whatever you like now; the
+          <code>Post to Instagram</code> button stays disabled until tomorrow actually arrives, when the 7&ndash;8am
+          cron job publishes the saved composition on its own.
+        </div>
+      <?php endif; ?>
 
       <?php if (isset($_GET['posted'])): ?>
         <div class="alert" style="margin-bottom:var(--s-5)">Posted &mdash; media id <?php echo $e($_GET['posted']); ?></div>
@@ -353,7 +369,13 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <span class="card__title">Publish</span>
             </div>
             <div class="card__body">
-              <?php if ($already_posted): ?>
+              <?php if ($prep_mode): ?>
+                <div class="admin-note">
+                  This is tomorrow's draft &mdash; posting is disabled until tomorrow gets here.
+                  Save whatever you want set up now; the cron job publishes it around 7&ndash;8am.
+                </div>
+                <button class="btn btn--block" type="button" disabled>Preparing tomorrow's post</button>
+              <?php elseif ($already_posted): ?>
                 <div class="admin-note">
                   Already posted today. Reloading this page regenerates the preview but will not
                   post again &mdash; the same flag also stops the cron job repeating it.

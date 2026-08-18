@@ -12,9 +12,9 @@ require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now = time();
+$now = ig_admin_target_date();
 
-$all = array_map('ig_film_key', ig_arthouse_films($conn));
+$all = array_map('ig_film_key', ig_arthouse_films($conn, $now));
 $included = is_array($_POST['included'] ?? null) ? $_POST['included'] : [];
 $excluded = array_values(array_diff($all, $included));
 

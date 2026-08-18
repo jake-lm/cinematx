@@ -3200,6 +3200,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
   @include label(9px, var(--text-3));
   &.status-live  { background: var(--red); color: #fff; }
   &.status-draft { background: var(--surface-3); color: var(--text-3); }
+  &.status-prep  { background: transparent; color: var(--red); border: 1px solid var(--red); }
+}
+
+.adm-prep-note {
+  margin-bottom: var(--s-5);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--red); border-radius: 6px;
+  font-size: var(--t-xs); line-height: 1.5; color: var(--text-2);
+  strong { color: var(--text); }
 }
 
 .post-row-actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }

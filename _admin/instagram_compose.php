@@ -11,7 +11,7 @@ require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now  = time();
+$now  = ig_admin_target_date();
 $mode = $_POST['mode'] ?? 'default';
 if (!in_array($mode, ['default', 'auto', 'manual'], true)) $mode = 'default';
 

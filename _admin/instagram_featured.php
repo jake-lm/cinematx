@@ -12,12 +12,12 @@ require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now = time();
+$now = ig_admin_target_date();
 
 // Only keys that are actually on today's card are kept — posted values are
 // user input, and the day's real film list is the source of truth for what
 // a valid key even looks like.
-$valid = array_map('ig_film_key', ig_today_films($conn));
+$valid = array_map('ig_film_key', ig_today_films($conn, $now));
 $posted = is_array($_POST['featured'] ?? null) ? $_POST['featured'] : [];
 $keys = array_values(array_intersect($posted, $valid));
 

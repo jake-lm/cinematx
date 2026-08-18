@@ -11,9 +11,9 @@ require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/instagram.php';
 
-$now = time();
+$now = ig_admin_target_date();
 
-$valid = array_map('ig_alamo_key', ig_alamo_films($conn));
+$valid = array_map('ig_alamo_key', ig_alamo_films($conn, $now));
 $posted = is_array($_POST['alamo'] ?? null) ? $_POST['alamo'] : [];
 $keys = array_values(array_intersect($posted, $valid));
 

@@ -61,14 +61,34 @@ define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStenci
 const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club'];
 const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
+// The admin page's own "today." Past IG_ADMIN_CUTOVER_HOUR (10pm Central —
+// this project's only timezone, see database.php) it rolls forward to
+// tomorrow's date, so the evening before can be spent setting tomorrow's
+// post up rather than waiting past midnight to touch it. Every admin
+// page/handler should read this instead of calling time()/strtotime('today')
+// directly. The cron job is the one exception and must never call this: by
+// the time it runs (7-8am) the literal calendar day already IS the day that
+// was prepared the night before, so it always wants straight today.
+const IG_ADMIN_CUTOVER_HOUR = 22;
+
+function ig_admin_target_date() {
+    $today = strtotime('today');
+    return (int) date('G') >= IG_ADMIN_CUTOVER_HOUR ? strtotime('+1 day', $today) : $today;
+}
+
 // Today's raw arthouse lineup (IG_VENUES) — always the full day, regardless
 // of what a prior save excluded, the same "full day, independent of the
 // selection" shape ig_alamo_films() uses. ig_today_films() is what actually
 // applies exclusions; this is what the admin checklist offers to exclude
 // from, so unchecking something is always reversible.
-function ig_arthouse_films($conn) {
-    $start = strtotime('today');
-    $end   = strtotime('tomorrow') - 1;
+//
+// $date defaults to the real strtotime('today') — not ig_admin_target_date()
+// — so bin/post-instagram.php's plain ig_arthouse_films($conn) call keeps
+// fetching the literal current day unchanged; admin callers pass the target
+// date explicitly.
+function ig_arthouse_films($conn, $date = null) {
+    $start = $date ?? strtotime('today');
+    $end   = strtotime('+1 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
     $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
     // The raw scrape misses posters for anything a venue re-bills with extra
@@ -94,8 +114,8 @@ function ig_arthouse_films($conn) {
 // Today's window in the project's own timezone (America/Chicago, set in
 // database.php). $force is false — this rides on whatever warm-cache.php
 // has already scraped, same as a normal page request.
-function ig_today_films($conn) {
-    $start = strtotime('today');
+function ig_today_films($conn, $date = null) {
+    $start = $date ?? strtotime('today');
 
     // Every arthouse screening is on the card by default — the admin
     // checklist is opt-*out*, the mirror image of Alamo's opt-in below, so
@@ -103,7 +123,7 @@ function ig_today_films($conn) {
     // today's exact current behavior.
     $excluded = ig_excluded_read($start);
     $films = array_values(array_filter(
-        ig_arthouse_films($conn),
+        ig_arthouse_films($conn, $start),
         fn($f) => !in_array(ig_film_key($f), $excluded, true)
     ));
 
@@ -116,7 +136,7 @@ function ig_today_films($conn) {
     $alamoSelected = ig_alamo_read($start);
     if ($alamoSelected) {
         $alamo = array_values(array_filter(
-            ig_alamo_films($conn),
+            ig_alamo_films($conn, $start),
             fn($f) => in_array(ig_alamo_key($f), $alamoSelected, true)
         ));
         $films = array_merge($films, $alamo);
@@ -148,9 +168,9 @@ function ig_today_films($conn) {
  * checklist offers. See ig_today_films() for where a day's selections
  * actually get merged in.
  */
-function ig_alamo_films($conn) {
-    $start = strtotime('today');
-    $end   = strtotime('tomorrow') - 1;
+function ig_alamo_films($conn, $date = null) {
+    $start = $date ?? strtotime('today');
+    $end   = strtotime('+1 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
     $films = array_values(array_filter($films, fn($f) => ($f['venue'] ?? '') === IG_ALAMO_VENUE));
     $films = ctx_enrich($films);
