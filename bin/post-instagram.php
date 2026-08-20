@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Daily Instagram poster — run from cron, never from the web
 //
-//    30 7 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/www/cinematx/uploads/social/cinematx-ig.log 2>&1
+//    30 12 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/www/cinematx/uploads/social/cinematx-ig.log 2>&1
 //
 //  Installed in www-data's own crontab (`crontab -u www-data -e`), not
 //  root's — this writes into uploads/social/ alongside the admin panel's
@@ -11,6 +11,15 @@
 //  for the same reason: /var/log itself isn't www-data-writable, and
 //  uploads/social/ is already where every other runtime state file
 //  (.posted-<date>, compose-<date>.json, ...) lives.
+//
+//  The hour above is 12, not 7 — production's system clock is UTC, and this
+//  box's cron doesn't honor a TZ=/CRON_TZ= line for schedule matching
+//  (tested 2026-08-20: it only reaches the job's own environment, never the
+//  scheduler). 30 12 UTC is 7:30am only while Central is on CDT (Mar-Nov);
+//  it needs to become 30 13 for CST (Nov-Mar) and back again each changeover
+//  — there's no way to make this self-adjusting without either changing the
+//  box's system timezone (shared with venuetx, out of scope here) or a
+//  systemd timer, so for now this is a standing manual chore twice a year.
 //
 //  Renders today's Austin screenings into a card and publishes it through
 //  the Instagram Graph API. Pass --dry-run to generate the image + caption
