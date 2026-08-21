@@ -720,6 +720,26 @@ const IG_THEMES = [
     'austin'    => 'Evening in Austin',
 ];
 
+// Each day of the week has its own standing theme — chosen editorially, well
+// ahead of any particular day's admin session. date('w') is 0 (Sunday)
+// through 6 (Saturday), already timezone-correct for whatever midnight
+// timestamp a caller passes in (ig_admin_target_date()/strtotime('today')
+// are both already resolved in America/Chicago). Terminal isn't part of the
+// weekly rotation; it just stays reachable from the theme picker like always.
+const IG_THEME_SCHEDULE = [
+    0 => 'neon',       // Sunday
+    1 => 'newsprint',  // Monday
+    2 => 'darkroom',   // Tuesday — "Film Reel"
+    3 => 'zine',       // Wednesday
+    4 => 'austin',     // Thursday — "Night in Austin"
+    5 => 'marquee',    // Friday
+    6 => 'paper',      // Saturday
+];
+
+function ig_theme_for_date($date) {
+    return IG_THEME_SCHEDULE[(int) date('w', $date)] ?? 'paper';
+}
+
 // $moreCount is screenings that exist on a *later* list page — not this
 // page's own row-capacity overflow, which each renderer still tracks
 // internally. Only Auto/Manual multi-page days ever pass a nonzero value;
@@ -2974,9 +2994,12 @@ function ig_caption(array $films, $date) {
 
 // ── Composition ──────────────────────────────────────────────────────────
 
-// Absent compose-<date>.json means this: one card, today's exact design,
-// no pagination, no spotlight pages. New days behave exactly as they always
-// have until someone opens the admin page and changes something.
+// Absent compose-<date>.json means this: one card, that day's scheduled
+// theme (ig_theme_for_date()), no pagination, no spotlight pages. New days
+// behave this way until someone opens the admin page and changes something
+// — a plain literal 'paper' here would only ever matter as ig_compose_write()'s
+// last-resort fallback for a POST that somehow omitted 'theme', which the
+// admin form never does.
 const IG_COMPOSE_DEFAULT = ['mode' => 'default', 'per_page' => null, 'features' => false, 'theme' => 'paper'];
 
 // Screenings-per-page when Auto mode (or Manual with no count set) is
@@ -2988,11 +3011,19 @@ function ig_compose_path($date) {
     return dirname(__DIR__) . '/uploads/social/compose-' . date('Y-m-d', $date) . '.json';
 }
 
+// Same shape as IG_COMPOSE_DEFAULT, but with that day's scheduled theme
+// instead of a fixed one — the actual default a fresh, never-saved date
+// reads as.
+function ig_compose_default($date) {
+    return ['theme' => ig_theme_for_date($date)] + IG_COMPOSE_DEFAULT;
+}
+
 function ig_compose_read($date) {
-    $file = ig_compose_path($date);
-    if (!file_exists($file)) return IG_COMPOSE_DEFAULT;
+    $file    = ig_compose_path($date);
+    $default = ig_compose_default($date);
+    if (!file_exists($file)) return $default;
     $data = json_decode(file_get_contents($file), true);
-    return is_array($data) ? $data + IG_COMPOSE_DEFAULT : IG_COMPOSE_DEFAULT;
+    return is_array($data) ? $data + $default : $default;
 }
 
 function ig_compose_write($date, array $compose) {
