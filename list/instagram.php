@@ -56,8 +56,11 @@ define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStenci
 // ── Data ─────────────────────────────────────────────────────────────────
 
 // The three arthouse venues this post is meant to promote — not the chains
-// (Alamo Drafthouse, Fathom Events) and not member-submitted `events`. Alamo
+// (Alamo Drafthouse, Fathom Events) and not real member-submitted `events`
+// (source 'user', kept out until public engagement is actually on). Alamo
 // is still selectable on a per-day basis, though — see ig_alamo_films().
+// An admin-added screening (source 'admin', see _admin/events.php) is let
+// in regardless of venue name — see ig_arthouse_films()'s filter.
 const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club'];
 const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
@@ -90,7 +93,14 @@ function ig_arthouse_films($conn, $date = null) {
     $start = $date ?? strtotime('today');
     $end   = strtotime('+1 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
-    $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    // A scraped screening qualifies by venue name; an admin-added one (see
+    // _admin/events.php) qualifies regardless of what venue it names, since
+    // that's the whole point — a one-off venue no scraper covers. A real
+    // member submission (source 'user') matches neither and stays out.
+    $films = array_values(array_filter(
+        $films,
+        fn($f) => in_array($f['venue'], IG_VENUES, true) || ($f['source'] ?? null) === 'admin'
+    ));
     // The raw scrape misses posters for anything a venue re-bills with extra
     // billing baked into the title — "PHAT GIRLZ (20th Anniversary)" doesn't
     // match TMDB, "PHAT GIRLZ" does. v7/screenings.php's ctx_enrich() already

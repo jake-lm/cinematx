@@ -15,7 +15,7 @@ $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: /list'); exit; }
 
 $stmt = $conn->prepare(
-  "SELECT e.*, u.name AS author_name, u.photo AS author_photo
+  "SELECT e.*, u.name AS author_name, u.photo AS author_photo, u.admin AS author_admin
    FROM events e
    LEFT JOIN users u ON e.uid = u.id
    WHERE e.id = :id AND e.active = 1"
@@ -25,9 +25,12 @@ $event = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$event) { header('Location: /list'); exit; }
 
-$e    = 'ctx_e';
-$when = date('l, F j, Y \a\t g:ia', $event['screentime']);
-$past = $event['screentime'] < $CTX_NOW;
+$e      = 'ctx_e';
+$when   = date('l, F j, Y \a\t g:ia', $event['screentime']);
+$past   = $event['screentime'] < $CTX_NOW;
+// An admin-added screening (see _admin/events.php) reads as a plain
+// listing — no "submitted by a member" framing, since it isn't one.
+$member = empty($event['author_admin']);
 
 $ctx_title  = $event['title'] . ' — Cinema, TX';
 $ctx_active = 'list';                 // it was reached from The List
@@ -50,10 +53,12 @@ require dirname(__DIR__) . '/v7/_chrome.php';
   <main class="canvas">
     <article class="reading">
 
+      <?php if ($member || $past): ?>
       <div class="reading__kicker">
-        <span>Submitted by a member</span>
+        <?php if ($member): ?><span>Submitted by a member</span><?php endif; ?>
         <?php if ($past): ?><span class="reading__past">Already screened</span><?php endif; ?>
       </div>
+      <?php endif; ?>
 
       <h1 class="reading__title"><?php echo $e($event['title']); ?></h1>
 
@@ -91,7 +96,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <?php endif; ?>
       </div>
 
-      <?php if (!empty($event['author_name'])): ?>
+      <?php if ($member && !empty($event['author_name'])): ?>
       <div class="reading__share">
         <a class="face" href="/users/profile.php?id=<?php echo (int)$event['uid']; ?>" title="<?php echo $e($event['author_name']); ?>">
           <?php if (!empty($event['author_photo'])): ?>
@@ -104,7 +109,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <?php endif; ?>
 
       <div class="reading__fineprint">
-        Member-submitted. <a class="reading__link" href="/list">The List</a> has everything else playing this week.
+        <?php if ($member): ?>Member-submitted. <?php endif; ?><a class="reading__link" href="/list">The List</a> has everything else playing this week.
       </div>
 
     </article>

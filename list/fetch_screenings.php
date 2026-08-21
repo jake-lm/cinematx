@@ -68,9 +68,15 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         }
     }
 
+    // Joined against users.admin so an admin-added screening (see
+    // _admin/events.php) reads as 'source' => 'admin' rather than 'user' —
+    // the one thing that lets it into Instagram's arthouse pipeline
+    // (list/instagram.php's ig_arthouse_films()) and keeps a real member
+    // submission out of it, without a schema change either way.
     $events_q = $conn->prepare(
-        "SELECT e.id, e.title, e.poster, e.screentime, e.location
+        "SELECT e.id, e.title, e.poster, e.screentime, e.location, u.admin
          FROM events e
+         LEFT JOIN users u ON u.id = e.uid
          WHERE e.active = 1 AND e.screentime >= :now AND e.screentime <= :end
          ORDER BY e.screentime ASC"
     );
@@ -82,7 +88,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             'venue'     => $event['location'],
             'poster'    => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
             'url'       => '/events/?id=' . $event['id'],
-            'source'    => 'user',
+            'source'    => !empty($event['admin']) ? 'admin' : 'user',
             // Members submit a title and a time, not a filmography. The
             // renderer omits whatever is null rather than showing a gap.
             'year'      => null,
