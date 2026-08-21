@@ -26,7 +26,7 @@ if ($bias === null || $bias < 0 || $bias > 1) {
 
 // Only a hero URL that's actually on today's (or, past the prep-mode
 // cutover, tomorrow's) card is a valid key — same "the day's real film list
-// is the source of truth" rule instagram_featured.php and
+// is the source of truth" rule instagram_carousel.php and
 // instagram_alamo.php already follow. The crop itself still isn't
 // date-scoped once saved — this is only about which posters are valid to
 // adjust from whichever day the admin page is currently showing.

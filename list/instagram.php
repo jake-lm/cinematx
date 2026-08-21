@@ -143,15 +143,6 @@ function ig_today_films($conn, $date = null) {
         usort($films, fn($a, $b) => min($a['timestamps']) <=> min($b['timestamps']));
     }
 
-    // Featured never needs its own inclusion logic — it just flags whatever
-    // survived the two filters above, so it always matches what's actually
-    // going on the card.
-    $featured = ig_featured_read($start);
-    foreach ($films as &$f) {
-        $f['featured'] = in_array(ig_film_key($f), $featured, true);
-    }
-    unset($f);
-
     return $films;
 }
 
@@ -211,8 +202,8 @@ function ig_alamo_key(array $film) {
 }
 
 // Same identity a film has for grouping repeat showtimes and for the
-// Featured checkboxes — title+venue+location, already unique enough within
-// one day's window that nothing else is needed.
+// On the Carousel checkboxes — title+venue+location, already unique enough
+// within one day's window that nothing else is needed.
 function ig_film_key(array $film) {
     return mb_strtolower(trim($film['title'])) . '|' . $film['venue'] . '|' . ($film['location'] ?? '');
 }
@@ -304,9 +295,9 @@ function ig_presented_with($billing) {
     return null;
 }
 
-// A pill — rectangle with semicircular ends — for the wordmark chip, the
-// showtime pills, and the Featured pill. Carries its own weak drop shadow
-// (an offset, low-alpha copy of the same shape, drawn first) so it reads as
+// A pill — rectangle with semicircular ends — for the wordmark chip and
+// showtime pills. Carries its own weak drop shadow (an offset, low-alpha
+// copy of the same shape, drawn first) so it reads as
 // sitting slightly above whatever it's on — hero photo, paper, or marquee's
 // black — rather than flat against it. GD has no blur filter worth reaching
 // for here, so this is the shadow: a soft edge would need compositing onto
@@ -326,32 +317,9 @@ function ig_pill($im, $x1, $y1, $x2, $y2, $color) {
     imagefilledellipse($im, $x2 - $r, $y1 + $r, $r * 2, $r * 2, $color);
 }
 
-// Vertices of a 5-pointed star centered at ($cx, $cy), alternating outer/
-// inner radius, one point straight up — for imagefilledpolygon().
-function ig_star_points($cx, $cy, $outerR, $innerR) {
-    $points = [];
-    for ($i = 0; $i < 10; $i++) {
-        $r = ($i % 2 === 0) ? $outerR : $innerR;
-        $angle = -M_PI / 2 + $i * (M_PI / 5);
-        $points[] = $cx + $r * cos($angle);
-        $points[] = $cy + $r * sin($angle);
-    }
-    return $points;
-}
-
-// The Featured emblem pinned on a poster thumbnail's corner — a filled
-// circle with a star cut into it, small enough that it doesn't need to be a
-// legible word the way the spotlight page's pill does. Same shape on every
-// theme; only the two colors change.
-function ig_draw_featured_badge($im, $cx, $cy, $badgeColor, $starColor, $radius = 20) {
-    imagefilledellipse($im, $cx, $cy, $radius * 2, $radius * 2, $badgeColor);
-    imagefilledpolygon($im, ig_star_points($cx, $cy, (int) ($radius * 0.62), (int) ($radius * 0.62 * 0.5)), $starColor);
-}
-
 // A drawn arrow — shaft plus a filled triangular head — rather than a "→"
-// glyph, same reasoning as the star: nothing guarantees an arrow character
-// is in either font, so it's drawn instead of trusted to render. Runs from
-// $x1 to $x2 at height $y.
+// glyph, since nothing guarantees an arrow character is in either font, so
+// it's drawn instead of trusted to render. Runs from $x1 to $x2 at height $y.
 function ig_draw_arrow($im, $x1, $y, $x2, $color, $thickness = 3, $headSize = 9) {
     imagesetthickness($im, $thickness);
     imageline($im, (int) $x1, (int) $y, (int) ($x2 - $headSize), (int) $y, $color);
@@ -534,27 +502,6 @@ function ig_sprocket_edge($im, $x, $h, $stripW, $stripColor, $holeColor, $spacin
         imagefilledellipse($im, $cx, $top, $holeW, $holeW, $holeColor);
         imagefilledellipse($im, $cx, $bot, $holeW, $holeW, $holeColor);
     }
-}
-
-// A hand-drawn grease-pencil circle — an editor's mark circling a keeper
-// frame on a workprint, not a clean CAD-perfect ring. Built from short
-// straight segments around the circle with a small random radius jitter
-// per segment, and a few segments of overshoot past a full turn so it never
-// quite closes clean, the way an actual hand-drawn circle never does.
-function ig_grease_circle($im, $cx, $cy, $r, $color, $thickness = 5) {
-    imagesetthickness($im, $thickness);
-    $segments = 28;
-    $overshoot = 3;
-    $px = null; $py = null;
-    for ($i = 0; $i <= $segments + $overshoot; $i++) {
-        $angle  = ($i / $segments) * 2 * M_PI - M_PI / 2;
-        $jitter = $r * (mt_rand(-6, 6) / 100);
-        $x = $cx + ($r + $jitter) * cos($angle);
-        $y = $cy + ($r + $jitter) * sin($angle);
-        if ($px !== null) imageline($im, (int) $px, (int) $py, (int) $x, (int) $y, $color);
-        $px = $x; $py = $y;
-    }
-    imagesetthickness($im, 1);
 }
 
 // The circle-and-tick countdown leader a 35mm print used to open with — a
@@ -807,10 +754,6 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     $muted   = ig_hex($im, '#6B6659');
     $divider = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
-    // Featured's own identity color — same gold Marquee already uses for it —
-    // rather than theme-relative, so "Featured" reads as one consistent mark
-    // regardless of which visual theme is posting that day.
-    $gold    = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -868,13 +811,6 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
             $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
-        }
-
-        // Pinned on the poster's corner rather than a text line — the row
-        // height is shared by every film on the page (Auto mode's pagination
-        // depends on it), so Featured can't grow the row it's on.
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $ink);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
@@ -986,10 +922,6 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_MARQUEE_TITLE, $initial);
         }
 
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $bg);
-        }
-
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_MARQUEE_TITLE, $title);
 
@@ -1045,7 +977,6 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     $muted       = ig_hex($im, '#8A8578');
     $divider     = ig_hex($im, '#C9C2AF');
     $placeholder = ig_hex($im, '#E3DDD0');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -1100,10 +1031,6 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
             $ibox = imagettfbbox(36, 0, IG_FONT_ZINE_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_ZINE_TITLE, $initial);
-        }
-
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $ink);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 32, $textMaxWidth);
@@ -1162,7 +1089,6 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
     $muted       = ig_hex($im, '#6B675C');
     $rule        = ig_hex($im, '#B8B2A0');
     $placeholder = ig_hex($im, '#D9D4C3');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -1215,10 +1141,6 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
             $ibox = imagettfbbox(36, 0, IG_FONT_NEWSPRINT_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
-        }
-
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $ink);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 32, $textMaxWidth);
@@ -1277,8 +1199,6 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     $ink         = ig_hex($im, '#F5F0FF');
     $muted       = ig_hex($im, '#8B7FA8');
     $placeholder = ig_hex($im, '#241243');
-    $gold        = ig_hex($im, '#F2C14E');
-    $dark        = $bg;
 
     imagefill($im, 0, 0, $bg);
 
@@ -1346,10 +1266,6 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             imagettftext($im, 26, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_NEON_TITLE, $initial);
         }
 
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $margin + 17, $y + 17, $gold, $dark);
-        }
-
         // Space for the "w/ Org" tag is reserved before the title is fit,
         // not squeezed in after — otherwise a long title would always fill
         // the row and the tag would silently never have room to appear.
@@ -1410,8 +1326,7 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
 // visual consistency across the picker. STATUS is decorative flavor text
 // rather than real operational data (nothing here tracks delays), the same
 // license the other themes take with a REC dot or a torn-paper edge —
-// Featured films get both the usual poster-corner badge and a gold
-// "FEATURED" in the STATUS column instead of green "ON TIME".
+// every row just reads "ON TIME" in green.
 function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
@@ -1425,7 +1340,6 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $divider     = ig_hex($im, '#26282C');
     $placeholder = ig_hex($im, '#1B1D20');
     $green       = ig_hex($im, '#5FD68C');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $bg);
     ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
@@ -1501,21 +1415,13 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 24, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_TERMINAL, $initial);
         }
-        if (!empty($film['featured'])) {
-            ig_draw_featured_badge($im, $colPoster + 17, $y + 17, $gold, $bg);
-        }
-
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 22, $titleMaxWidth);
         imagettftext($im, 22, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
 
         $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, 14, $venueMaxWidth);
         imagettftext($im, 14, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
 
-        if (!empty($film['featured'])) {
-            imagettftext($im, 18, 0, $colStatus, $textY, $gold, IG_FONT_TERMINAL, ig_fit_text('FEATURED', IG_FONT_TERMINAL, 18, $statusMaxWidth));
-        } else {
-            imagettftext($im, 18, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
-        }
+        imagettftext($im, 18, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1549,9 +1455,6 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
 // real safelight only ever shows one color — but posters stay untinted, full
 // color, like Neon's (unlike Zine's pink duotone or Newsprint's grayscale),
 // since a printed still isn't what's under the safelight, the film is.
-// Featured swaps the star-badge every other theme uses for a hand-drawn grease-
-// pencil circle around the poster — an editor circling a keeper frame —
-// still in the same fixed gold every theme's Featured mark uses.
 function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
@@ -1565,7 +1468,6 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     $rust        = ig_hex($im, '#B33B1E');
     $muted       = ig_hex($im, '#8A7D6E');
     $placeholder = ig_hex($im, '#241C15');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $bg);
     ig_sprocket_edge($im, 0, $h, 56, $strip, $bg);
@@ -1617,10 +1519,6 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
             $ibox = imagettfbbox(36, 0, IG_FONT_DARKROOM_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_DARKROOM_TITLE, $initial);
-        }
-
-        if (!empty($film['featured'])) {
-            ig_grease_circle($im, $margin + (int) ($thumbW / 2), $y + (int) ($thumbH / 2), 63, $gold, 5);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 30, $textMaxWidth);
@@ -1683,7 +1581,6 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     $terracotta  = ig_hex($im, '#C0562B');
     $divider     = ig_hex($im, '#E4D5BC');
     $placeholder = ig_hex($im, '#EDE1C8');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $cream);
 
@@ -1747,17 +1644,6 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
             $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
-        }
-
-        // Featured — a cluster of firefly glow-dots near the poster's
-        // corner instead of the star badge every other theme uses, an
-        // authentic Texas-evening detail rather than a generic mark. Still
-        // the same fixed Featured gold.
-        if (!empty($film['featured'])) {
-            $fireflyGlow = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
-            ig_glow_circle($im, $margin + $thumbW - 8, $y + 10, 4, $gold, $fireflyGlow);
-            ig_glow_circle($im, $margin + $thumbW + 6, $y + 24, 3, $gold, $fireflyGlow);
-            ig_glow_circle($im, $margin + $thumbW - 4, $y + 36, 3, $gold, $fireflyGlow);
         }
 
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 30, $textMaxWidth);
@@ -1866,7 +1752,6 @@ function ig_build_feature_page_paper(array $film, $date) {
     $muted       = ig_hex($im, '#6B6659');
     $divider     = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -1909,17 +1794,6 @@ function ig_build_feature_page_paper(array $film, $date) {
     $pillPadX = 30;
     $pillH    = 60;
     $py       = 70;
-
-    // Gold — Featured's own identity color, the same one Marquee already
-    // uses for it, rather than theme-relative.
-    if (!empty($film['featured'])) {
-        $label = 'FEATURED';
-        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
-        $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
-        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $ink, IG_FONT_BODY, $label);
-        $py += $pillH + 14;
-    }
 
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
@@ -2033,18 +1907,6 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $pillH    = 60;
     $py       = 70;
 
-    // Gold, same as the showtime pill and the bulb frame — the theme's one
-    // signature color, distinguished from the showtime pill by its text
-    // rather than a second accent color.
-    if (!empty($film['featured'])) {
-        $label = 'FEATURED';
-        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
-        $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
-        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
-        $py += $pillH + 14;
-    }
-
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
         $label = date('g:i A', $ts);
@@ -2120,7 +1982,6 @@ function ig_build_feature_page_zine(array $film, $date) {
     $muted       = ig_hex($im, '#8A8578');
     $divider     = ig_hex($im, '#C9C2AF');
     $placeholder = ig_hex($im, '#E3DDD0');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -2153,15 +2014,6 @@ function ig_build_feature_page_zine(array $film, $date) {
     $pillPadX = 30;
     $pillH    = 60;
     $py       = 70;
-
-    if (!empty($film['featured'])) {
-        $label = 'FEATURED';
-        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
-        $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
-        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $ink, IG_FONT_BODY, $label);
-        $py += $pillH + 14;
-    }
 
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
@@ -2217,12 +2069,10 @@ function ig_build_feature_page_zine(array $film, $date) {
     return $im;
 }
 
-// Newsprint's spotlight page: the hero runs grayscale, no color wash —
-// black ink photo reproduction rather than a Riso tint. Showtime and
-// Featured both draw as flat rectangles instead of ig_pill()'s rounded,
-// shadowed shape — a newspaper doesn't have soft UI chrome. Title-line
-// gap is a touch wider than paper/zine use (measured: Roboto Slab's
-// ascent at 56px runs to the same 56px, versus Fraunces' 52px).
+// Newsprint's spotlight page: showtimes draw as flat rectangles instead of
+// ig_pill()'s rounded, shadowed shape — a newspaper doesn't have soft UI
+// chrome. Title-line gap is a touch wider than paper/zine use (measured:
+// Roboto Slab's ascent at 56px runs to the same 56px, versus Fraunces' 52px).
 function ig_build_feature_page_newsprint(array $film, $date) {
     $w = 1080;
     $h = 1350;
@@ -2235,7 +2085,6 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     $muted       = ig_hex($im, '#6B675C');
     $rule        = ig_hex($im, '#B8B2A0');
     $placeholder = ig_hex($im, '#D9D4C3');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $paper);
 
@@ -2268,15 +2117,6 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     $labelPadX = 26;
     $labelH    = 56;
     $py        = 70;
-
-    if (!empty($film['featured'])) {
-        $label = 'FEATURED';
-        $box   = imagettfbbox($labelFont, 0, IG_FONT_BODY, $label);
-        $tw    = $box[2] - $box[0];
-        imagefilledrectangle($im, $margin, $py, $margin + $tw + $labelPadX * 2, $py + $labelH, $gold);
-        imagettftext($im, $labelFont, 0, $margin + $labelPadX, $py + $labelH - 16, $ink, IG_FONT_BODY, $label);
-        $py += $labelH + 12;
-    }
 
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
@@ -2333,8 +2173,8 @@ function ig_build_feature_page_newsprint(array $film, $date) {
 }
 
 // Neon's spotlight page: hero stays full color (this theme is about
-// watching it on a CRT, not a print-reproduction tint), showtime/Featured
-// are ig_pill()'s usual rounded, shadowed shape — a lit rounded-corner sign
+// watching it on a CRT, not a print-reproduction tint); showtimes use
+// ig_pill()'s usual rounded, shadowed shape — a lit rounded-corner sign
 // is exactly what a neon pill already looks like.
 function ig_build_feature_page_neon(array $film, $date) {
     $w = 1080;
@@ -2349,7 +2189,6 @@ function ig_build_feature_page_neon(array $film, $date) {
     $muted       = ig_hex($im, '#8B7FA8');
     $divider     = ig_hex($im, '#3A2B5C');
     $placeholder = ig_hex($im, '#241243');
-    $gold        = ig_hex($im, '#F2C14E');
     $dark        = $bg;
     $cyanGlow    = imagecolorallocatealpha($im, 0x2D, 0xE2, 0xE6, 105);
 
@@ -2384,15 +2223,6 @@ function ig_build_feature_page_neon(array $film, $date) {
     $pillPadX = 30;
     $pillH    = 60;
     $py       = 70;
-
-    if (!empty($film['featured'])) {
-        $label = 'FEATURED';
-        $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
-        $tw    = $box[2] - $box[0];
-        ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
-        imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $dark, IG_FONT_BODY, $label);
-        $py += $pillH + 14;
-    }
 
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
@@ -2482,7 +2312,6 @@ function ig_build_feature_page_terminal(array $film, $date) {
     $divider     = ig_hex($im, '#26282C');
     $placeholder = ig_hex($im, '#1B1D20');
     $green       = ig_hex($im, '#5FD68C');
-    $gold        = ig_hex($im, '#F2C14E');
 
     imagefill($im, 0, 0, $bg);
 
@@ -2569,8 +2398,8 @@ function ig_build_feature_page_terminal(array $film, $date) {
     // Boarding-stub blocks — bordered rectangles rather than the shared
     // ig_pill() helper, since a rounded pill reads as software chrome and a
     // square-cornered box reads as a printed stub. One per showtime, plus a
-    // status block carrying the same decorative Featured/On Time flavor text
-    // the list page's STATUS column uses.
+    // status block carrying the same decorative "ON TIME" flavor text the
+    // list page's STATUS column uses.
     $drawBlock = function ($im, $x, $y, $bw, $bh, $label, $value, $valueColor) use ($dim) {
         imagesetthickness($im, 2);
         imagerectangle($im, $x, $y, $x + $bw, $y + $bh, $dim);
@@ -2590,11 +2419,10 @@ function ig_build_feature_page_terminal(array $film, $date) {
         $bx += $bw + 18;
     }
 
-    $statusValue = !empty($film['featured']) ? 'FEATURED' : 'ON TIME';
-    $statusColor = !empty($film['featured']) ? $gold : $green;
+    $statusValue = 'ON TIME';
     $box = imagettfbbox(26, 0, IG_FONT_TERMINAL, $statusValue);
     $bw  = ($box[2] - $box[0]) + 40;
-    $drawBlock($im, $bx, $y, $bw, $blockH, 'STATUS', $statusValue, $statusColor);
+    $drawBlock($im, $bx, $y, $bw, $blockH, 'STATUS', $statusValue, $green);
     $y += $blockH + 44;
 
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
@@ -2621,9 +2449,9 @@ function ig_build_feature_page_terminal(array $film, $date) {
 // One film's frame under the safelight — full-bleed hero (same as Paper/
 // Zine/Newsprint/Neon, unlike Terminal's bottom-anchored band), sprocket
 // edges running the full height on top of everything including the hero,
-// and rubber-stamped rectangles for showtimes/Featured rather than a pill —
-// a pill reads as software chrome, a bordered stamp reads as something
-// pressed onto a workprint can.
+// and rubber-stamped rectangles for showtimes rather than a pill — a pill
+// reads as software chrome, a bordered stamp reads as something pressed
+// onto a workprint can.
 function ig_build_feature_page_darkroom(array $film, $date) {
     $w = 1080;
     $h = 1350;
@@ -2637,7 +2465,6 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     $rust        = ig_hex($im, '#B33B1E');
     $muted       = ig_hex($im, '#8A7D6E');
     $placeholder = ig_hex($im, '#241C15');
-    $gold        = ig_hex($im, '#F2C14E');
     $amberGlow   = imagecolorallocatealpha($im, 0xE0, 0x8A, 0x3E, 105);
 
     imagefill($im, 0, 0, $bg);
@@ -2685,12 +2512,6 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     $sy = $heroH + 30;
     $stampH = 50;
 
-    if (!empty($film['featured'])) {
-        $box = imagettfbbox(24, 0, IG_FONT_BODY, 'FEATURED');
-        $bw  = ($box[2] - $box[0]) + 36;
-        $drawStamp($im, $sx, $sy, $bw, $stampH, 'FEATURED', $gold);
-        $sx += $bw + 16;
-    }
     foreach (($film['timestamps'] ?? [$film['timestamp'] ?? null]) as $ts) {
         if (!$ts) continue;
         $label = date('g:i A', $ts);
@@ -2766,7 +2587,6 @@ function ig_build_feature_page_austin(array $film, $date) {
     $terracotta  = ig_hex($im, '#E8935A');
     $divider     = ig_hex($im, '#3E2A38');
     $placeholder = ig_hex($im, '#241826');
-    $gold        = ig_hex($im, '#F2C14E');
     $dark        = $nightGround;
 
     imagefill($im, 0, 0, $nightGround);
@@ -2792,17 +2612,6 @@ function ig_build_feature_page_austin(array $film, $date) {
         $alpha = (int) round(127 * (1 - $i / $fadeH));
         $band  = imagecolorallocatealpha($im, 0x16, 0x0F, 0x24, $alpha);
         imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
-    }
-
-    // Firefly cluster instead of a "FEATURED" pill — same fixed Featured
-    // gold, but not a badge, tucked in the hero's upper-right so it never
-    // fights the showtime pills at upper-left.
-    if (!empty($film['featured'])) {
-        $fireflyGlow = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
-        ig_glow_circle($im, $w - 150, 60, 5, $gold, $fireflyGlow);
-        ig_glow_circle($im, $w - 110, 100, 4, $gold, $fireflyGlow);
-        ig_glow_circle($im, $w - 170, 120, 4, $gold, $fireflyGlow);
-        ig_glow_circle($im, $w - 90, 150, 3, $gold, $fireflyGlow);
     }
 
     $pillFont = 28;
@@ -3021,31 +2830,64 @@ function ig_compose_write($date, array $compose) {
     file_put_contents(ig_compose_path($date), json_encode($compose + IG_COMPOSE_DEFAULT));
 }
 
-// Which films the editorial board checked as Featured today — cosmetic only
-// for now (a badge on the list card, a pill on the spotlight page, priority
-// for spotlight slots), not yet a site-wide concept. Keyed by ig_film_key()
-// rather than array position, so it survives the scrape re-running with a
-// different film order.
-function ig_featured_path($date) {
-    return dirname(__DIR__) . '/uploads/social/featured-' . date('Y-m-d', $date) . '.json';
+// Which films are on today's carousel — which ones get their own spotlight
+// page, out of Instagram's shared 10-image-per-post budget (list pages +
+// spotlight pages together). Keyed by ig_film_key() rather than array
+// position, so it survives the scrape re-running with a different film
+// order. Unlike every other per-day override file, absent here does NOT
+// mean "empty" — it means "no override yet," which ig_carousel_selection()
+// tells apart from an explicit empty save (nobody wants a single spotlight
+// page today) by returning null instead of [].
+function ig_carousel_path($date) {
+    return dirname(__DIR__) . '/uploads/social/carousel-' . date('Y-m-d', $date) . '.json';
 }
 
-function ig_featured_read($date) {
-    $file = ig_featured_path($date);
-    if (!file_exists($file)) return [];
+function ig_carousel_read($date) {
+    $file = ig_carousel_path($date);
+    if (!file_exists($file)) return null;
     $data = json_decode(file_get_contents($file), true);
-    return is_array($data) ? $data : [];
+    return is_array($data) ? $data : null;
 }
 
-function ig_featured_write($date, array $keys) {
+function ig_carousel_write($date, array $keys) {
     $dir = dirname(__DIR__) . '/uploads/social';
     if (!is_dir($dir)) mkdir($dir, 0775, true);
-    file_put_contents(ig_featured_path($date), json_encode(array_values($keys)));
+    file_put_contents(ig_carousel_path($date), json_encode(array_values($keys)));
+}
+
+// How many of the carousel's 10 images are actually available for spotlight
+// pages once the list pages this composition needs are accounted for.
+// Default mode never has spotlight pages at all (ig_build_images() returns
+// before ever looking at $compose['features']), so it's always 0 slots
+// there regardless of film count.
+function ig_carousel_slots(array $films, array $compose) {
+    if ($compose['mode'] === 'default' || empty($films)) return 0;
+    $maxPerPage = ($compose['mode'] === 'manual' && !empty($compose['per_page']))
+        ? max(1, (int) $compose['per_page'])
+        : IG_AUTO_MAX_PER_PAGE;
+    return max(0, 10 - count(ig_paginate($films, $maxPerPage)));
+}
+
+/**
+ * The film keys actually on today's carousel: an explicit saved list if the
+ * admin has touched the checklist (however many or few that is — even an
+ * empty save is honored, meaning "no spotlight pages today"), otherwise the
+ * first however-many-slots-fit films in chronological order — exactly what
+ * an untouched day has always rendered, now made adjustable instead of
+ * automatic-only. $films is expected already chronological (ig_today_films()
+ * always returns it that way), so slicing it keeps that order.
+ */
+function ig_carousel_selection(array $films, array $compose, $date) {
+    $saved = ig_carousel_read($date);
+    if ($saved !== null) return $saved;
+    $slots = ig_carousel_slots($films, $compose);
+    return array_map('ig_film_key', array_slice($films, 0, $slots));
 }
 
 // Which Alamo films today's admin opted into the card — same read/write
-// shape as Featured, but keyed by ig_alamo_key() (title only) rather than
-// ig_film_key(), since the checklist itself is one row per title.
+// shape as the carousel list, but keyed by ig_alamo_key() (title only)
+// rather than ig_film_key(), since the checklist itself is one row per
+// title, and absent here does mean empty (Alamo is opt-in, not defaulted).
 function ig_alamo_path($date) {
     return dirname(__DIR__) . '/uploads/social/alamo-' . date('Y-m-d', $date) . '.json';
 }
@@ -3064,10 +2906,10 @@ function ig_alamo_write($date, array $keys) {
 }
 
 // Which arthouse films today's admin opted *out* of the card — the mirror
-// of Alamo's opt-in list above, keyed by ig_film_key() same as Featured
-// since this checklist is the same one-row-per-venue-screening granularity.
-// Empty/absent means nothing excluded, i.e. today's default: every arthouse
-// screening included.
+// of Alamo's opt-in list above, keyed by ig_film_key() same as the carousel
+// list, since this checklist is the same one-row-per-venue-screening
+// granularity. Empty/absent means nothing excluded, i.e. today's default:
+// every arthouse screening included.
 function ig_excluded_path($date) {
     return dirname(__DIR__) . '/uploads/social/excluded-' . date('Y-m-d', $date) . '.json';
 }
@@ -3097,8 +2939,8 @@ function ig_excluded_write($date, array $keys) {
  * Auto/Manual: ig_paginate() splits every screening across list pages (never
  * dropped, never a stranded last page), then — if the features toggle is on
  * — spends whatever carousel room is left (up to Instagram's 10-image cap)
- * on one feature page per film, chronological order, stopping when the
- * films or the cap runs out.
+ * on one feature page per film in ig_carousel_selection()'s order, stopping
+ * when that selection or the cap runs out.
  */
 function ig_build_images(array $films, $date, array $compose) {
     $theme = in_array($compose['theme'] ?? 'paper', array_keys(IG_THEMES), true) ? $compose['theme'] : 'paper';
@@ -3120,17 +2962,15 @@ function ig_build_images(array $films, $date, array $compose) {
     }
 
     if (!empty($compose['features'])) {
-        // Featured films fill spotlight slots first — still chronological
-        // among themselves — so a busy day with limited slots doesn't leave
-        // an editorial pick without its page. array_filter preserves order
-        // within each group; this only moves featured ones ahead of it.
-        $ordered = array_merge(
-            array_values(array_filter($films, fn($f) => !empty($f['featured']))),
-            array_values(array_filter($films, fn($f) => empty($f['featured'])))
-        );
+        // $films is already chronological, so filtering it down to the
+        // carousel selection keeps that order — a checked-but-late film
+        // still yields its slot to an earlier one if there isn't room for
+        // both, same as an untouched day's default already would.
+        $selected = ig_carousel_selection($films, $compose, $date);
+        $chosen   = array_values(array_filter($films, fn($f) => in_array(ig_film_key($f), $selected, true)));
 
         $slotsLeft = 10 - count($images);
-        foreach ($ordered as $film) {
+        foreach ($chosen as $film) {
             if ($slotsLeft <= 0) break;
             $images[] = ig_build_feature_page($film, $date, $theme);
             $slotsLeft--;

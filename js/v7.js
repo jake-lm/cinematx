@@ -1114,9 +1114,10 @@
   }
 
   // ══ Instagram admin — poster crop ═══════════════════════════════════════
-  // Adjust crop toggle/slider/save live outside the Featured <label> on
+  // Adjust crop toggle/slider/save live outside the row's own <label> on
   // purpose (see css/v7.scss's .adm-crop-row comment) — nothing here can
-  // accidentally flip that checkbox. object-position and $vBias in
+  // accidentally flip the On the Carousel checkbox. object-position and
+  // $vBias in
   // list/instagram.php share the same 0–100% top/bottom meaning, so the
   // live preview here matches what the saved PNG will actually crop to.
 

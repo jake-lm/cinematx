@@ -1,10 +1,11 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-//  Admin — save today's Featured checkboxes
+//  Admin — save today's On the Carousel checkboxes
 //
-//  Cosmetic only for now: a badge on the list card, a pill on the spotlight
-//  page, and priority for spotlight slots when there isn't room for every
-//  film — nothing else on the site knows about this yet. Keyed by
+//  Which films get their own spotlight page. Whatever comes back checked is
+//  saved verbatim — including an all-unchecked save, which means "no
+//  spotlight pages today" and is meaningfully different from never having
+//  saved at all (see ig_carousel_read()'s null-vs-[] distinction). Keyed by
 //  ig_film_key() rather than array position, so a save still lines up with
 //  the right film even if the scrape re-runs in a different order.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -18,10 +19,10 @@ $now = ig_admin_target_date();
 // user input, and the day's real film list is the source of truth for what
 // a valid key even looks like.
 $valid = array_map('ig_film_key', ig_today_films($conn, $now));
-$posted = is_array($_POST['featured'] ?? null) ? $_POST['featured'] : [];
+$posted = is_array($_POST['carousel'] ?? null) ? $_POST['carousel'] : [];
 $keys = array_values(array_intersect($posted, $valid));
 
-ig_featured_write($now, $keys);
+ig_carousel_write($now, $keys);
 
 header('Location: /_admin/instagram.php');
 exit;

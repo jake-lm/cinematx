@@ -54,6 +54,11 @@ $dirty   = $compose['mode'] !== $saved['mode']
         || $compose['features'] !== !empty($saved['features'])
         || $compose['theme'] !== ($saved['theme'] ?? 'paper');
 
+$carousel_selection = ig_carousel_selection($films, $compose, $now);
+$carousel_slots     = ig_carousel_slots($films, $compose);
+foreach ($films as &$f) { $f['on_carousel'] = in_array(ig_film_key($f), $carousel_selection, true); }
+unset($f);
+
 $images  = ig_build_images($films, $now, $compose);
 $pages   = ig_save_images($images, $now);
 $caption = ig_caption($films, $now);
@@ -438,11 +443,11 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
           <section class="card adm-card">
             <div class="card__head">
-              <span class="card__title">On the card</span>
-              <span class="adm-count"><?php echo count($films); ?></span>
+              <span class="card__title">On the Carousel</span>
+              <span class="adm-count"><?php echo count($carousel_selection); ?> / <?php echo $carousel_slots; ?></span>
             </div>
             <?php if ($films): ?>
-            <form action="/_admin/instagram_featured.php" method="post">
+            <form action="/_admin/instagram_carousel.php" method="post">
               <?php echo admin_csrf_field(); ?>
               <div class="card__body card__body--flush">
                 <?php foreach ($films as $f):
@@ -451,7 +456,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 ?>
                 <div class="adm-crop-row">
                   <label class="adm-row adm-row--check">
-                    <input type="checkbox" name="featured[]" value="<?php echo $e(ig_film_key($f)); ?>"<?php echo !empty($f['featured']) ? ' checked' : ''; ?>>
+                    <input type="checkbox" name="carousel[]" value="<?php echo $e(ig_film_key($f)); ?>"<?php echo !empty($f['on_carousel']) ? ' checked' : ''; ?>>
                     <span class="adm-row__text">
                       <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['title'])); ?></span>
                       <span class="adm-row__sub">
@@ -477,9 +482,13 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               </div>
               <div class="card__body">
                 <div class="admin-note" style="margin:0 0 var(--s-3)">
-                  Cosmetic for now &mdash; a badge on the card, priority for spotlight slots. Checked films fill spotlight pages first when there isn't room for everyone.
+                  <?php if ($carousel_slots === 0): ?>
+                    No spotlight slots today &mdash; either Default mode or every list page is already spent. Checking a film here has no effect until Auto/Manual with spotlight panels is on.
+                  <?php else: ?>
+                    Defaults to the earliest <?php echo $carousel_slots; ?> screening<?php echo $carousel_slots === 1 ? '' : 's'; ?> by showtime, the most this composition has room for. Check one to guarantee it a spotlight page even if its time would leave it out; uncheck one to leave it out even if its time would include it.
+                  <?php endif; ?>
                 </div>
-                <button class="btn btn--quiet btn--sm" type="submit">Save featured</button>
+                <button class="btn btn--quiet btn--sm" type="submit">Save carousel</button>
               </div>
             </form>
             <?php else: ?>

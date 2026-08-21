@@ -1900,15 +1900,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .adm-row__when { flex: none; @include label(var(--t-3xs), var(--red-hi)); }
 .adm-row__end  { flex: none; display: flex; align-items: center; gap: var(--s-2); }
 
-// A row that's also its own checkbox label — Featured, in "On the card".
+// A row that's also its own checkbox label — used by "On the Carousel"
+// among others.
 .adm-row--check {
   cursor: pointer;
   input[type="checkbox"] { flex: none; accent-color: var(--red); }
 }
 
-// ── Poster crop (spotlight-hero repositioning, "On the card") ──────────────
+// ── Poster crop (spotlight-hero repositioning, "On the Carousel") ──────────
 // The toggle sits outside .adm-row's own <label> on purpose — nested inside
-// it, a click would also flip the Featured checkbox the label wraps.
+// it, a click would also flip the checkbox the label wraps.
 .adm-crop-row { border-bottom: 1px solid var(--line); &:last-child { border-bottom: none; } }
 .adm-crop-row .adm-row { border-bottom: none; }
 
