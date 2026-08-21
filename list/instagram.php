@@ -2994,13 +2994,13 @@ function ig_caption(array $films, $date) {
 
 // ── Composition ──────────────────────────────────────────────────────────
 
-// Absent compose-<date>.json means this: one card, that day's scheduled
-// theme (ig_theme_for_date()), no pagination, no spotlight pages. New days
-// behave this way until someone opens the admin page and changes something
-// — a plain literal 'paper' here would only ever matter as ig_compose_write()'s
-// last-resort fallback for a POST that somehow omitted 'theme', which the
+// Absent compose-<date>.json means this: Auto mode with spotlight panels on,
+// that day's scheduled theme (ig_theme_for_date()). New days behave this way
+// until someone opens the admin page and changes something — the literal
+// 'default'/false/'paper' here only ever matter as ig_compose_write()'s
+// last-resort fallback for a POST that somehow omitted a field, which the
 // admin form never does.
-const IG_COMPOSE_DEFAULT = ['mode' => 'default', 'per_page' => null, 'features' => false, 'theme' => 'paper'];
+const IG_COMPOSE_DEFAULT = ['mode' => 'auto', 'per_page' => null, 'features' => true, 'theme' => 'paper'];
 
 // Screenings-per-page when Auto mode (or Manual with no count set) is
 // active — today's exact row height, so a single-page Auto day looks
