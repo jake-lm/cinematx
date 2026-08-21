@@ -2948,19 +2948,8 @@ function ig_public_url($relative, $path = null) {
 
 // ── Caption ──────────────────────────────────────────────────────────────
 
-// A handful of intro lines, rotated deterministically by day-of-year so the
-// same day's dry run and real post always match, but it varies day to day.
-const IG_INTROS = [
-    "Here's where to be in Austin today:",
-    "Tonight's lineup around town:",
-    "A few reasons to leave the apartment:",
-    "What's screening across the city today:",
-    "On screens around Austin today:",
-];
-
 function ig_build_caption(array $films, $date) {
-    $intro = IG_INTROS[(int) date('z', $date) % count(IG_INTROS)];
-    $lines = ['Today in Austin — ' . date('l, F j', $date), '', $intro, ''];
+    $lines = ['Today in Austin — ' . date('l, F j', $date), ''];
 
     foreach ($films as $film) {
         $venue = $film['location'] ? "{$film['venue']} ({$film['location']})" : $film['venue'];
