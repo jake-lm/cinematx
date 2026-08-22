@@ -561,14 +561,25 @@ function ig_fetch_thumb($url, $w, $h, $vBias = 0.5) {
     $cacheFile = $cacheDir . '/' . md5($url) . '.jpg';
 
     if (!file_exists($cacheFile)) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 5,
-            CURLOPT_USERAGENT      => 'CinemaTX/1.0 (+https://cinematx.net)',
-        ]);
-        $data = curl_exec($ch);
-        curl_close($ch);
+        // A site-root-relative path — an admin-uploaded event poster (see
+        // _admin/events.php, list/fetch_screenings.php's events query) —
+        // is already a file on this box. Reading it directly is simpler
+        // and more reliable than a self-referential HTTP fetch, and
+        // doesn't depend on the box being able to reach its own public
+        // URL. Every scraped/TMDB poster is a genuine absolute URL and
+        // still goes through curl exactly as before.
+        if ($url[0] === '/' && ($url[1] ?? '') !== '/') {
+            $data = @file_get_contents(dirname(__DIR__) . $url);
+        } else {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_USERAGENT      => 'CinemaTX/1.0 (+https://cinematx.net)',
+            ]);
+            $data = curl_exec($ch);
+            curl_close($ch);
+        }
         if (!$data) return null;
         file_put_contents($cacheFile, $data);
     }
