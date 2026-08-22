@@ -74,7 +74,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
     // (list/instagram.php's ig_arthouse_films()) and keeps a real member
     // submission out of it, without a schema change either way.
     $events_q = $conn->prepare(
-        "SELECT e.id, e.title, e.director, e.year, e.runtime, e.genres, e.poster, e.screentime, e.location, e.synopsis, u.admin
+        "SELECT e.id, e.title, e.director, e.year, e.runtime, e.genres, e.poster, e.screentime, e.location, e.ticket_url, e.synopsis, u.admin
          FROM events e
          LEFT JOIN users u ON u.id = e.uid
          WHERE e.active = 1 AND e.screentime >= :now AND e.screentime <= :end
@@ -87,7 +87,11 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             'timestamp' => (int)$event['screentime'],
             'venue'     => $event['location'],
             'poster'    => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
-            'url'       => '/events/?id=' . $event['id'],
+            // A ticket link (see _admin/events.php) behaves exactly like a
+            // scraped screening's own url — clicking through from anywhere
+            // on the site goes straight to it. Without one, the fallback is
+            // this listing's own page, same as always.
+            'url'       => $event['ticket_url'] ?: ('/events/?id=' . $event['id']),
             'source'    => !empty($event['admin']) ? 'admin' : 'user',
             // Members submit a title and a time, not a filmography — none
             // of these extra fields exist on that flow, only

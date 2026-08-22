@@ -64,18 +64,22 @@ function events_handle_poster($event_id, $existingPoster) {
 }
 
 $event_id   = (int) ($_POST['event_id'] ?? 0);
-$title      = trim($_POST['title']    ?? '');
-$director   = trim($_POST['director'] ?? '');
-$location   = trim($_POST['location'] ?? '');
-$address    = trim($_POST['address']  ?? '');
-$synopsis   = trim($_POST['synopsis'] ?? '');
-$genres     = trim($_POST['genres']   ?? '');
+$title      = trim($_POST['title']      ?? '');
+$director   = trim($_POST['director']   ?? '');
+$location   = trim($_POST['location']   ?? '');
+$address    = trim($_POST['address']    ?? '');
+$synopsis   = trim($_POST['synopsis']   ?? '');
+$genres     = trim($_POST['genres']     ?? '');
+$ticket_url = trim($_POST['ticket_url'] ?? '');
 $year       = ($_POST['year']    ?? '') !== '' ? (int) $_POST['year']    : null;
 $runtime    = ($_POST['runtime'] ?? '') !== '' ? (int) $_POST['runtime'] : null;
 $screentime = events_parse_screentime($_POST['screentime'] ?? '');
 
 if ($title === '' || $location === '' || $screentime === null) {
     events_fail('Title, venue, and date & time are all required.');
+}
+if ($ticket_url !== '' && !filter_var($ticket_url, FILTER_VALIDATE_URL)) {
+    events_fail('Ticket link must be a valid URL.');
 }
 
 if ($event_id) {
@@ -88,26 +92,26 @@ if ($event_id) {
 
     $sql = "UPDATE `events` SET title=:title, director=:director, year=:year, runtime=:runtime,
                 genres=:genres, screentime=:screentime, location=:location,
-                address=:address, synopsis=:synopsis, edited=:edited" . ($poster !== null ? ', poster=:poster' : '') . "
+                address=:address, ticket_url=:ticket_url, synopsis=:synopsis, edited=:edited" . ($poster !== null ? ', poster=:poster' : '') . "
             WHERE id=:id AND uid=:uid";
     $params = [
         ':title' => $title, ':director' => $director ?: null, ':year' => $year, ':runtime' => $runtime,
         ':genres' => $genres ?: null, ':screentime' => $screentime, ':location' => $location,
-        ':address' => $address ?: null, ':synopsis' => $synopsis ?: null, ':edited' => time(),
+        ':address' => $address ?: null, ':ticket_url' => $ticket_url ?: null, ':synopsis' => $synopsis ?: null, ':edited' => time(),
         ':id' => $event_id, ':uid' => $admin_user['id'],
     ];
     if ($poster !== null) $params[':poster'] = $poster;
     $conn->prepare($sql)->execute($params);
 } else {
     $stmt = $conn->prepare(
-        "INSERT INTO `events` (uid, title, director, year, runtime, genres, screentime, location, address, synopsis, stamp, active)
-         VALUES (:uid, :title, :director, :year, :runtime, :genres, :screentime, :location, :address, :synopsis, :stamp, 1)"
+        "INSERT INTO `events` (uid, title, director, year, runtime, genres, screentime, location, address, ticket_url, synopsis, stamp, active)
+         VALUES (:uid, :title, :director, :year, :runtime, :genres, :screentime, :location, :address, :ticket_url, :synopsis, :stamp, 1)"
     );
     $stmt->execute([
         ':uid' => $admin_user['id'], ':title' => $title, ':director' => $director ?: null,
         ':year' => $year, ':runtime' => $runtime, ':genres' => $genres ?: null, ':screentime' => $screentime,
-        ':location' => $location, ':address' => $address ?: null, ':synopsis' => $synopsis ?: null,
-        ':stamp' => time(),
+        ':location' => $location, ':address' => $address ?: null, ':ticket_url' => $ticket_url ?: null,
+        ':synopsis' => $synopsis ?: null, ':stamp' => time(),
     ]);
     $event_id = (int) $conn->lastInsertId();
 

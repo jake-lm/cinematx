@@ -104,6 +104,15 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           </span>
         </div>
         <?php endif; ?>
+        <?php if (!empty($event['ticket_url'])): ?>
+        <div class="deets__row">
+          <span class="deets__label">Tickets</span>
+          <span class="deets__value">
+            <a class="deets__map" href="<?php echo $e($event['ticket_url']); ?>"
+               target="_blank" rel="noopener">Get tickets <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+          </span>
+        </div>
+        <?php endif; ?>
       </div>
 
       <?php if ($member && !empty($event['author_name'])): ?>
