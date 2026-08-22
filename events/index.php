@@ -63,7 +63,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <h1 class="reading__title"><?php echo $e($event['title']); ?></h1>
 
       <div class="reading__by">
-        <?php echo $e($when); ?> &middot; <?php echo $e($event['location']); ?>
+        <?php echo $e($when); ?> &middot; <?php echo $e($event['location']); ?><?php if (!empty($event['director'])): ?> &middot; dir. <?php echo $e($event['director']); ?><?php endif; ?>
       </div>
 
       <?php if (!empty($event['poster'])): ?>

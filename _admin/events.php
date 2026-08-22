@@ -22,7 +22,7 @@ if (isset($_GET['edit'])) {
 }
 
 $upcoming = $conn->prepare(
-    "SELECT id, title, poster, screentime, location, address
+    "SELECT id, title, director, poster, screentime, location, address
      FROM `events` WHERE uid = :uid AND screentime > :now
      ORDER BY screentime ASC LIMIT 60"
 );
@@ -69,6 +69,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="field"><label class="field__label" for="ev-title">Title</label>
                 <input class="field__input" id="ev-title" name="title" type="text" required
                        value="<?php echo $e($editing['title'] ?? ''); ?>"></div>
+              <div class="field"><label class="field__label" for="ev-director">Director <span class="admin-tz">optional</span></label>
+                <input class="field__input" id="ev-director" name="director" type="text"
+                       value="<?php echo $e($editing['director'] ?? ''); ?>"></div>
               <div class="field"><label class="field__label" for="ev-venue">Venue</label>
                 <input class="field__input" id="ev-venue" name="location" type="text" required
                        placeholder="e.g. The Marchesa"
@@ -125,7 +128,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               </span>
               <span class="adm-row__text">
                 <span class="adm-row__title"><?php echo $e($ev['title']); ?></span>
-                <span class="adm-row__sub"><?php echo $e($ev['location']); ?></span>
+                <span class="adm-row__sub">
+                  <?php echo $e($ev['location']); ?><?php if ($ev['director']): ?> &middot; dir. <?php echo $e($ev['director']); ?><?php endif; ?>
+                </span>
               </span>
               <span class="adm-row__when"><?php echo date('g:ia', $ev['screentime']); ?></span>
               <span class="adm-row__end">
