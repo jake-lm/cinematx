@@ -72,9 +72,12 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       </div>
       <?php endif; ?>
 
-      <?php // No blurb here on purpose — the events table stores a title, a
-            // time and a place, and nothing else. If a description column is
-            // ever added, it belongs above this block. ?>
+      <?php if (!empty($event['synopsis'])): ?>
+      <div class="reading__body">
+        <p><?php echo nl2br($e($event['synopsis'])); ?></p>
+      </div>
+      <?php endif; ?>
+
       <div class="deets">
         <div class="deets__row">
           <span class="deets__label">When</span>

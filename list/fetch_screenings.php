@@ -74,7 +74,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
     // (list/instagram.php's ig_arthouse_films()) and keeps a real member
     // submission out of it, without a schema change either way.
     $events_q = $conn->prepare(
-        "SELECT e.id, e.title, e.poster, e.screentime, e.location, u.admin
+        "SELECT e.id, e.title, e.poster, e.screentime, e.location, e.synopsis, u.admin
          FROM events e
          LEFT JOIN users u ON u.id = e.uid
          WHERE e.active = 1 AND e.screentime >= :now AND e.screentime <= :end
@@ -89,12 +89,13 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             'poster'    => $event['poster'] ? '/uploads/events/' . $event['poster'] : null,
             'url'       => '/events/?id=' . $event['id'],
             'source'    => !empty($event['admin']) ? 'admin' : 'user',
-            // Members submit a title and a time, not a filmography. The
+            // Members submit a title and a time, not a filmography — no
+            // synopsis field on that flow, only _admin/events.php's. The
             // renderer omits whatever is null rather than showing a gap.
             'year'      => null,
             'runtime'   => null,
             'location'  => null,
-            'overview'  => null,
+            'overview'  => $event['synopsis'] ?: null,
             'genres'    => null,
             'director'  => null,
             'cast'      => null,

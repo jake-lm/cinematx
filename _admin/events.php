@@ -76,6 +76,8 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="field"><label class="field__label" for="ev-address">Address <span class="admin-tz">optional</span></label>
                 <input class="field__input" id="ev-address" name="address" type="text"
                        value="<?php echo $e($editing['address'] ?? ''); ?>"></div>
+              <div class="field"><label class="field__label" for="ev-synopsis">Synopsis <span class="admin-tz">optional</span></label>
+                <textarea class="field__input admin-textarea" id="ev-synopsis" name="synopsis" rows="4"><?php echo $e($editing['synopsis'] ?? ''); ?></textarea></div>
               <div class="field"><label class="field__label" for="ev-when">Date &amp; time <span class="admin-tz">America/Chicago</span></label>
                 <input class="field__input" id="ev-when" name="screentime" type="datetime-local" required
                        value="<?php echo $editing ? $e((new DateTime('@' . $editing['screentime']))->setTimezone($tz)->format('Y-m-d\TH:i')) : ''; ?>"></div>
