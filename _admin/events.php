@@ -72,6 +72,15 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="field"><label class="field__label" for="ev-director">Director <span class="admin-tz">optional</span></label>
                 <input class="field__input" id="ev-director" name="director" type="text"
                        value="<?php echo $e($editing['director'] ?? ''); ?>"></div>
+              <div class="field"><label class="field__label" for="ev-year">Year <span class="admin-tz">optional</span></label>
+                <input class="field__input" id="ev-year" name="year" type="number" min="1880" max="2100"
+                       value="<?php echo $e($editing['year'] ?? ''); ?>"></div>
+              <div class="field"><label class="field__label" for="ev-runtime">Runtime (minutes) <span class="admin-tz">optional</span></label>
+                <input class="field__input" id="ev-runtime" name="runtime" type="number" min="1"
+                       value="<?php echo $e($editing['runtime'] ?? ''); ?>"></div>
+              <div class="field"><label class="field__label" for="ev-genres">Genre <span class="admin-tz">optional</span></label>
+                <input class="field__input" id="ev-genres" name="genres" type="text" placeholder="e.g. Drama, Comedy"
+                       value="<?php echo $e($editing['genres'] ?? ''); ?>"></div>
               <div class="field"><label class="field__label" for="ev-venue">Venue</label>
                 <input class="field__input" id="ev-venue" name="location" type="text" required
                        placeholder="e.g. The Marchesa"

@@ -69,6 +69,9 @@ $director   = trim($_POST['director'] ?? '');
 $location   = trim($_POST['location'] ?? '');
 $address    = trim($_POST['address']  ?? '');
 $synopsis   = trim($_POST['synopsis'] ?? '');
+$genres     = trim($_POST['genres']   ?? '');
+$year       = ($_POST['year']    ?? '') !== '' ? (int) $_POST['year']    : null;
+$runtime    = ($_POST['runtime'] ?? '') !== '' ? (int) $_POST['runtime'] : null;
 $screentime = events_parse_screentime($_POST['screentime'] ?? '');
 
 if ($title === '' || $location === '' || $screentime === null) {
@@ -83,11 +86,13 @@ if ($event_id) {
 
     $poster = events_handle_poster($event_id, $existing['poster']);
 
-    $sql = "UPDATE `events` SET title=:title, director=:director, screentime=:screentime, location=:location,
+    $sql = "UPDATE `events` SET title=:title, director=:director, year=:year, runtime=:runtime,
+                genres=:genres, screentime=:screentime, location=:location,
                 address=:address, synopsis=:synopsis, edited=:edited" . ($poster !== null ? ', poster=:poster' : '') . "
             WHERE id=:id AND uid=:uid";
     $params = [
-        ':title' => $title, ':director' => $director ?: null, ':screentime' => $screentime, ':location' => $location,
+        ':title' => $title, ':director' => $director ?: null, ':year' => $year, ':runtime' => $runtime,
+        ':genres' => $genres ?: null, ':screentime' => $screentime, ':location' => $location,
         ':address' => $address ?: null, ':synopsis' => $synopsis ?: null, ':edited' => time(),
         ':id' => $event_id, ':uid' => $admin_user['id'],
     ];
@@ -95,11 +100,12 @@ if ($event_id) {
     $conn->prepare($sql)->execute($params);
 } else {
     $stmt = $conn->prepare(
-        "INSERT INTO `events` (uid, title, director, screentime, location, address, synopsis, stamp, active)
-         VALUES (:uid, :title, :director, :screentime, :location, :address, :synopsis, :stamp, 1)"
+        "INSERT INTO `events` (uid, title, director, year, runtime, genres, screentime, location, address, synopsis, stamp, active)
+         VALUES (:uid, :title, :director, :year, :runtime, :genres, :screentime, :location, :address, :synopsis, :stamp, 1)"
     );
     $stmt->execute([
-        ':uid' => $admin_user['id'], ':title' => $title, ':director' => $director ?: null, ':screentime' => $screentime,
+        ':uid' => $admin_user['id'], ':title' => $title, ':director' => $director ?: null,
+        ':year' => $year, ':runtime' => $runtime, ':genres' => $genres ?: null, ':screentime' => $screentime,
         ':location' => $location, ':address' => $address ?: null, ':synopsis' => $synopsis ?: null,
         ':stamp' => time(),
     ]);
