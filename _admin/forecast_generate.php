@@ -45,9 +45,14 @@ $scriptPath = dirname(__DIR__) . '/bin/forecast-generate.php';
 // past the lock check above into a duplicate launch.
 forecast_write_progress($episode_id, 'running', 0);
 
+// Not PHP_BINARY — under mod_php (this server's SAPI) it's empty, since
+// there's no standalone PHP executable, only the apache2 binary with PHP
+// loaded in. PHP_BINDIR is the install directory, stable across every
+// SAPI, and every PHP install puts a `php` symlink there.
+$phpBinary = PHP_BINDIR . '/php';
 $cmd = sprintf(
     'nohup %s %s --episode=%d > %s 2>&1 &',
-    escapeshellarg(PHP_BINARY),
+    escapeshellarg($phpBinary),
     escapeshellarg($scriptPath),
     $episode_id,
     escapeshellarg($logPath)
