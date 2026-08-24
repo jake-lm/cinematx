@@ -58,14 +58,15 @@ $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
 
 $coverPath = $dir . '/' . $episode_id . '-cover-' . time() . '.png';
-$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films);
+$durationSlot = null;
+$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, true, $durationSlot);
 imagepng($cover, $coverPath);
 imagedestroy($cover);
 
 $outputName = $episode_id . '-generated-' . time() . '.mp4';
 $outputPath = $dir . '/' . $outputName;
 
-$result = forecast_generate_video($audioPath, $coverPath, $outputPath, $duration, function ($percent) use ($episode_id) {
+$result = forecast_generate_video($audioPath, $coverPath, $outputPath, $duration, $durationSlot, function ($percent) use ($episode_id) {
     forecast_write_progress($episode_id, 'running', $percent);
 });
 

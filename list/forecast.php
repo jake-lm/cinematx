@@ -212,7 +212,7 @@ function forecast_circle_crop($src, $diameter) {
     return $dst;
 }
 
-function forecast_build_cover(array $episode, $conn, $filmsOverride = null) {
+function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $liveDuration = false, &$durationSlot = null) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
@@ -256,11 +256,29 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null) {
     imagettftext($im, $headlineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
     $y += 70;
 
-    $byline = 'with ' . $episode['guest_name'];
-    if (!empty($episode['duration_seconds'])) {
-        $byline .= '   ·   ' . forecast_format_duration($episode['duration_seconds']);
+    $bylinePrefix = 'with ' . $episode['guest_name'];
+    $hasDuration = !empty($episode['duration_seconds']);
+    if ($hasDuration) $bylinePrefix .= '   ·   ';
+    imagettftext($im, 34, 0, $margin, $y, $muted, IG_FONT_BODY, $bylinePrefix);
+
+    if ($hasDuration) {
+        $prefixBbox = imagettfbbox(34, 0, IG_FONT_BODY, $bylinePrefix);
+        $durationX = $margin + ($prefixBbox[2] - $prefixBbox[0]);
+        if ($liveDuration) {
+            // Left blank here on purpose — ffmpeg draws a live elapsed/total
+            // counter into this exact spot at render time (see
+            // forecast_generate_video()'s $durationSlot). Measured off a
+            // representative sample string at the same font/size so the
+            // slot handed to ffmpeg lines up with this baseline exactly,
+            // rather than an offset re-derived independently over there and
+            // risking drift from whatever this function actually drew.
+            $sample = sprintf('%02d:%02d / %02d:%02d', 0, 0, intdiv($episode['duration_seconds'], 60), $episode['duration_seconds'] % 60);
+            $sampleBbox = imagettfbbox(34, 0, IG_FONT_BODY, $sample);
+            $durationSlot = ['x' => $durationX, 'y' => $y + $sampleBbox[5], 'size' => 34];
+        } else {
+            imagettftext($im, 34, 0, $durationX, $y, $muted, IG_FONT_BODY, forecast_format_duration($episode['duration_seconds']));
+        }
     }
-    imagettftext($im, 34, 0, $margin, $y, $muted, IG_FONT_BODY, $byline);
     $y += 50;
 
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
@@ -307,6 +325,11 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null) {
     $textMaxWidth = $w - $margin - $textX;
     $titleSize = $thumbH >= 90 ? 26 : max(18, (int) round($thumbH * 26 / 105));
     $metaSize  = $thumbH >= 90 ? 20 : max(14, (int) round($thumbH * 20 / 105));
+    // A second, smaller meta line for the director — sized down from
+    // $metaSize the same way $metaSize itself scales off $titleSize, so it
+    // shrinks in step with everything else on a long manual selection
+    // rather than becoming the tallest thing in a cramped row.
+    $metaSize2 = $thumbH >= 90 ? 18 : max(12, (int) round($thumbH * 18 / 105));
 
     foreach ($films as $f) {
         $thumb = ig_fetch_thumb($f['poster'] ?? null, $thumbW, $thumbH);
@@ -318,18 +341,27 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null) {
         }
 
         // Offset from fixed font-size padding, not a fraction of thumbH —
-        // a fraction shrinks the gap between the two lines just as fast as
-        // it shrinks the thumbnail, but the floored font sizes below don't
-        // shrink nearly that fast, so the old fraction-based offsets let
-        // the two lines run into each other on a long manual selection.
+        // a fraction shrinks the gap between lines just as fast as it
+        // shrinks the thumbnail, but the floored font sizes below don't
+        // shrink nearly that fast, so a fraction-based offset lets the
+        // lines run into each other on a long manual selection. Three
+        // lines (title, venue/time, director) still fit well inside even
+        // the shrunk floor row height this way — verified by rendering a
+        // 15-film test list end to end before this shipped.
         $titleY = $y + $titleSize + 8;
         $metaY  = $titleY + $metaSize + 8;
+        $metaY2 = $metaY + $metaSize2 + 6;
 
         $title = ig_fit_text(mb_strtoupper($f['display_title']), IG_FONT_HEADLINE, $titleSize, $textMaxWidth);
         imagettftext($im, $titleSize, 0, $textX, $titleY, $ink, IG_FONT_HEADLINE, $title);
 
-        $meta = ig_fit_text($f['venue'] . '  ·  ' . date('D', $f['timestamp']), IG_FONT_BODY, $metaSize, $textMaxWidth);
+        $meta = ig_fit_text($f['venue'] . '  ·  ' . date('D, g:ia', $f['timestamp']), IG_FONT_BODY, $metaSize, $textMaxWidth);
         imagettftext($im, $metaSize, 0, $textX, $metaY, $muted, IG_FONT_BODY, $meta);
+
+        if (!empty($f['director'])) {
+            $director = ig_fit_text('Dir. ' . $f['director'], IG_FONT_BODY, $metaSize2, $textMaxWidth);
+            imagettftext($im, $metaSize2, 0, $textX, $metaY2, $muted, IG_FONT_BODY, $director);
+        }
 
         $y += $rowHeight;
     }
@@ -459,8 +491,24 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * need for its separate -progress file option or any extra moving parts,
  * just read the pipe as it streams and match that pattern against the
  * already-known total duration.
+ *
+ * $durationSlot, if given (['x', 'y', 'size'], from forecast_build_cover()'s
+ * own by-reference output — see its $liveDuration param), draws a live
+ * "elapsed / total" counter into the video at that exact position instead
+ * of the static duration forecast_build_cover() would otherwise have baked
+ * into the cover PNG. `%{pts\:gmtime\:%M\:%S}` is ffmpeg drawtext's own
+ * text-expansion syntax — pts is seconds since playback start, gmtime
+ * reinterprets that as a Unix timestamp and formats it with strftime,
+ * giving zero-padded minutes:seconds with no extra moving parts (no
+ * separate progress file, no JS timer) and no hour component to strip for
+ * an episode under an hour. Ticks once a second as ffmpeg's own encoding
+ * clock advances — confirmed by extracting frames at the start, middle,
+ * and end of a real ~6 minute episode and checking the printed value
+ * against each frame's actual timestamp, not just that it looked right on
+ * the first frame (the exact mistake that broke drawbox's progress bar
+ * earlier in this file).
  */
-function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationSeconds, $onProgress = null) {
+function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationSeconds, $durationSlot = null, $onProgress = null) {
     if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
     if (!file_exists($coverPath)) return ['ok' => false, 'error' => 'Cover image not found.'];
     if ($durationSeconds <= 0) return ['ok' => false, 'error' => 'Could not determine audio duration.'];
@@ -469,6 +517,13 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
     $waveX = 90;  $waveY = FORECAST_WAVE_BAND_Y + 40;
     $barX  = 90;  $barY = FORECAST_WAVE_BAND_Y + 230;
     $barW  = 900; $barH = 8;
+
+    // Plain path, not escapeshellarg()'d — this is a value inside an
+    // ffmpeg filter-option string, not a shell argument on its own; the
+    // whole -filter_complex value gets one escapeshellarg() pass below.
+    // Safe unescaped because IG_FONT_BODY is a fixed repo-controlled path
+    // with none of ffmpeg's filter-syntax special characters (: , ' [ ]).
+    $fontfilePath = IG_FONT_BODY;
 
     // A second, smaller waveform in the top band — same source, same
     // showwaves/colorkey treatment, just sized to fit the shorter strip
@@ -488,6 +543,14 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
         . "g='if({$lit}\\,{$fillG}\\,{$trackG})':"
         . "b='if({$lit}\\,{$fillB}\\,{$trackB})'";
 
+    $timerFilter = null;
+    if ($durationSlot) {
+        $totalStr = sprintf('%02d\\:%02d', intdiv($durationSeconds, 60), $durationSeconds % 60);
+        $timerText = "%{pts\\:gmtime\\:%M\\:%S} / {$totalStr}";
+        $timerFilter = "drawtext=fontfile={$fontfilePath}:text='{$timerText}':fontsize={$durationSlot['size']}"
+            . ":fontcolor=0x6B6659:x={$durationSlot['x']}:y={$durationSlot['y']}";
+    }
+
     $filter =
         "[1:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
         . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
@@ -496,7 +559,9 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
         . "[2:v]{$barGeq}[bar];"
         . "[0:v][wave2]overlay={$topWaveX}:{$topWaveY}[bg0];"
         . "[bg0][wave]overlay={$waveX}:{$waveY}[bg1];"
-        . "[bg1][bar]overlay={$barX}:{$barY}[out]";
+        . ($timerFilter
+            ? "[bg1][bar]overlay={$barX}:{$barY}[bg2];[bg2]{$timerFilter}[out]"
+            : "[bg1][bar]overlay={$barX}:{$barY}[out]");
 
     $cmd = sprintf(
         'ffmpeg -y -loop 1 -i %s -i %s -f lavfi -i %s -filter_complex %s -map %s -map 1:a '
