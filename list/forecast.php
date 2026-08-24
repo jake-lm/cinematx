@@ -57,15 +57,22 @@ function forecast_format_duration($seconds) {
 // ── Cover graphic (1080×1920 — Reels' own aspect ratio, not the daily
 //    carousel's 1080×1350/1080×700) ─────────────────────────────────────
 
-// The bottom band ffmpeg composites the waveform and progress bar into
-// afterward — the cover render itself never draws here, so there's nothing
-// underneath for the overlay to fight with.
-const FORECAST_WAVE_BAND_Y = 1650;
+// The top and bottom bands ffmpeg composites the waveform (and, at the
+// bottom, the progress bar) into afterward — the cover render itself never
+// draws into either, so there's nothing underneath for the overlay to
+// fight with.
+const FORECAST_TOP_WAVE_BAND_H = 130;
+const FORECAST_WAVE_BAND_Y     = 1650;
 
 // This week's screenings, one row per unique title (a film playing three
 // nights only needs to appear once here) — the same Paper-theme list
 // language the daily carousel already uses, so Forecast's background reads
-// as "the list" rather than an unrelated graphic. $weekOf anchors the
+// as "the list" rather than an unrelated graphic.
+//
+// Picked round-robin across the week's days rather than strictly
+// chronologically, so a busy Monday can't fill the whole row budget before
+// the rest of the week ever gets a look — every night that has a screening
+// gets its first pick before any night gets a second. $weekOf anchors the
 // 7-day window; capped at $limit rows, with the true remaining count
 // returned alongside so the cover can show a "+N more this week" line
 // exactly like ig_build_list_page()'s own overflow handling.
@@ -76,19 +83,32 @@ function forecast_week_films($conn, $weekOf, $limit = 9) {
     $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
     $films = ctx_enrich($films);
 
-    $seen = [];
-    $unique = [];
+    $byDay = [];
+    $seenTitles = [];
     foreach ($films as $f) {
         $title = !empty($f['display_title']) ? $f['display_title'] : $f['title'];
         $key = mb_strtolower($title);
-        if (isset($seen[$key])) continue;
-        $seen[$key] = true;
-        $unique[] = $f + ['display_title' => $title];
+        if (isset($seenTitles[$key])) continue;
+        $seenTitles[$key] = true;
+        $byDay[date('Y-m-d', $f['timestamp'])][] = $f + ['display_title' => $title];
+    }
+    ksort($byDay);
+
+    $ordered = [];
+    for ($round = 0; ; $round++) {
+        $addedThisRound = false;
+        foreach ($byDay as $dayFilms) {
+            if (isset($dayFilms[$round])) {
+                $ordered[] = $dayFilms[$round];
+                $addedThisRound = true;
+            }
+        }
+        if (!$addedThisRound) break;
     }
 
     return [
-        'films' => array_slice($unique, 0, $limit),
-        'more'  => max(0, count($unique) - $limit),
+        'films' => array_slice($ordered, 0, $limit),
+        'more'  => max(0, count($ordered) - $limit),
     ];
 }
 
@@ -136,8 +156,14 @@ function forecast_build_cover(array $episode, $conn) {
     imagefill($im, 0, 0, $paper);
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
 
+    // Dark, same as the bottom band — so the gold waveform ffmpeg composites
+    // in here afterward reads the same way in both places, and the two
+    // bands bookend the cream list content between them.
+    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
+    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
+
     $margin = 80;
-    $y = 110;
+    $y = $topBandEnd + 96;
 
     imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
     $y += 90;
@@ -296,6 +322,14 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
     $barX  = 90;  $barY = FORECAST_WAVE_BAND_Y + 230;
     $barW  = 900; $barH = 8;
 
+    // A second, smaller waveform in the top band — same source, same
+    // showwaves/colorkey treatment, just sized to fit the shorter strip
+    // reserved up there (see FORECAST_TOP_WAVE_BAND_H in
+    // forecast_build_cover()) so the video reads as bookended top and
+    // bottom rather than only weighted toward the bottom.
+    $topWaveW = 900; $topWaveH = 90;
+    $topWaveX = 90;  $topWaveY = (int) (14 + (FORECAST_TOP_WAVE_BAND_H - $topWaveH) / 2);
+
     // 0x3A362E (track) / 0x922E32 (fill), split into decimal RGB — geq's
     // per-channel expressions take plain numbers, not hex literals.
     $trackR = 0x3A; $trackG = 0x36; $trackB = 0x2E;
@@ -309,8 +343,11 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
     $filter =
         "[1:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
         . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
+        . "[1:a]showwaves=s={$topWaveW}x{$topWaveH}:mode=cline:rate=25:colors=0xF2C14E[wraw2];"
+        . "[wraw2]colorkey=0x000000:0.15:0.1,format=rgba[wave2];"
         . "[2:v]{$barGeq}[bar];"
-        . "[0:v][wave]overlay={$waveX}:{$waveY}[bg1];"
+        . "[0:v][wave2]overlay={$topWaveX}:{$topWaveY}[bg0];"
+        . "[bg0][wave]overlay={$waveX}:{$waveY}[bg1];"
         . "[bg1][bar]overlay={$barX}:{$barY}[out]";
 
     $cmd = sprintf(
