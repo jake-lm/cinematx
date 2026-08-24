@@ -212,7 +212,7 @@ function forecast_circle_crop($src, $diameter) {
     return $dst;
 }
 
-function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $liveDuration = false, &$durationSlot = null) {
+function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $totalThisWeek = null, $liveDuration = false, &$durationSlot = null) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
@@ -295,7 +295,6 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $liv
         // same as the automatic default, rather than rendering illegibly
         // small rows.
         $films = $filmsOverride;
-        $more  = 0;
         // 95, not lower — the floor title+meta text (18px/14px, set below)
         // needs about that much room to stay clear of both the row above
         // and the thumbnail beneath it. Confirmed by rendering a 15-film
@@ -305,13 +304,18 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $liv
         if (count($films) > 0 && count($films) * $idealRowHeight > $availableHeight) {
             $fitRows = max(1, (int) floor($availableHeight / $minRowHeight));
             if (count($films) > $fitRows) {
-                $more  = count($films) - $fitRows;
                 $films = array_slice($films, 0, $fitRows);
             }
             $rowHeight = count($films) > 0 ? (int) floor($availableHeight / count($films)) : $idealRowHeight;
         } else {
             $rowHeight = $idealRowHeight;
         }
+        // "+N more" here isn't just an overflow indicator the way it is in
+        // the automatic path below — it also covers films the admin simply
+        // didn't check, so the cover still hints there's more happening
+        // this week even when the showcase is a deliberately short,
+        // comfortably-fitting list.
+        $more = $totalThisWeek !== null ? max(0, $totalThisWeek - count($films)) : 0;
         $thumbH = max(40, min(105, $rowHeight - 25));
         $thumbW = (int) round($thumbH * 70 / 105);
     } else {

@@ -42,9 +42,11 @@ $sortedSaved = $savedKeys; sort($sortedSaved);
 $sortedCurrent = $currentKeys; sort($sortedCurrent);
 $dirty = $previewSubmitted && ($sortedCurrent !== $sortedSaved);
 
+$totalThisWeek = array_sum(array_map('count', $byDay));
+
 $dir = dirname(__DIR__) . '/uploads/forecast';
 $previewPath = $dir . '/' . $episode_id . '-preview.png';
-$cover = forecast_build_cover($episode, $conn, $films);
+$cover = forecast_build_cover($episode, $conn, $films, $totalThisWeek);
 imagepng($cover, $previewPath);
 imagedestroy($cover);
 $previewUrl = '/uploads/forecast/' . $episode_id . '-preview.png?v=' . filemtime($previewPath);
@@ -95,7 +97,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
         <div>
           <div class="ig-mock" style="margin-bottom:var(--s-5)">
-            <?php if ($hasVideo && !$dirty): ?>
+            <?php if ($hasVideo && !$dirty && !$previewSubmitted): ?>
             <video class="ig-mock__image" src="<?php echo $e($videoUrl . '?v=' . @filemtime($dir . '/' . basename($videoUrl))); ?>" controls playsinline></video>
             <?php else: ?>
             <img class="ig-mock__image" src="<?php echo $e($previewUrl); ?>" alt="Cover mockup" />

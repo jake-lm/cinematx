@@ -56,10 +56,11 @@ forecast_write_progress($episode_id, 'running', 0);
 
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
+$totalThisWeek = array_sum(array_map('count', $byDay));
 
 $coverPath = $dir . '/' . $episode_id . '-cover-' . time() . '.png';
 $durationSlot = null;
-$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, true, $durationSlot);
+$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, $totalThisWeek, true, $durationSlot);
 imagepng($cover, $coverPath);
 imagedestroy($cover);
 
