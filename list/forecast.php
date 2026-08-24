@@ -62,65 +62,161 @@ function forecast_format_duration($seconds) {
 // underneath for the overlay to fight with.
 const FORECAST_WAVE_BAND_Y = 1650;
 
-function forecast_build_cover(array $episode) {
+// This week's screenings, one row per unique title (a film playing three
+// nights only needs to appear once here) — the same Paper-theme list
+// language the daily carousel already uses, so Forecast's background reads
+// as "the list" rather than an unrelated graphic. $weekOf anchors the
+// 7-day window; capped at $limit rows, with the true remaining count
+// returned alongside so the cover can show a "+N more this week" line
+// exactly like ig_build_list_page()'s own overflow handling.
+function forecast_week_films($conn, $weekOf, $limit = 9) {
+    $start = strtotime($weekOf);
+    $end   = strtotime('+7 day', $start) - 1;
+    $films = fetch_all_screenings($conn, $start, $end, false);
+    $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    $films = ctx_enrich($films);
+
+    $seen = [];
+    $unique = [];
+    foreach ($films as $f) {
+        $title = !empty($f['display_title']) ? $f['display_title'] : $f['title'];
+        $key = mb_strtolower($title);
+        if (isset($seen[$key])) continue;
+        $seen[$key] = true;
+        $unique[] = $f + ['display_title' => $title];
+    }
+
+    return [
+        'films' => array_slice($unique, 0, $limit),
+        'more'  => max(0, count($unique) - $limit),
+    ];
+}
+
+// Crops $src to a centered square, resizes to $diameter, and masks
+// everything outside the circle to transparent — the standard GD approach
+// (no native circular clip), fast enough at badge size to just walk every
+// pixel once. Caller owns disposing both the input and the returned image.
+function forecast_circle_crop($src, $diameter) {
+    $srcW = imagesx($src);
+    $srcH = imagesy($src);
+    $size = min($srcW, $srcH);
+    $srcX = (int) (($srcW - $size) / 2);
+    $srcY = (int) (($srcH - $size) / 2);
+
+    $dst = imagecreatetruecolor($diameter, $diameter);
+    imagealphablending($dst, false);
+    imagesavealpha($dst, true);
+    $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+    imagefilledrectangle($dst, 0, 0, $diameter, $diameter, $transparent);
+    imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $diameter, $diameter, $size, $size);
+
+    $r = $diameter / 2;
+    for ($x = 0; $x < $diameter; $x++) {
+        for ($y = 0; $y < $diameter; $y++) {
+            if (($x - $r) ** 2 + ($y - $r) ** 2 > $r ** 2) {
+                imagesetpixel($dst, $x, $y, $transparent);
+            }
+        }
+    }
+    return $dst;
+}
+
+function forecast_build_cover(array $episode, $conn) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
 
+    $paper  = ig_hex($im, '#F4F1EB');
     $ink    = ig_hex($im, '#14120F');
-    $cream  = ig_hex($im, '#F4F1EB');
     $red    = ig_hex($im, '#922E32');
-    $gold   = ig_hex($im, '#F2C14E');
-    $muted  = ig_hex($im, '#B5AFA0');
-    $placeholder = ig_hex($im, '#241D16');
+    $muted  = ig_hex($im, '#6B6659');
+    $divider = ig_hex($im, '#DED7C7');
+    $placeholder = ig_hex($im, '#E4DECE');
 
-    imagefill($im, 0, 0, $ink);
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
 
     $margin = 80;
-    $heroH  = 1200;
+    $y = 110;
 
-    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
-    $hero = $photoUrl ? ig_fetch_thumb($photoUrl, $w, $heroH) : null;
-    if ($hero) {
-        imagecopy($im, $hero, 0, 0, 0, 0, $w, $heroH);
-        imagedestroy($hero);
-    } else {
-        imagefilledrectangle($im, 0, 0, $w, $heroH, $placeholder);
-        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
-        $ibox = imagettfbbox(140, 0, IG_FONT_HEADLINE, $initial);
-        $iw = $ibox[2] - $ibox[0];
-        imagettftext($im, 140, 0, (int) (($w - $iw) / 2), (int) ($heroH / 2) + 50, $muted, IG_FONT_HEADLINE, $initial);
-    }
+    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
+    $y += 90;
 
-    // Fade the hero into the ink background so the text block below always
-    // has guaranteed contrast regardless of the photo's own tones.
-    $fadeH = 260;
-    for ($i = 0; $i < $fadeH; $i++) {
-        $alpha = (int) round(127 * (1 - $i / $fadeH));
-        $band  = imagecolorallocatealpha($im, 0x14, 0x12, 0x0F, $alpha);
-        imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
-    }
-    imagefilledrectangle($im, 0, $heroH, $w, FORECAST_WAVE_BAND_Y, $ink);
-
-    imagettftext($im, 30, 0, $margin, $heroH + 70, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
-
-    $name = ig_fit_text(mb_strtoupper($episode['guest_name']), IG_FONT_HEADLINE, 64, $w - $margin * 2);
-    imagettftext($im, 64, 0, $margin, $heroH + 150, $cream, IG_FONT_HEADLINE, $name);
-
+    // The largest text on the page — this is the headline now, the guest
+    // is the byline underneath it, a deliberate flip from the first design
+    // (guest photo full-bleed, guest name as the title).
     $weekOf = 'WEEK OF ' . strtoupper(date('M j', strtotime($episode['week_of'])));
-    $deckParts = [$weekOf];
-    if (!empty($episode['duration_seconds'])) {
-        $deckParts[] = forecast_format_duration($episode['duration_seconds']);
-    }
-    imagettftext($im, 28, 0, $margin, $heroH + 200, $gold, IG_FONT_BODY, implode('   ·   ', $deckParts));
+    imagettftext($im, 96, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
+    $y += 70;
 
-    if (!empty($episode['blurb'])) {
-        $y = $heroH + 260;
-        foreach (ig_wrap_lines($episode['blurb'], IG_FONT_BODY, 26, $w - $margin * 2, 4) as $line) {
-            imagettftext($im, 26, 0, $margin, $y, $muted, IG_FONT_BODY, $line);
-            $y += 38;
-        }
+    $byline = 'with ' . $episode['guest_name'];
+    if (!empty($episode['duration_seconds'])) {
+        $byline .= '   ·   ' . forecast_format_duration($episode['duration_seconds']);
     }
+    imagettftext($im, 34, 0, $margin, $y, $muted, IG_FONT_BODY, $byline);
+    $y += 50;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 50;
+
+    $thumbW = 70; $thumbH = 105;
+    $textX  = $margin + $thumbW + 26;
+    $textMaxWidth = $w - $margin - $textX;
+    $rowHeight = $thumbH + 30;
+
+    $week = forecast_week_films($conn, $episode['week_of'], (int) floor((FORECAST_WAVE_BAND_Y - $y - 60) / $rowHeight));
+
+    foreach ($week['films'] as $f) {
+        $thumb = ig_fetch_thumb($f['poster'] ?? null, $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+        }
+
+        $title = ig_fit_text(mb_strtoupper($f['display_title']), IG_FONT_HEADLINE, 26, $textMaxWidth);
+        imagettftext($im, 26, 0, $textX, $y + 38, $ink, IG_FONT_HEADLINE, $title);
+
+        $meta = ig_fit_text($f['venue'] . '  ·  ' . date('D', $f['timestamp']), IG_FONT_BODY, 20, $textMaxWidth);
+        imagettftext($im, 20, 0, $textX, $y + 70, $muted, IG_FONT_BODY, $meta);
+
+        $y += $rowHeight;
+    }
+
+    if ($week['more'] > 0) {
+        imagettftext($im, 22, 0, $margin, $y + 30, $red, IG_FONT_BODY, '+ ' . $week['more'] . ' more this week');
+    }
+
+    // Guest photo — small, bottom-right, its own badge rather than the
+    // frame's dominant image now that the list is. Sits above
+    // FORECAST_WAVE_BAND_Y so it never collides with ffmpeg's waveform/
+    // progress-bar overlay.
+    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
+    $badgeD = 220;
+    $bx = $w - $margin - $badgeD;
+    $by = FORECAST_WAVE_BAND_Y - $badgeD - 40;
+
+    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 80);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 4, (int) ($by + $badgeD / 2) + 6, $badgeD + 16, $badgeD + 16, $shadow);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 10, $badgeD + 10, $red);
+
+    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
+    if ($photoSrc) {
+        $circle = forecast_circle_crop($photoSrc, $badgeD);
+        imagedestroy($photoSrc);
+        imagealphablending($im, true);
+        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
+        imagedestroy($circle);
+    } else {
+        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
+        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
+        $ibox = imagettfbbox(80, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 80, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 28), $muted, IG_FONT_HEADLINE, $initial);
+    }
+
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
 
     return $im;
 }

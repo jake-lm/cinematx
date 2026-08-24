@@ -38,7 +38,7 @@ if (!$duration) {
 }
 
 $coverPath = $dir . '/' . $episode_id . '-cover-' . time() . '.png';
-$cover = forecast_build_cover($episode + ['duration_seconds' => $duration]);
+$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn);
 imagepng($cover, $coverPath);
 imagedestroy($cover);
 
