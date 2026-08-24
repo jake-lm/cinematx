@@ -496,17 +496,24 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * own by-reference output — see its $liveDuration param), draws a live
  * "elapsed / total" counter into the video at that exact position instead
  * of the static duration forecast_build_cover() would otherwise have baked
- * into the cover PNG. `%{pts\:gmtime\:%M\:%S}` is ffmpeg drawtext's own
- * text-expansion syntax — pts is seconds since playback start, gmtime
- * reinterprets that as a Unix timestamp and formats it with strftime,
- * giving zero-padded minutes:seconds with no extra moving parts (no
- * separate progress file, no JS timer) and no hour component to strip for
- * an episode under an hour. Ticks once a second as ffmpeg's own encoding
- * clock advances — confirmed by extracting frames at the start, middle,
- * and end of a real ~6 minute episode and checking the printed value
- * against each frame's actual timestamp, not just that it looked right on
- * the first frame (the exact mistake that broke drawbox's progress bar
- * earlier in this file).
+ * into the cover PNG. Built from ffmpeg drawtext's `%{eif:...}` text
+ * expansion (evaluate an expression, format as an integer, zero-pad to a
+ * given width) — `floor(t/60)` and `mod(t\,60)`, each zero-padded to 2
+ * digits, off `t` (the frame's own timestamp in seconds). No extra moving
+ * parts (no separate progress file, no JS timer), and it naturally has no
+ * hour component to strip for an episode under an hour.
+ *
+ * Not `%{pts\:gmtime\:%M\:%S}`, ffmpeg's own documented recipe for exactly
+ * this — it parses without error but silently fails on this server's
+ * ffmpeg (4.4.2): every frame logs "Invalid delta '%M'" and skips drawing
+ * entirely, so the very first version of this produced a real, valid
+ * video with no timer on it at all, discovered only by actually looking at
+ * an extracted frame rather than trusting the "ok":true result. Confirmed
+ * the eif version actually ticks (not just parses) by extracting frames at
+ * the start, past a minute rollover, and near the end of a real multi-
+ * minute test render and checking the printed value against each frame's
+ * real timestamp — not just that it looked right on the first frame, the
+ * exact mistake that broke drawbox's progress bar earlier in this file.
  */
 function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationSeconds, $durationSlot = null, $onProgress = null) {
     if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
@@ -546,7 +553,18 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
     $timerFilter = null;
     if ($durationSlot) {
         $totalStr = sprintf('%02d\\:%02d', intdiv($durationSeconds, 60), $durationSeconds % 60);
-        $timerText = "%{pts\\:gmtime\\:%M\\:%S} / {$totalStr}";
+        // Built from eif (evaluate-integer-format) expansions, not the
+        // pts:gmtime:FORMAT expansion the ffmpeg docs describe — that one
+        // reliably failed on this server's ffmpeg (4.4.2) with "Invalid
+        // delta '%M'" for every frame, silently skipping the draw instead
+        // of erroring out, which is exactly why the first version of this
+        // rendered a real, valid video with no timer text on it at all.
+        // eif's two calls compute whole minutes and whole seconds off `t`
+        // (the frame's own timestamp) directly and zero-pad each to width
+        // 2 — confirmed ticking correctly frame to frame, including the
+        // minute rollover (00:59 -> 01:00), by extracting frames at
+        // several checkpoints across a real multi-minute test render.
+        $timerText = "%{eif\\:floor(t/60)\\:d\\:2}\\:%{eif\\:mod(t\\,60)\\:d\\:2} / {$totalStr}";
         $timerFilter = "drawtext=fontfile={$fontfilePath}:text='{$timerText}':fontsize={$durationSlot['size']}"
             . ":fontcolor=0x6B6659:x={$durationSlot['x']}:y={$durationSlot['y']}";
     }
