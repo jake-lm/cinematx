@@ -1,67 +1,58 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-//  Admin — assemble one episode's Reel video from its cover + audio
+//  Admin — start generating one episode's Reel video, in the background
 //
 //  Skipped entirely when a video was uploaded directly — that file posts
-//  as-is (see forecast_post.php). Synchronous: the admin's request waits
-//  for ffmpeg to finish. Acceptable for an occasional, admin-only action —
-//  there's no background job queue in this codebase to build on, and
-//  max_execution_time is already unlimited on this box.
-//
-//  Re-running this overwrites generated_video every time; it never touches
-//  a directly-uploaded video_file.
+//  as-is (see forecast_post.php). A real episode takes upward of 15-20
+//  minutes end to end (ffmpeg, mostly the geq-driven progress bar), far
+//  too long for the admin's own request to block on, so this only ever
+//  launches bin/forecast-generate.php detached and returns immediately —
+//  that script owns the actual ffmpeg run, writing
+//  uploads/forecast/<id>-progress.json as it goes.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 admin_check_csrf();
 require dirname(__DIR__) . '/list/forecast.php';
 
-function forecast_generate_fail($msg) {
-    header('Location: /_admin/forecast.php?error=' . urlencode($msg));
+function forecast_generate_fail($episode_id, $msg) {
+    header('Location: /_admin/forecast_episode.php?id=' . $episode_id . '&error=' . urlencode($msg));
     exit;
 }
 
 $episode_id = (int) ($_POST['episode_id'] ?? 0);
 $episode = forecast_get_episode($conn, $episode_id);
 if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
-    forecast_generate_fail('That episode was not found.');
+    forecast_generate_fail($episode_id, 'That episode was not found.');
 }
 if (empty($episode['audio_file'])) {
-    forecast_generate_fail('Upload an audio file before generating a video.');
+    forecast_generate_fail($episode_id, 'Upload an audio file before generating a video.');
+}
+
+// The progress file's own status is the lock — refuse a second concurrent
+// run for the same episode rather than spawning a duplicate ffmpeg.
+$status = forecast_generation_status($episode_id);
+if ($status && ($status['status'] ?? '') === 'running') {
+    forecast_generate_fail($episode_id, 'A generation is already running for this episode.');
 }
 
 $dir = dirname(__DIR__) . '/uploads/forecast';
-$audioPath = $dir . '/' . $episode['audio_file'];
+$logPath = $dir . '/' . $episode_id . '-generate.log';
+$scriptPath = dirname(__DIR__) . '/bin/forecast-generate.php';
 
-$duration = forecast_probe_duration($audioPath);
-if (!$duration) {
-    forecast_generate_fail('Could not read the audio file\'s duration.');
-}
+// Written here, not left to bin/forecast-generate.php's own first update,
+// so the very next request — even one landing before the background
+// process has actually started up — already sees "running" and can't slip
+// past the lock check above into a duplicate launch.
+forecast_write_progress($episode_id, 'running', 0);
 
-$coverPath = $dir . '/' . $episode_id . '-cover-' . time() . '.png';
-$cover = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn);
-imagepng($cover, $coverPath);
-imagedestroy($cover);
+$cmd = sprintf(
+    'nohup %s %s --episode=%d > %s 2>&1 &',
+    escapeshellarg(PHP_BINARY),
+    escapeshellarg($scriptPath),
+    $episode_id,
+    escapeshellarg($logPath)
+);
+exec($cmd);
 
-$outputName = $episode_id . '-generated-' . time() . '.mp4';
-$outputPath = $dir . '/' . $outputName;
-
-$result = forecast_generate_video($audioPath, $coverPath, $outputPath, $duration);
-
-// The cover is only an intermediate for ffmpeg to composite over — nothing
-// else ever reads it once the video exists.
-unlink($coverPath);
-
-if (!$result['ok']) {
-    forecast_generate_fail('Video generation failed: ' . mb_strimwidth($result['error'], 0, 300, '…'));
-}
-
-$old = $episode['generated_video'] ?? null;
-$conn->prepare("UPDATE `forecast_episodes` SET generated_video = :video, duration_seconds = :duration, edited = :edited WHERE id = :id AND uid = :uid")
-     ->execute([
-         ':video' => $outputName, ':duration' => $duration, ':edited' => time(),
-         ':id' => $episode_id, ':uid' => $admin_user['id'],
-     ]);
-if ($old && $old !== $outputName && file_exists($dir . '/' . $old)) unlink($dir . '/' . $old);
-
-header('Location: /_admin/forecast.php');
+header('Location: /_admin/forecast_episode.php?id=' . $episode_id);
 exit;

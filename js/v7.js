@@ -1394,13 +1394,43 @@
     });
   }
 
+  // ══ Film Forecast — generation progress ═════════════════════════════════
+  // Polls while a background ffmpeg run is in flight (see
+  // _admin/forecast_generate.php / bin/forecast-generate.php). A full page
+  // reload once status leaves "running" is deliberate — this admin has no
+  // client framework, every other action here already re-renders server-
+  // side, and the finished view (video player, or the error banner) is
+  // already what a fresh load of forecast_episode.php produces.
+  function initForecastProgress() {
+    var bar = $('[data-forecast-progress]');
+    if (!bar) return;
+    var label = $('[data-forecast-progress-label]');
+    var episodeId = bar.getAttribute('data-episode-id');
+
+    var timer = setInterval(function () {
+      fetch('/_admin/forecast_progress.php?id=' + encodeURIComponent(episodeId), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.status === 'running') {
+            var pct = data.percent || 0;
+            bar.value = pct;
+            if (label) label.textContent = 'Generating… ' + pct + '%';
+          } else {
+            clearInterval(timer);
+            location.reload();
+          }
+        })
+        .catch(function () {});
+    }, 2000);
+  }
+
   function boot() {
     initWelcome(); initTheme(); initThemeSwitcher(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
     initProfileFaceUpload(); initProfileBannerUpload(); initLetterboxdConnect(); initYouMenu();
-    initRoleGroup(); initRoleDrop(); initPosterCrop();
+    initRoleGroup(); initRoleDrop(); initPosterCrop(); initForecastProgress();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

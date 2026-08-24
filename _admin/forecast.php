@@ -79,7 +79,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="field"><label class="field__label" for="fc-audio">Audio file <span class="admin-tz">for auto-generating the Reel</span></label>
                 <input class="field__input" id="fc-audio" name="audio_file" type="file" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav">
                 <?php if ($editing && !empty($editing['audio_file'])): ?>
-                <div class="admin-note" style="margin:var(--s-2) 0 0">Current: <?php echo $e($editing['audio_file']); ?><?php if (!empty($editing['duration_seconds'])): ?> (<?php echo forecast_format_duration($editing['duration_seconds']); ?>)<?php endif; ?></div>
+                <div class="admin-note" style="margin:var(--s-2) 0 0">Current: <a href="/_admin/forecast_episode.php?id=<?php echo (int) $editing['id']; ?>"><?php echo $e($editing['audio_file']); ?></a><?php if (!empty($editing['duration_seconds'])): ?> (<?php echo forecast_format_duration($editing['duration_seconds']); ?>)<?php endif; ?> &mdash; pick the showcase and generate the video there.</div>
                 <?php endif; ?>
               </div>
               <div class="field"><label class="field__label" for="fc-video">Or a finished video <span class="admin-tz">skips generation, posts as-is</span></label>
@@ -109,7 +109,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <div class="card__body card__body--flush">
             <?php foreach ($episodes as $ep):
               $hasVideo   = !empty($ep['video_file']) || !empty($ep['generated_video']);
-              $canGenerate = !empty($ep['audio_file']) && empty($ep['video_file']);
+              $hasSource  = !empty($ep['audio_file']) || !empty($ep['video_file']);
               $posted     = !empty($ep['posted_media_id']);
             ?>
             <div class="adm-row">
@@ -119,32 +119,26 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <?php endif; ?>
               </span>
               <span class="adm-row__text">
+                <?php if ($hasSource): ?>
+                <a class="adm-row__title" href="/_admin/forecast_episode.php?id=<?php echo (int) $ep['id']; ?>"><?php echo $e($ep['guest_name']); ?></a>
+                <?php else: ?>
                 <span class="adm-row__title"><?php echo $e($ep['guest_name']); ?></span>
+                <?php endif; ?>
                 <span class="adm-row__sub">
                   Week of <?php echo $e(date('M j', strtotime($ep['week_of']))); ?>
                   <?php if ($ep['duration_seconds']): ?> &middot; <?php echo forecast_format_duration($ep['duration_seconds']); ?><?php endif; ?>
-                  <?php if ($posted): ?> &middot; Posted<?php elseif ($hasVideo): ?> &middot; Ready<?php else: ?> &middot; Needs a video<?php endif; ?>
+                  <?php if ($posted): ?> &middot; Posted<?php elseif ($hasVideo): ?> &middot; Ready<?php elseif ($hasSource): ?> &middot; Needs a video<?php else: ?> &middot; Needs audio<?php endif; ?>
                 </span>
               </span>
               <span class="adm-row__end">
+                <?php if ($hasSource): ?>
+                <a class="event-edit" href="/_admin/forecast_episode.php?id=<?php echo (int) $ep['id']; ?>" title="Open workshop">
+                  <i class="fa-solid fa-clapperboard"></i>
+                </a>
+                <?php endif; ?>
                 <a class="event-edit" href="/_admin/forecast.php?edit=<?php echo (int) $ep['id']; ?>" title="Edit">
                   <i class="fa-solid fa-pen"></i>
                 </a>
-                <?php if ($canGenerate): ?>
-                <form action="/_admin/forecast_generate.php" method="post">
-                  <?php echo admin_csrf_field(); ?>
-                  <input type="hidden" name="episode_id" value="<?php echo (int) $ep['id']; ?>">
-                  <button class="event-edit" type="submit" title="Generate video"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
-                </form>
-                <?php endif; ?>
-                <?php if ($hasVideo && !$posted): ?>
-                <form action="/_admin/forecast_post.php" method="post"
-                      onsubmit="return confirm('Publish this Reel to the live Instagram account now? This cannot be undone.');">
-                  <?php echo admin_csrf_field(); ?>
-                  <input type="hidden" name="episode_id" value="<?php echo (int) $ep['id']; ?>">
-                  <button class="event-edit" type="submit" title="Post to Instagram"><i class="fa-brands fa-instagram"></i></button>
-                </form>
-                <?php endif; ?>
                 <?php if (!$posted): ?>
                 <form action="/_admin/forecast_delete.php" method="post"
                       onsubmit="return confirm('Delete this episode?');">
