@@ -160,15 +160,21 @@ function forecast_caption(array $episode) {
  * genuinely audio-reactive per frame (tested against a two-tone clip: tight
  * scallops during the high-frequency half, wide ones during the low).
  *
- * The progress bar is an xfade 'wiperight' transition between a static
- * muted track and a solid fill color, run over the full clip duration —
- * not a `t`-expression drawbox width, which was the first approach tried
- * here and turned out to be broken in this ffmpeg build: drawbox's w
- * option accepted a `t`-based expression without erroring, but silently
- * evaluated it as a constant (always fully filled, from frame one) rather
- * than re-evaluating per frame. xfade's wipe is what actually grows in
- * step with playback, verified frame-by-frame (empty → half → full at the
- * 0%/50%/100% marks of a test clip) before wiring it in here.
+ * The progress bar is a geq-generated clip — every pixel's color is a
+ * direct function of its X position and the frame time T, `if(X < barW*T/
+ * duration, fill, track)`. Two earlier approaches both looked right in
+ * short tests and broke on a real episode:
+ *   - drawbox's w as a `t`-based expression accepted the syntax without
+ *     erroring, but silently evaluated it as a constant (fully filled from
+ *     frame one) instead of re-evaluating per frame — caught by checking
+ *     multiple checkpoints across a clip, not just the first frame.
+ *   - xfade's wipe actually animated correctly, but its `duration` option
+ *     turned out to be capped at 60 seconds (it's meant for short
+ *     transitions between clips) — invisible in an 8-second test clip,
+ *     fatal on a real 5-10 minute episode ("Value 383.000000 for parameter
+ *     'duration' out of range [0 - 60]").
+ * geq has no such cap and was verified against both a short clip and a
+ * real 383-second duration before landing here.
  *
  * Returns ['ok' => true] or ['ok' => false, 'error' => '...'] — the ffmpeg
  * output tail on failure, since a filter-graph syntax error only shows up
@@ -184,20 +190,29 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
     $barX  = 90;  $barY = FORECAST_WAVE_BAND_Y + 230;
     $barW  = 900; $barH = 8;
 
+    // 0x3A362E (track) / 0x922E32 (fill), split into decimal RGB — geq's
+    // per-channel expressions take plain numbers, not hex literals.
+    $trackR = 0x3A; $trackG = 0x36; $trackB = 0x2E;
+    $fillR  = 0x92; $fillG  = 0x2E; $fillB  = 0x32;
+    $lit = "lt(X\\,{$barW}*T/{$durationSeconds})";
+    $barGeq = "geq="
+        . "r='if({$lit}\\,{$fillR}\\,{$trackR})':"
+        . "g='if({$lit}\\,{$fillG}\\,{$trackG})':"
+        . "b='if({$lit}\\,{$fillB}\\,{$trackB})'";
+
     $filter =
         "[1:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
         . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
-        . "[2:v][3:v]xfade=transition=wiperight:duration={$durationSeconds}:offset=0[bar];"
+        . "[2:v]{$barGeq}[bar];"
         . "[0:v][wave]overlay={$waveX}:{$waveY}[bg1];"
         . "[bg1][bar]overlay={$barX}:{$barY}[out]";
 
     $cmd = sprintf(
-        'ffmpeg -y -loop 1 -i %s -i %s -f lavfi -i %s -f lavfi -i %s -filter_complex %s -map %s -map 1:a '
+        'ffmpeg -y -loop 1 -i %s -i %s -f lavfi -i %s -filter_complex %s -map %s -map 1:a '
         . '-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -r 25 -shortest %s 2>&1',
         escapeshellarg($coverPath),
         escapeshellarg($audioPath),
-        escapeshellarg("color=c=0x3A362E:s={$barW}x{$barH}:d={$durationSeconds}:r=25"),
-        escapeshellarg("color=c=0x922E32:s={$barW}x{$barH}:d={$durationSeconds}:r=25"),
+        escapeshellarg("color=c=black:s={$barW}x{$barH}:d={$durationSeconds}:r=25"),
         escapeshellarg($filter),
         escapeshellarg('[out]'),
         escapeshellarg($outputPath)
