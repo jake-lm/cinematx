@@ -532,12 +532,28 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
         if ($chunk === '' || $chunk === false) usleep(200000);
     } while ($status['running']);
 
+    // The exit code has to come from *this* $status — the one where
+    // running just flipped to false — not from proc_close()'s return
+    // value below. proc_get_status() reaps the child internally
+    // (waitpid), so by the time proc_close() runs the process is often
+    // already gone; it then has nothing left to reap and returns -1,
+    // which reads as a crash even though ffmpeg finished cleanly. Caught
+    // on a real 383s episode: valid, complete output file on disk, exit
+    // code -1 anyway — every "failure" was ffmpeg's own progress output
+    // (frame=/fps=/time=/bitrate=), never an actual error line, because
+    // there never was a real one.
+    $exitCode = $status['exitcode'];
+
     fclose($pipes[1]);
     fclose($pipes[2]);
-    $exitCode = proc_close($process);
+    proc_close($process);
 
     if ($exitCode !== 0 || !file_exists($outputPath)) {
-        $lines = array_filter(explode("\n", $tail));
+        // ffmpeg's -stats progress line rewrites in place with \r, not
+        // \n — split on both, or a genuine fatal error sitting among a
+        // burst of progress updates ends up glued to them as one
+        // "line" instead of standing out on its own.
+        $lines = array_filter(preg_split('/[\r\n]+/', $tail));
         return ['ok' => false, 'error' => implode("\n", array_slice($lines, -25))];
     }
     return ['ok' => true];
