@@ -144,9 +144,19 @@ function forecast_build_cover(array $episode, $conn) {
 
     // The largest text on the page — this is the headline now, the guest
     // is the byline underneath it, a deliberate flip from the first design
-    // (guest photo full-bleed, guest name as the title).
+    // (guest photo full-bleed, guest name as the title). Shrinks to fit
+    // one line rather than wrapping or running off the edge — "WEEK OF"
+    // plus a short date is usually fine at 96px, but a longer week_of
+    // format shouldn't be able to overflow the canvas.
     $weekOf = 'WEEK OF ' . strtoupper(date('M j', strtotime($episode['week_of'])));
-    imagettftext($im, 96, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
+    $headlineMaxWidth = $w - $margin * 2;
+    $headlineSize = 96;
+    while ($headlineSize > 40) {
+        $bbox = imagettfbbox($headlineSize, 0, IG_FONT_HEADLINE, $weekOf);
+        if ($bbox[2] - $bbox[0] <= $headlineMaxWidth) break;
+        $headlineSize -= 2;
+    }
+    imagettftext($im, $headlineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
     $y += 70;
 
     $byline = 'with ' . $episode['guest_name'];
