@@ -3024,30 +3024,37 @@ function ig_graph_call($url, array $fields, $method = 'GET') {
 
 /**
  * Creates a media container and polls until Meta finishes processing it.
- * Shared by the single-image path and every child of a carousel. Returns the
- * container id, or throws with whatever error payload Meta returned.
+ * Shared by the single-image path, every child of a carousel, and Reels
+ * (ig_publish_reel() in list/forecast.php). Returns the container id, or
+ * throws with whatever error payload Meta returned.
+ *
+ * $maxAttempts/$sleepSecs default to 10×2s (20s), plenty for an image.
+ * Video processing can run well past that for a several-minute Reel, so
+ * the Reels path passes a much longer budget explicitly rather than
+ * changing the default every other caller relies on.
  */
-function ig_create_container($base, $ig, array $fields) {
+function ig_create_container($base, $ig, array $fields, $maxAttempts = 10, $sleepSecs = 2) {
     $create = ig_graph_call("$base/$ig/media", $fields + ['access_token' => IG_ACCESS_TOKEN], 'POST');
     if (empty($create['id'])) {
         throw new RuntimeException('IG container creation failed: ' . json_encode($create));
     }
     $container_id = $create['id'];
 
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < $maxAttempts; $i++) {
         $status = ig_graph_call("$base/$container_id", [
             'fields'       => 'status_code',
             'access_token' => IG_ACCESS_TOKEN,
         ]);
         $code = $status['status_code'] ?? null;
-        if ($code === 'FINISHED') break;
+        if ($code === 'FINISHED') return $container_id;
         if ($code === 'ERROR') {
             throw new RuntimeException('IG container failed to process: ' . json_encode($status));
         }
-        sleep(2);
+        sleep($sleepSecs);
     }
 
-    return $container_id;
+    throw new RuntimeException("IG container $container_id never finished processing after "
+        . ($maxAttempts * $sleepSecs) . 's — it may still complete on Meta\'s side; check the container status manually before retrying.');
 }
 
 /**
