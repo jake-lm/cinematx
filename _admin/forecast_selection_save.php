@@ -21,16 +21,8 @@ if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
 }
 
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
-$valid = [];
-foreach ($byDay as $dayFilms) {
-    foreach ($dayFilms as $f) $valid[] = ig_film_key($f);
-}
-
 $posted = is_array($_POST['films'] ?? null) ? $_POST['films'] : [];
-$keys = array_values(array_intersect($posted, $valid));
-
-$conn->prepare("UPDATE `forecast_episodes` SET selected_films = :films WHERE id = :id AND uid = :uid")
-     ->execute([':films' => json_encode($keys), ':id' => $episode_id, ':uid' => $admin_user['id']]);
+forecast_save_selection($conn, $episode_id, $admin_user['id'], $byDay, $posted);
 
 header('Location: /_admin/forecast_episode.php?id=' . $episode_id);
 exit;

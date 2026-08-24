@@ -127,6 +127,24 @@ function forecast_all_week_films($conn, $weekOf) {
     return forecast_week_by_day($conn, $weekOf);
 }
 
+// Shared by _admin/forecast_selection_save.php (save without generating)
+// and _admin/forecast_generate.php (generate always saves the exact
+// selection it's about to render first, so "what I just checked" and
+// "what the video actually shows" can never drift apart). Only keys that
+// are actually playing this week are kept — the day's real data is the
+// source of truth for what a valid key looks like, same rule every other
+// checklist save in this project already follows.
+function forecast_save_selection($conn, $episode_id, $uid, array $byDay, array $posted) {
+    $valid = [];
+    foreach ($byDay as $dayFilms) {
+        foreach ($dayFilms as $f) $valid[] = ig_film_key($f);
+    }
+    $keys = array_values(array_intersect($posted, $valid));
+    $conn->prepare("UPDATE `forecast_episodes` SET selected_films = :films WHERE id = :id AND uid = :uid")
+         ->execute([':films' => json_encode($keys), ':id' => $episode_id, ':uid' => $uid]);
+    return $keys;
+}
+
 /**
  * Which films actually belong on the cover, resolved in the same
  * override-beats-saved-beats-default order the daily carousel's own

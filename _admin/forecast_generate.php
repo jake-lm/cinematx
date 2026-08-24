@@ -9,6 +9,14 @@
 //  launches bin/forecast-generate.php detached and returns immediately —
 //  that script owns the actual ffmpeg run, writing
 //  uploads/forecast/<id>-progress.json as it goes.
+//
+//  The Generate form on forecast_episode.php submits the exact film keys
+//  it's currently showing (whatever's checked, saved or not) alongside
+//  episode_id, and this always saves that set before launching — so
+//  "what I just checked" and "what the video actually shows" can never
+//  drift apart. Previously Generate ignored an unsaved checklist change
+//  and silently rendered from whatever was last saved, which looked like
+//  it had reset the selection.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 admin_check_csrf();
@@ -26,6 +34,11 @@ if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
 }
 if (empty($episode['audio_file'])) {
     forecast_generate_fail($episode_id, 'Upload an audio file before generating a video.');
+}
+
+if (is_array($_POST['films'] ?? null)) {
+    $byDay = forecast_all_week_films($conn, $episode['week_of']);
+    forecast_save_selection($conn, $episode_id, $admin_user['id'], $byDay, $_POST['films']);
 }
 
 // The progress file's own status is the lock — refuse a second concurrent

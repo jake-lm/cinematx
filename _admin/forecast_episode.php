@@ -114,12 +114,15 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <progress class="admin-progress" data-forecast-progress data-episode-id="<?php echo $episode_id; ?>" value="<?php echo (int) ($genStatus['percent'] ?? 0); ?>" max="100"></progress>
               <?php else: ?>
                 <div class="admin-note" style="margin:0 0 var(--s-3)">
-                  <?php echo $hasVideo ? 'Regenerating replaces the current video.' : 'Builds the cover from the saved selection below and assembles the Reel.'; ?>
-                  <?php if ($dirty): ?> Save your selection first &mdash; this uses whatever\'s saved, not the live preview.<?php endif; ?>
+                  <?php echo $hasVideo ? 'Regenerating replaces the current video.' : 'Builds the cover from the showcase below and assembles the Reel.'; ?>
+                  Uses exactly what's checked right now &mdash; saves it as part of generating.
                 </div>
                 <form action="/_admin/forecast_generate.php" method="post">
                   <?php echo admin_csrf_field(); ?>
                   <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                  <?php foreach ($currentKeys as $k): ?>
+                  <input type="hidden" name="films[]" value="<?php echo $e($k); ?>">
+                  <?php endforeach; ?>
                   <button class="btn btn--block" type="submit"><?php echo $hasVideo ? 'Regenerate video' : 'Generate video'; ?></button>
                 </form>
               <?php endif; ?>
