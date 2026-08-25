@@ -51,6 +51,31 @@ imagepng($cover, $previewPath);
 imagedestroy($cover);
 $previewUrl = '/uploads/forecast/' . $episode_id . '-preview.png?v=' . filemtime($previewPath);
 
+// Timeline — rebuilt fresh on every load, same reasoning the mockup
+// preview above already follows: cheap GD renders, and a stale cached
+// image here would be exactly the kind of "why isn't this showing my
+// changes" bug already hit once this session with the video/mockup
+// toggle.
+$episodeDuration = (float) ($episode['duration_seconds'] ?? 0);
+$audioUrl = !empty($episode['audio_file']) ? '/uploads/forecast/' . rawurlencode($episode['audio_file']) : null;
+$chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $episodeDuration);
+
+$introStoryboardPath = $dir . '/' . $episode_id . '-storyboard-intro.png';
+$introStoryboardImg = forecast_build_intro_card($episode + ['duration_seconds' => $episodeDuration]);
+imagepng($introStoryboardImg, $introStoryboardPath);
+imagedestroy($introStoryboardImg);
+$introStoryboardUrl = '/uploads/forecast/' . $episode_id . '-storyboard-intro.png?v=' . filemtime($introStoryboardPath);
+
+$chapterStoryboardUrls = [];
+foreach ($chapters as $c) {
+    $slug = md5($c['film']);
+    $path = $dir . '/' . $episode_id . '-storyboard-' . $slug . '.png';
+    $cardImg = forecast_build_chapter_card($c['data']);
+    imagepng($cardImg, $path);
+    imagedestroy($cardImg);
+    $chapterStoryboardUrls[$c['film']] = '/uploads/forecast/' . $episode_id . '-storyboard-' . $slug . '.png?v=' . filemtime($path);
+}
+
 $genStatus   = forecast_generation_status($episode_id);
 $generating  = $genStatus && ($genStatus['status'] ?? '') === 'running';
 $genError    = $genStatus && ($genStatus['status'] ?? '') === 'error' ? ($genStatus['error'] ?? 'Generation failed.') : null;
@@ -119,12 +144,13 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                   <?php echo $hasVideo ? 'Regenerating replaces the current video.' : 'Builds the cover from the showcase below and assembles the Reel.'; ?>
                   Uses exactly what's checked right now &mdash; saves it as part of generating.
                 </div>
-                <form action="/_admin/forecast_generate.php" method="post">
+                <form action="/_admin/forecast_generate.php" method="post" data-forecast-generate-form>
                   <?php echo admin_csrf_field(); ?>
                   <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
                   <?php foreach ($currentKeys as $k): ?>
                   <input type="hidden" name="films[]" value="<?php echo $e($k); ?>">
                   <?php endforeach; ?>
+                  <input type="hidden" name="chapters" data-forecast-chapters-input>
                   <button class="btn btn--block" type="submit"><?php echo $hasVideo ? 'Regenerate video' : 'Generate video'; ?></button>
                 </form>
               <?php endif; ?>
@@ -211,6 +237,45 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </section>
 
       </div>
+
+      <?php if ($films && $audioUrl && $episodeDuration > 0): ?>
+      <section class="card adm-card" style="margin-top:var(--s-5)" data-forecast-timeline
+               data-audio-url="<?php echo $e($audioUrl); ?>"
+               data-duration="<?php echo $e($episodeDuration); ?>"
+               data-episode-id="<?php echo $episode_id; ?>"
+               data-csrf="<?php echo $e($_SESSION['admin_csrf']); ?>"
+               data-intro-image="<?php echo $e($introStoryboardUrl); ?>">
+        <div class="card__head">
+          <span class="card__title">Timeline</span>
+          <span class="adm-count" data-forecast-timeline-dirty hidden>Unsaved</span>
+        </div>
+        <div class="card__body">
+          <div class="admin-note" style="margin:0 0 var(--s-3)">
+            Drag each marker to when that film actually comes up — the video cuts to its card there instead of showing the full list the whole time. The preview above follows the marker you're dragging.
+          </div>
+
+          <div class="ig-mock" style="margin-bottom:var(--s-4)">
+            <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($introStoryboardUrl); ?>" alt="Segment preview">
+          </div>
+
+          <div data-forecast-waveform-wrap style="position:relative">
+            <canvas data-forecast-waveform-canvas style="width:100%;height:110px;display:block;border-radius:var(--radius);background:var(--surface-2)"></canvas>
+            <div data-forecast-markers style="position:absolute;inset:0;top:0;bottom:0"></div>
+          </div>
+
+          <div style="margin-top:var(--s-4);display:flex;align-items:center;gap:var(--s-3)">
+            <button class="btn btn--quiet btn--sm" type="button" data-forecast-chapters-save disabled>Save chapters</button>
+            <span class="admin-note" style="margin:0" data-forecast-chapters-status></span>
+          </div>
+        </div>
+      </section>
+
+      <script type="application/json" data-forecast-chapters-data><?php echo json_encode([
+          'chapters' => array_map(fn($c) => ['film' => $c['film'], 'start' => $c['start'], 'title' => $c['title']], $chapters),
+          'chapterImages' => $chapterStoryboardUrls,
+      ]); ?></script>
+      <?php endif; ?>
+
     </div>
   </main>
 

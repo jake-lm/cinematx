@@ -16,7 +16,8 @@
 //  "what I just checked" and "what the video actually shows" can never
 //  drift apart. Previously Generate ignored an unsaved checklist change
 //  and silently rendered from whatever was last saved, which looked like
-//  it had reset the selection.
+//  it had reset the selection. Chapter marker positions get the same
+//  save-before-launch treatment, for the same reason.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 admin_check_csrf();
@@ -38,7 +39,16 @@ if (empty($episode['audio_file'])) {
 
 if (is_array($_POST['films'] ?? null)) {
     $byDay = forecast_all_week_films($conn, $episode['week_of']);
-    forecast_save_selection($conn, $episode_id, $admin_user['id'], $byDay, $_POST['films']);
+    $selectedKeys = forecast_save_selection($conn, $episode_id, $admin_user['id'], $byDay, $_POST['films']);
+} else {
+    $selectedKeys = json_decode($episode['selected_films'] ?? '[]', true) ?: [];
+}
+
+if (isset($_POST['chapters'])) {
+    $posted = json_decode($_POST['chapters'], true);
+    if (is_array($posted)) {
+        forecast_save_chapters($conn, $episode_id, $admin_user['id'], $selectedKeys, $posted, (float) ($episode['duration_seconds'] ?? 0));
+    }
 }
 
 // The progress file's own status is the lock — refuse a second concurrent

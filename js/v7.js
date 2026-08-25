@@ -1424,13 +1424,229 @@
     }, 2000);
   }
 
+  // ══ Film Forecast — chapter timeline ════════════════════════════════════
+  // A waveform (decoded client-side from the episode's own audio — no
+  // server rendering involved) with one draggable marker per selected
+  // film. Dragging is pure client-side state until "Save chapters" posts
+  // it; the storyboard preview above follows whichever marker is being
+  // dragged so a placement can be sanity-checked without a real ~15-20
+  // minute video render.
+  function initForecastTimeline() {
+    var section = $('[data-forecast-timeline]');
+    if (!section) return;
+
+    var audioUrl   = section.getAttribute('data-audio-url');
+    var duration   = parseFloat(section.getAttribute('data-duration')) || 0;
+    var episodeId  = section.getAttribute('data-episode-id');
+    var csrf       = section.getAttribute('data-csrf');
+    var introImage = section.getAttribute('data-intro-image');
+
+    var dataEl = $('[data-forecast-chapters-data]');
+    var initial = { chapters: [], chapterImages: {} };
+    try { initial = JSON.parse(dataEl.textContent); } catch (e) {}
+    var chapterImages = initial.chapterImages || {};
+    var chapters = (initial.chapters || []).map(function (c) {
+      return { film: c.film, start: c.start, title: c.title };
+    });
+
+    var canvas       = section.querySelector('[data-forecast-waveform-canvas]');
+    var markersWrap  = section.querySelector('[data-forecast-markers]');
+    var storyboardImg = $('[data-forecast-storyboard-img]');
+    var saveBtn      = section.querySelector('[data-forecast-chapters-save]');
+    var dirtyChip    = section.querySelector('[data-forecast-timeline-dirty]');
+    var statusEl     = section.querySelector('[data-forecast-chapters-status]');
+    var generateForm = $('[data-forecast-generate-form]');
+
+    var snapshot = function () {
+      return JSON.stringify(chapters.map(function (c) { return [c.film, c.start]; }));
+    };
+    var savedSnapshot = snapshot();
+
+    function markDirty() {
+      var dirty = snapshot() !== savedSnapshot;
+      if (saveBtn) saveBtn.disabled = !dirty;
+      if (dirtyChip) dirtyChip.hidden = !dirty;
+    }
+
+    function formatTime(s) {
+      s = Math.max(0, Math.round(s));
+      var m = Math.floor(s / 60), sec = s % 60;
+      return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+
+    // The chapter that's "active" at a given moment — the last one whose
+    // start is at or before it — same rule the video itself will use to
+    // decide which card is on screen at any given time.
+    function activeChapterAt(time) {
+      var active = null;
+      chapters.forEach(function (c) {
+        if (c.start <= time && (!active || c.start > active.start)) active = c;
+      });
+      return active;
+    }
+
+    function updateStoryboard(time) {
+      if (!storyboardImg) return;
+      var active = activeChapterAt(time);
+      var url = active ? chapterImages[active.film] : introImage;
+      if (url && storyboardImg.getAttribute('src') !== url) storyboardImg.setAttribute('src', url);
+    }
+
+    function bindDrag(el, chapter, timeEl) {
+      function move(e) {
+        var rect = markersWrap.getBoundingClientRect();
+        var x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        var pct = rect.width > 0 ? x / rect.width : 0;
+        chapter.start = Math.round(pct * duration);
+        el.style.left = (pct * 100) + '%';
+        timeEl.textContent = formatTime(chapter.start);
+        updateStoryboard(chapter.start);
+      }
+      el.addEventListener('pointerdown', function (e) {
+        el.setPointerCapture(e.pointerId);
+        el.classList.add('is-dragging');
+        move(e);
+      });
+      el.addEventListener('pointermove', function (e) {
+        if (el.classList.contains('is-dragging')) move(e);
+      });
+      ['pointerup', 'pointercancel'].forEach(function (evt) {
+        el.addEventListener(evt, function () {
+          el.classList.remove('is-dragging');
+          markDirty();
+        });
+      });
+    }
+
+    function layoutMarkers() {
+      markersWrap.innerHTML = '';
+      chapters.forEach(function (c) {
+        var pct = duration > 0 ? Math.max(0, Math.min(100, (c.start / duration) * 100)) : 0;
+
+        var el = document.createElement('div');
+        el.className = 'fc-marker';
+        el.style.left = pct + '%';
+
+        var label = document.createElement('div');
+        label.className = 'fc-marker__label';
+        label.textContent = c.title;
+        el.appendChild(label);
+
+        var handle = document.createElement('div');
+        handle.className = 'fc-marker__handle';
+        el.appendChild(handle);
+
+        var timeEl = document.createElement('div');
+        timeEl.className = 'fc-marker__time';
+        timeEl.textContent = formatTime(c.start);
+        el.appendChild(timeEl);
+
+        bindDrag(el, c, timeEl);
+        markersWrap.appendChild(el);
+      });
+    }
+
+    function drawWaveform(peaks) {
+      var dpr = window.devicePixelRatio || 1;
+      var rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      var ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      var barW = rect.width / peaks.length;
+      var midY = rect.height / 2;
+      ctx.fillStyle = '#C9C2B4';
+      peaks.forEach(function (p, i) {
+        var h = Math.max(2, p * rect.height * 0.85);
+        ctx.fillRect(i * barW, midY - h / 2, Math.max(1, barW - 1), h);
+      });
+    }
+
+    var cachedPeaks = null;
+
+    function loadWaveform() {
+      if (cachedPeaks) { drawWaveform(cachedPeaks); return; }
+      if (!audioUrl) return;
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      fetch(audioUrl, { credentials: 'same-origin' })
+        .then(function (r) { return r.arrayBuffer(); })
+        .then(function (buf) { return new AudioCtx().decodeAudioData(buf); })
+        .then(function (audioBuffer) {
+          var raw = audioBuffer.getChannelData(0);
+          var samples = 260;
+          var blockSize = Math.max(1, Math.floor(raw.length / samples));
+          var peaks = [];
+          for (var i = 0; i < samples; i++) {
+            var start = i * blockSize, sum = 0;
+            for (var j = 0; j < blockSize; j++) sum += Math.abs(raw[start + j] || 0);
+            peaks.push(sum / blockSize);
+          }
+          var max = Math.max.apply(null, peaks) || 1;
+          cachedPeaks = peaks.map(function (p) { return p / max; });
+          drawWaveform(cachedPeaks);
+        })
+        // Fetched and decoded once, cached for any later redraw (a
+        // window resize shouldn't re-download and re-decode the whole
+        // audio file just to redraw the same bars at a new canvas size).
+        // Decoding can also fail outright (unsupported codec, browser
+        // quirk) — markers and the storyboard preview work off duration
+        // alone, so this is
+        // a degraded-but-functional state, not something to surface as
+        // an error.
+        .catch(function () {});
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function () {
+        saveBtn.disabled = true;
+        if (statusEl) statusEl.textContent = 'Saving…';
+        post('/_admin/forecast_chapters_save.php', {
+          episode_id: episodeId,
+          csrf: csrf,
+          chapters: JSON.stringify(chapters.map(function (c) { return { film: c.film, start: c.start }; }))
+        }).then(function (res) {
+          if (res && res.ok) {
+            savedSnapshot = snapshot();
+            if (statusEl) statusEl.textContent = 'Saved';
+          } else if (statusEl) {
+            statusEl.textContent = 'Failed to save';
+          }
+          markDirty();
+          setTimeout(function () { if (statusEl) statusEl.textContent = ''; }, 1800);
+        }).catch(function () {
+          if (statusEl) statusEl.textContent = 'Failed to save';
+          saveBtn.disabled = false;
+        });
+      });
+    }
+
+    // Generate always uses exactly what the timeline is currently
+    // showing, saving it as part of launching — same reasoning the film
+    // checklist's own Generate wiring already follows.
+    if (generateForm) {
+      generateForm.addEventListener('submit', function () {
+        var input = generateForm.querySelector('[data-forecast-chapters-input]');
+        if (input) {
+          input.value = JSON.stringify(chapters.map(function (c) { return { film: c.film, start: c.start }; }));
+        }
+      });
+    }
+
+    layoutMarkers();
+    updateStoryboard(0);
+    loadWaveform();
+    window.addEventListener('resize', function () { loadWaveform(); });
+  }
+
   function boot() {
     initWelcome(); initTheme(); initThemeSwitcher(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
     initProfileFaceUpload(); initProfileBannerUpload(); initLetterboxdConnect(); initYouMenu();
-    initRoleGroup(); initRoleDrop(); initPosterCrop(); initForecastProgress();
+    initRoleGroup(); initRoleDrop(); initPosterCrop(); initForecastProgress(); initForecastTimeline();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

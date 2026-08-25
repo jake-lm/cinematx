@@ -3251,6 +3251,59 @@ button, input, select, textarea {
   font-size: var(--t-3xs);
 }
 
+.fc-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.fc-marker:active, .fc-marker.is-dragging {
+  cursor: grabbing;
+}
+
+.fc-marker__handle {
+  width: 3px;
+  flex: 1;
+  background: var(--red);
+  border-radius: 2px;
+  box-shadow: 0 0 0 4px transparent;
+  transition: box-shadow 120ms ease;
+}
+
+.fc-marker.is-dragging .fc-marker__handle,
+.fc-marker:hover .fc-marker__handle {
+  box-shadow: 0 0 0 4px var(--red-wash);
+}
+
+.fc-marker__label {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  padding: 3px 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: var(--t-3xs);
+  white-space: nowrap;
+  border-radius: 6px;
+  pointer-events: none;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-marker__time {
+  position: absolute;
+  top: calc(100% + 4px);
+  font-size: var(--t-3xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
 .adm-seg {
   display: inline-flex;
   background: var(--surface-2);
