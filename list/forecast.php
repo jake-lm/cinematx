@@ -850,8 +850,12 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
     // showwaves/colorkey treatment, just sized to fit the shorter strip
     // reserved up there (see FORECAST_TOP_WAVE_BAND_H in
     // forecast_build_cover()) so the video reads as bookended top and
-    // bottom rather than only weighted toward the bottom.
-    $topWaveW = 900; $topWaveH = 90;
+    // bottom rather than only weighted toward the bottom. Narrower than
+    // the bottom one (700 vs 900) — the live counter's chrome now shares
+    // this band, and at full width the waveform's peaks ran directly
+    // through the timer text, confirmed by extracting a frame mid-fade
+    // and finding the two illegibly overlapping.
+    $topWaveW = 700; $topWaveH = 90;
     $topWaveX = 90;  $topWaveY = (int) (14 + (FORECAST_TOP_WAVE_BAND_H - $topWaveH) / 2);
 
     // 0x3A362E (track) / 0x922E32 (fill), split into decimal RGB — geq's
