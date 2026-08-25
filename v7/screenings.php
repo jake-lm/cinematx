@@ -46,6 +46,14 @@ const CTX_EDITION_SUFFIX = '/^(?:the\s+)?(?:final|extended|theatrical|unrated|ul
 // billing/anniversary text above.
 const CTX_DIRECTOR_PREFIX = '/^([A-Z][\w.]*(?:\s+[A-Z][\w.]*){0,2})\'s\s+/u';
 
+// A marathon/round-the-clock screening — Hyperreal's own event name for
+// these bolts the format onto the film title ("IT ENDS Endless Screening
+// presented by NEON"), so TMDB naturally found nothing for "IT ENDS
+// Endless Screening". The marathon format is real information worth
+// keeping, not just discarding — see ctx_billing() below, which captures
+// the same phrase verbatim rather than this constant just deleting it.
+const CTX_MARATHON_SCREENING = '/\s+(?:\d{1,3}[\s-]?hours?|endless)\s+(?:screening|marathon)\b.*$/i';
+
 /** The series/programme a screening belongs to, if the title carries one. */
 function ctx_series($raw) {
     $raw = trim((string)$raw);
@@ -78,6 +86,7 @@ function ctx_title_director_hint($raw) {
 function ctx_clean_title($raw) {
     $t = trim((string)$raw);
     $t = preg_replace(CTX_CONNECTIVES, '', $t);              // "… ft. X"
+    $t = preg_replace(CTX_MARATHON_SCREENING, '', $t);       // "… Endless Screening presented by X"
     $t = preg_replace(CTX_ANNIVERSARY, '', $t);              // "… 35th Anniversary…"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
@@ -99,14 +108,21 @@ function ctx_year($raw) {
 }
 
 /**
- * The two kinds of bolted-on billing worth surfacing rather than just
- * discarding: a live-score accompanist, or the org a screening is
- * presented with/by. Each pattern is anchored to the end of the raw title
- * and checked independently — not tied to whichever connective
- * ctx_clean_title() actually cut on — so "TENDER MERCIES ft. "Welcome to
- * Dollar Country" presented with End of an Ear" still surfaces "Presented
- * with End of an Ear" even though "ft." is the earlier, unrelated match
- * that strips the title down to "TENDER MERCIES".
+ * The kinds of bolted-on billing worth surfacing rather than just
+ * discarding: a marathon/round-the-clock format, a live-score accompanist,
+ * or the org a screening is presented with/by. Each pattern is anchored to
+ * the end of the raw title and checked independently — not tied to
+ * whichever connective ctx_clean_title() actually cut on — so "TENDER
+ * MERCIES ft. "Welcome to Dollar Country" presented with End of an Ear"
+ * still surfaces "Presented with End of an Ear" even though "ft." is the
+ * earlier, unrelated match that strips the title down to "TENDER MERCIES".
+ *
+ * Marathon format is checked first and wins over a presenter credit if a
+ * title has both ("IT ENDS Endless Screening presented by NEON") — the
+ * format is the thing someone actually needs to know before showing up,
+ * the distributor credit is much less essential. Captured verbatim from
+ * whatever the venue actually printed (not hardcoded to "24-Hour") so a
+ * differently-worded marathon elsewhere is represented accurately too.
  *
  * The other connectives (ft./featuring, in person, with director, w/)
  * stay silent strips — they're either a co-billed short (already folded
@@ -115,6 +131,9 @@ function ctx_year($raw) {
  */
 function ctx_billing($raw) {
     $raw = trim((string)$raw);
+    if (preg_match('/\b((?:\d{1,3}[\s-]?hours?|endless)\s+(?:screening|marathon))\b/i', $raw, $m)) {
+        return ucwords(strtolower(trim($m[1])));
+    }
     if (preg_match('/\bwith\s+live\s+score\s+by\s+(.+)$/i', $raw, $m)) {
         return 'Live score by ' . trim($m[1]);
     }
