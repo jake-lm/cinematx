@@ -189,9 +189,10 @@ function ctx_enrich(array $films) {
 
         // AFS's own screening page (scraper_afs.php) is the preferred
         // source when it's there; the title's own "X's Y" attribution,
-        // stripped out by ctx_clean_title() above, is the fallback for
-        // every other venue.
-        $hint = $f['director_hint'] ?? ctx_title_director_hint($raw);
+        // stripped out by ctx_clean_title() above, is the next fallback;
+        // a handful of titles with no scraped or title-borne signal at
+        // all are curated by hand — see tmdb_known_director_hint().
+        $hint = $f['director_hint'] ?? ctx_title_director_hint($raw) ?? tmdb_known_director_hint($clean);
         $tmdb = fetch_tmdb($clean, ctx_year($raw), $hint);
         if (!empty($tmdb['poster'])) {
             $f['poster']        = $tmdb['poster'];

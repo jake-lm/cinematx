@@ -50,6 +50,29 @@ function tmdb_query($title) {
     return $q !== '' ? $q : trim((string)$title);
 }
 
+// A handful of titles are shared by several unrelated films, at a venue
+// whose listing carries no year or director to break the tie the way
+// AFS's own screening page can (see scraper_afs.php's director_hint) —
+// tmdb_best() then falls back to whichever same-titled film has the
+// highest generic TMDB "popularity", which has nothing to do with which
+// one is actually screening, and isn't even stable over time (production
+// and local scraped this file's own first entry weeks apart and landed on
+// two different wrong-vs-right films as popularity drifted). Curated by
+// hand as they're found — the same role a scraped director_hint plays
+// automatically, just supplied here instead.
+const TMDB_KNOWN_DIRECTOR_HINTS = [
+    // "Memento Mori" (1999, Kim Tae-yong & Min Kyu-dong) — the Korean
+    // Whispering Corridors sequel. TMDB has a dozen unrelated films with
+    // this exact title across many countries and years; popularity
+    // ordering picked a 2022 Spanish short instead.
+    'memento mori' => 'Kim Tae-yong',
+];
+
+function tmdb_known_director_hint($title) {
+    $key = trim(mb_strtolower((string) $title));
+    return TMDB_KNOWN_DIRECTOR_HINTS[$key] ?? null;
+}
+
 /**
  * Pick the right film from a search response.
  *
