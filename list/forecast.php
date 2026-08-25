@@ -31,6 +31,52 @@ function forecast_get_episode($conn, $id) {
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
+// ── Podcast RSS feed ─────────────────────────────────────────────────────
+//
+// posted_media_id — already the "this episode is publicly live" signal the
+// Instagram Reel posting flow sets — doubles as the podcast feed's publish
+// gate too, rather than adding a second, separate "public" flag. Ascending
+// by posted_at so itunes:episode numbers count up in release order; the
+// feed itself still renders newest-first, the normal podcast convention.
+
+function forecast_feed_episodes($conn) {
+    return $conn->query(
+        "SELECT * FROM `forecast_episodes`
+         WHERE `posted_media_id` IS NOT NULL AND `audio_file` IS NOT NULL AND `audio_file` != ''
+         ORDER BY `posted_at` ASC, `id` ASC"
+    )->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function forecast_audio_mime($filename) {
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    switch ($ext) {
+        case 'mp3':  return 'audio/mpeg';
+        case 'wav':  return 'audio/wav';
+        case 'm4a':  return 'audio/mp4';
+        case 'aac':  return 'audio/aac';
+        case 'ogg':  return 'audio/ogg';
+        default:     return 'application/octet-stream';
+    }
+}
+
+// HH:MM:SS, not forecast_format_duration()'s M:SS — that one's for compact
+// on-page/on-cover display; itunes:duration is conventionally the fuller
+// timecode form and podcast apps expect it zero-padded throughout.
+function forecast_rss_duration($seconds) {
+    $seconds = (int) $seconds;
+    return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
+}
+
+// The blurb if the admin wrote one; otherwise a plain, non-Instagram-
+// flavored fallback — forecast_caption() exists for the Reel post
+// specifically (emoji, "Full schedule at cinematx.net" CTA) and isn't the
+// right tone for a podcast app's episode description.
+function forecast_feed_description(array $episode) {
+    $blurb = trim((string) ($episode['blurb'] ?? ''));
+    if ($blurb !== '') return $blurb;
+    return 'This week\'s Film Forecast, with ' . $episode['guest_name'] . '.';
+}
+
 // ── Media probing ───────────────────────────────────────────────────────
 
 /**
