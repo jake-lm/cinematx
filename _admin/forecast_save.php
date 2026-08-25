@@ -85,8 +85,19 @@ $photo = forecast_handle_upload('guest_photo', $episode_id, FORECAST_IMAGE_TYPES
 $audio = forecast_handle_upload('audio_file',  $episode_id, FORECAST_AUDIO_TYPES, $existing['audio_file']);
 $video = forecast_handle_upload('video_file',  $episode_id, FORECAST_VIDEO_TYPES, $existing['video_file']);
 
-$duration = null;
 $dir = dirname(__DIR__) . '/uploads/forecast';
+
+// Standardize on MP3 regardless of what was uploaded — see
+// forecast_transcode_audio_to_mp3()'s docblock. Runs synchronously: an
+// audio-only transcode of a ~10 minute episode takes seconds, nowhere
+// near long enough to need the background-job treatment video generation
+// gets.
+if ($audio !== null) {
+    $transcoded = forecast_transcode_audio_to_mp3($dir, $audio);
+    if ($transcoded !== null) $audio = $transcoded;
+}
+
+$duration = null;
 if ($video !== null) {
     $duration = forecast_probe_duration($dir . '/' . $video);
 } elseif ($audio !== null) {

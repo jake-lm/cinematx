@@ -47,6 +47,39 @@ function forecast_feed_episodes($conn) {
     )->fetchAll(PDO::FETCH_ASSOC);
 }
 
+/**
+ * Transcodes a just-uploaded audio file to a standard 128kbps MP3 — WAV in
+ * particular is valid per the podcast RSS spec but poorly supported by
+ * some directories/players, and it's many times the size of an MP3 for no
+ * audible difference at spoken-word bitrates (a real episode this project
+ * uploaded: 147MB WAV). Returns the new filename (already renamed to
+ * .mp3, source file removed) or null if there was nothing to do — the
+ * source was already an MP3, or ffmpeg failed. A failed transcode always
+ * leaves the original upload in place; it never deletes the only copy of
+ * the audio on a failure.
+ */
+function forecast_transcode_audio_to_mp3($dir, $filename) {
+    if (strtolower(pathinfo($filename, PATHINFO_EXTENSION)) === 'mp3') return null;
+
+    $srcPath = $dir . '/' . $filename;
+    $mp3Name = pathinfo($filename, PATHINFO_FILENAME) . '.mp3';
+    $mp3Path = $dir . '/' . $mp3Name;
+
+    $cmd = sprintf(
+        'ffmpeg -y -i %s -vn -c:a libmp3lame -b:a 128k %s 2>&1',
+        escapeshellarg($srcPath),
+        escapeshellarg($mp3Path)
+    );
+    exec($cmd, $output, $exitCode);
+    if ($exitCode !== 0 || !file_exists($mp3Path) || filesize($mp3Path) === 0) {
+        @unlink($mp3Path);
+        return null;
+    }
+
+    unlink($srcPath);
+    return $mp3Name;
+}
+
 function forecast_audio_mime($filename) {
     $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
     switch ($ext) {
