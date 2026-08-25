@@ -143,6 +143,16 @@ function forecast_format_duration($seconds) {
 const FORECAST_TOP_WAVE_BAND_H = 130;
 const FORECAST_WAVE_BAND_Y     = 1650;
 
+// How long each segment-to-segment fade takes in the generated video —
+// see forecast_generate_video(). Short on purpose: a beat between films,
+// not a slow dissolve.
+const FORECAST_SEGMENT_FADE = 1.0;
+
+// How much runtime the wrap-up card gets at the end of the video, and the
+// minimum room the last chapter needs before it before one gets carved
+// out at all — see bin/forecast-generate.php's segment assembly.
+const FORECAST_WRAPUP_SECONDS = 15;
+
 // Every unique screening this week (a film playing three nights only
 // counts once), grouped by calendar day and chronologically ordered within
 // each — the one source both the automatic picker and the manual
@@ -260,6 +270,60 @@ function forecast_resolve_selection(array $episode, array $byDay, $override = nu
 
     $keys = array_flip($wantedKeys);
     return array_values(array_filter($flat, fn($f) => isset($keys[ig_film_key($f)])));
+}
+
+// ── Chapters (segment timing) ───────────────────────────────────────────
+//
+// A chapter only ever exists for a film that's currently selected — the
+// checklist stays the single source of truth for *which* films are in the
+// episode, chapters only add *when*. Same reasoning selected_films itself
+// follows relative to the automatic default.
+
+/**
+ * Every currently-selected film gets a chapter, ordered by start time.
+ * A film with a saved start keeps it; a film with none (never placed, or
+ * newly checked since chapters were last saved) gets an evenly-spread
+ * default based on its position in $selectedFilms — a starting point to
+ * drag from, not meant to be precise. Films no longer selected are simply
+ * absent from $selectedFilms already, so their old saved chapter (if any)
+ * quietly drops out here rather than needing an explicit prune step.
+ */
+function forecast_resolve_chapters(array $selectedFilms, $savedChaptersJson, $durationSeconds) {
+    $saved = [];
+    if ($savedChaptersJson) {
+        foreach ((json_decode($savedChaptersJson, true) ?: []) as $c) {
+            if (isset($c['film'], $c['start'])) $saved[$c['film']] = (float) $c['start'];
+        }
+    }
+
+    $count = count($selectedFilms);
+    $chapters = [];
+    foreach (array_values($selectedFilms) as $i => $film) {
+        $key = ig_film_key($film);
+        $start = $saved[$key] ?? ($count > 0 ? round($durationSeconds * $i / $count) : 0);
+        $chapters[] = ['film' => $key, 'start' => (float) $start, 'title' => $film['display_title'] ?? $film['title'], 'data' => $film];
+    }
+
+    usort($chapters, fn($a, $b) => $a['start'] <=> $b['start']);
+    return $chapters;
+}
+
+// Mirrors forecast_save_selection()'s shape exactly: only chapters whose
+// film is actually in the current selection are kept, start times clamped
+// into range so a stray client-side drag can't save something nonsensical.
+function forecast_save_chapters($conn, $episode_id, $uid, array $selectedFilmKeys, array $postedChapters, $durationSeconds) {
+    $validKeys = array_flip($selectedFilmKeys);
+    $out = [];
+    foreach ($postedChapters as $c) {
+        if (!isset($c['film'], $c['start'])) continue;
+        if (!isset($validKeys[$c['film']])) continue;
+        $start = max(0, min((float) $durationSeconds, (float) $c['start']));
+        $out[] = ['film' => $c['film'], 'start' => $start];
+    }
+    usort($out, fn($a, $b) => $a['start'] <=> $b['start']);
+    $conn->prepare("UPDATE `forecast_episodes` SET chapters = :chapters WHERE id = :id AND uid = :uid")
+         ->execute([':chapters' => json_encode($out), ':id' => $episode_id, ':uid' => $uid]);
+    return $out;
 }
 
 // Crops $src to a centered square, resizes to $diameter, and masks
@@ -486,6 +550,158 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
     return $im;
 }
 
+// ── Segment cards (dynamic video) ───────────────────────────────────────
+//
+// The video no longer holds one static cover for its whole runtime — it
+// opens on this intro card, cuts to one forecast_build_chapter_card() per
+// film as the timeline says it's being discussed, and closes back on this
+// same intro design as a wrap-up (see forecast_generate_video()). Same
+// header treatment as forecast_build_cover() — eyebrow, headline, byline —
+// just without the film list, since there's no single list anymore; a
+// large centered guest photo fills the space that opened up instead of
+// leaving it empty.
+function forecast_build_intro_card(array $episode) {
+    $w = 1080;
+    $h = 1920;
+    $im = imagecreatetruecolor($w, $h);
+
+    $paper = ig_hex($im, '#F4F1EB');
+    $ink   = ig_hex($im, '#14120F');
+    $red   = ig_hex($im, '#922E32');
+    $muted = ig_hex($im, '#6B6659');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
+    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
+
+    $margin = 80;
+    $y = $topBandEnd + 96;
+
+    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
+    $y += 90;
+
+    $weekOf = 'WEEK OF ' . strtoupper(date('M j', strtotime($episode['week_of'])));
+    $headlineMaxWidth = $w - $margin * 2;
+    $headlineSize = 96;
+    while ($headlineSize > 40) {
+        $bbox = imagettfbbox($headlineSize, 0, IG_FONT_HEADLINE, $weekOf);
+        if ($bbox[2] - $bbox[0] <= $headlineMaxWidth) break;
+        $headlineSize -= 2;
+    }
+    imagettftext($im, $headlineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
+    $y += 70;
+
+    // No duration text here — the live elapsed/total counter now lives in
+    // the top chrome band instead (see forecast_generate_video()), visible
+    // across every segment rather than tied to this one card's layout.
+    imagettftext($im, 34, 0, $margin, $y, $muted, IG_FONT_BODY, 'with ' . $episode['guest_name']);
+    $y += 90;
+
+    // A large centered square photo fills the space the film list used
+    // to — not the small circular badge forecast_build_cover() uses,
+    // since here it's the frame's one dominant image instead of a small
+    // accent in the corner.
+    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
+    $photoSize = min($w - $margin * 2, FORECAST_WAVE_BAND_Y - $y - 80);
+    $px = (int) (($w - $photoSize) / 2);
+    $py = $y + (int) ((FORECAST_WAVE_BAND_Y - $y - $photoSize) / 2);
+
+    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $photoSize, $photoSize) : null;
+    if ($photoSrc) {
+        imagecopy($im, $photoSrc, $px, $py, 0, 0, $photoSize, $photoSize);
+        imagedestroy($photoSrc);
+    } else {
+        imagefilledrectangle($im, $px, $py, $px + $photoSize, $py + $photoSize, $placeholder);
+        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
+        $ibox = imagettfbbox(160, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 160, 0, (int) ($px + $photoSize / 2 - $iw / 2), (int) ($py + $photoSize / 2 + 56), $muted, IG_FONT_HEADLINE, $initial);
+    }
+
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+
+    return $im;
+}
+
+// One per chapter — a full-frame "now watching" card: poster, title,
+// venue/director. Same reserved top/bottom bands as every other frame in
+// this video, so ffmpeg's waveform/progress-bar/timer overlays land
+// identically regardless of which card is showing underneath.
+function forecast_build_chapter_card(array $film) {
+    $w = 1080;
+    $h = 1920;
+    $im = imagecreatetruecolor($w, $h);
+
+    $paper = ig_hex($im, '#F4F1EB');
+    $ink   = ig_hex($im, '#14120F');
+    $red   = ig_hex($im, '#922E32');
+    $muted = ig_hex($im, '#6B6659');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
+    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
+
+    $margin = 80;
+    $y = $topBandEnd + 90;
+
+    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Now Watching'));
+    $y += 60;
+
+    $posterW = 620;
+    $posterH = 930; // 2:3, standard poster aspect
+    $posterX = (int) (($w - $posterW) / 2);
+    $posterY = $y;
+
+    $title = !empty($film['display_title']) ? $film['display_title'] : $film['title'];
+    $poster = ig_fetch_thumb($film['poster'] ?? null, $posterW, $posterH);
+    if ($poster) {
+        imagecopy($im, $poster, $posterX, $posterY, 0, 0, $posterW, $posterH);
+        imagedestroy($poster);
+    } else {
+        imagefilledrectangle($im, $posterX, $posterY, $posterX + $posterW, $posterY + $posterH, $placeholder);
+        $fallback = ig_wrap_lines(mb_strtoupper($title), IG_FONT_HEADLINE, 44, $posterW - 80, 4);
+        $fy = $posterY + (int) ($posterH / 2) - (count($fallback) * 25);
+        foreach ($fallback as $line) {
+            $lbox = imagettfbbox(44, 0, IG_FONT_HEADLINE, $line);
+            $lx = $posterX + (int) (($posterW - ($lbox[2] - $lbox[0])) / 2);
+            imagettftext($im, 44, 0, $lx, $fy, $muted, IG_FONT_HEADLINE, $line);
+            $fy += 56;
+        }
+    }
+
+    $y = $posterY + $posterH + 60;
+    $textMaxWidth = $w - $margin * 2;
+
+    $titleSize = 60;
+    while ($titleSize > 32) {
+        $bbox = imagettfbbox($titleSize, 0, IG_FONT_HEADLINE, mb_strtoupper($title));
+        if ($bbox[2] - $bbox[0] <= $textMaxWidth) break;
+        $titleSize -= 2;
+    }
+    $tbox = imagettfbbox($titleSize, 0, IG_FONT_HEADLINE, mb_strtoupper($title));
+    $tx = (int) (($w - ($tbox[2] - $tbox[0])) / 2);
+    imagettftext($im, $titleSize, 0, $tx, $y, $ink, IG_FONT_HEADLINE, mb_strtoupper($title));
+    $y += 56;
+
+    $metaParts = array_filter([$film['director'] ?? null, $film['venue'] ?? null]);
+    if ($metaParts) {
+        $meta = ig_fit_text(implode('   ·   ', $metaParts), IG_FONT_BODY, 30, $textMaxWidth);
+        $mbox = imagettfbbox(30, 0, IG_FONT_BODY, $meta);
+        $mx = (int) (($w - ($mbox[2] - $mbox[0])) / 2);
+        imagettftext($im, 30, 0, $mx, $y, $muted, IG_FONT_BODY, $meta);
+    }
+
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+
+    return $im;
+}
+
 // ── Caption ──────────────────────────────────────────────────────────────
 
 function forecast_build_caption(array $episode) {
@@ -538,15 +754,35 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
 // ── Video assembly ───────────────────────────────────────────────────────
 
 /**
- * Composites the cover PNG, an animated waveform, and a filling progress
- * bar into one mp4 sized to the audio's own duration. Only used for the
- * audio-upload path — a directly-uploaded video skips this and posts as-is.
+ * Composites an ordered sequence of segment images (intro, one per
+ * chapter, wrap-up — see forecast_build_intro_card()/
+ * forecast_build_chapter_card()), an animated waveform, a filling
+ * progress bar, and a live elapsed/total counter into one mp4 sized to
+ * the audio's own duration. Only used for the audio-upload path — a
+ * directly-uploaded video skips this and posts as-is.
+ *
+ * $segments is `[['image' => <path>, 'start' => <seconds>], ...]`,
+ * ordered by start, `start` of the first entry always 0. Each segment
+ * plays until the next one's start (or the audio's end, for the last).
+ * A single segment behaves like the old single-static-cover design — no
+ * crossfade filter is built at all in that case.
+ *
+ * Segments after the first fade in over `FORECAST_SEGMENT_FADE` seconds,
+ * timed so the fade finishes exactly at its segment's start — a crossfade
+ * look without the classic multi-way xfade offset-chaining recipe (each
+ * subsequent xfade's offset depends on every prior segment's duration
+ * minus every prior transition's overlap, a well-known source of
+ * off-by-one drift). Works because every `-loop 1` image input already
+ * shares one global timeline by default (no `-itsoffset`, no `setpts`
+ * reset) — `fade`'s `st` and `overlay`'s `enable` can both just use the
+ * segment's real, absolute start time directly.
  *
  * The waveform (ffmpeg's showwaves) draws on black by default; colorkey
- * strips that black to transparent before it's overlaid, so the cover
- * shows through everywhere the waveform itself isn't drawn — confirmed
- * genuinely audio-reactive per frame (tested against a two-tone clip: tight
- * scallops during the high-frequency half, wide ones during the low).
+ * strips that black to transparent before it's overlaid, so whichever
+ * segment is showing underneath shows through everywhere the waveform
+ * itself isn't drawn — confirmed genuinely audio-reactive per frame
+ * (tested against a two-tone clip: tight scallops during the high-
+ * frequency half, wide ones during the low).
  *
  * The progress bar is a geq-generated clip — every pixel's color is a
  * direct function of its X position and the frame time T, `if(X < barW*T/
@@ -564,6 +800,21 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * geq has no such cap and was verified against both a short clip and a
  * real 383-second duration before landing here.
  *
+ * The elapsed/total counter is chrome, not part of any one segment's
+ * design — it's drawn top-right of the top band, on every segment alike,
+ * built from ffmpeg drawtext's `%{eif:...}` text expansion (evaluate an
+ * expression, format as an integer, zero-pad to a given width) —
+ * `floor(t/60)` and `mod(t\,60)`, each zero-padded to 2 digits, off `t`
+ * (the frame's own timestamp in seconds). Not `%{pts\:gmtime\:%M\:%S}`,
+ * ffmpeg's own documented recipe for exactly this — it parses without
+ * error but silently fails on this server's ffmpeg (4.4.2): every frame
+ * logs "Invalid delta '%M'" and skips drawing entirely, discovered only
+ * by actually looking at an extracted frame rather than trusting an
+ * "ok":true result. The eif version was confirmed actually ticking (not
+ * just parsing), including the minute rollover, by extracting frames at
+ * several checkpoints across a real multi-minute test render — the exact
+ * discipline that caught the drawbox and pts:gmtime failures too.
+ *
  * Returns ['ok' => true] or ['ok' => false, 'error' => '...'] — the ffmpeg
  * output tail on failure, since a filter-graph syntax error only shows up
  * there, not in the exit code alone.
@@ -574,33 +825,13 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * need for its separate -progress file option or any extra moving parts,
  * just read the pipe as it streams and match that pattern against the
  * already-known total duration.
- *
- * $durationSlot, if given (['x', 'y', 'size'], from forecast_build_cover()'s
- * own by-reference output — see its $liveDuration param), draws a live
- * "elapsed / total" counter into the video at that exact position instead
- * of the static duration forecast_build_cover() would otherwise have baked
- * into the cover PNG. Built from ffmpeg drawtext's `%{eif:...}` text
- * expansion (evaluate an expression, format as an integer, zero-pad to a
- * given width) — `floor(t/60)` and `mod(t\,60)`, each zero-padded to 2
- * digits, off `t` (the frame's own timestamp in seconds). No extra moving
- * parts (no separate progress file, no JS timer), and it naturally has no
- * hour component to strip for an episode under an hour.
- *
- * Not `%{pts\:gmtime\:%M\:%S}`, ffmpeg's own documented recipe for exactly
- * this — it parses without error but silently fails on this server's
- * ffmpeg (4.4.2): every frame logs "Invalid delta '%M'" and skips drawing
- * entirely, so the very first version of this produced a real, valid
- * video with no timer on it at all, discovered only by actually looking at
- * an extracted frame rather than trusting the "ok":true result. Confirmed
- * the eif version actually ticks (not just parses) by extracting frames at
- * the start, past a minute rollover, and near the end of a real multi-
- * minute test render and checking the printed value against each frame's
- * real timestamp — not just that it looked right on the first frame, the
- * exact mistake that broke drawbox's progress bar earlier in this file.
  */
-function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationSeconds, $durationSlot = null, $onProgress = null) {
+function forecast_generate_video($audioPath, array $segments, $outputPath, $durationSeconds, $onProgress = null) {
     if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
-    if (!file_exists($coverPath)) return ['ok' => false, 'error' => 'Cover image not found.'];
+    if (!$segments) return ['ok' => false, 'error' => 'No segments to render.'];
+    foreach ($segments as $seg) {
+        if (!file_exists($seg['image'])) return ['ok' => false, 'error' => 'Segment image not found: ' . basename($seg['image'])];
+    }
     if ($durationSeconds <= 0) return ['ok' => false, 'error' => 'Could not determine audio duration.'];
 
     $waveW = 900; $waveH = 160;
@@ -633,45 +864,53 @@ function forecast_generate_video($audioPath, $coverPath, $outputPath, $durationS
         . "g='if({$lit}\\,{$fillG}\\,{$trackG})':"
         . "b='if({$lit}\\,{$fillB}\\,{$trackB})'";
 
-    $timerFilter = null;
-    if ($durationSlot) {
-        $totalStr = sprintf('%02d\\:%02d', intdiv($durationSeconds, 60), $durationSeconds % 60);
-        // Built from eif (evaluate-integer-format) expansions, not the
-        // pts:gmtime:FORMAT expansion the ffmpeg docs describe — that one
-        // reliably failed on this server's ffmpeg (4.4.2) with "Invalid
-        // delta '%M'" for every frame, silently skipping the draw instead
-        // of erroring out, which is exactly why the first version of this
-        // rendered a real, valid video with no timer text on it at all.
-        // eif's two calls compute whole minutes and whole seconds off `t`
-        // (the frame's own timestamp) directly and zero-pad each to width
-        // 2 — confirmed ticking correctly frame to frame, including the
-        // minute rollover (00:59 -> 01:00), by extracting frames at
-        // several checkpoints across a real multi-minute test render.
-        $timerText = "%{eif\\:floor(t/60)\\:d\\:2}\\:%{eif\\:mod(t\\,60)\\:d\\:2} / {$totalStr}";
-        $timerFilter = "drawtext=fontfile={$fontfilePath}:text='{$timerText}':fontsize={$durationSlot['size']}"
-            . ":fontcolor=0x6B6659:x={$durationSlot['x']}:y={$durationSlot['y']}";
+    $totalStr = sprintf('%02d\\:%02d', intdiv($durationSeconds, 60), $durationSeconds % 60);
+    $timerText = "%{eif\\:floor(t/60)\\:d\\:2}\\:%{eif\\:mod(t\\,60)\\:d\\:2} / {$totalStr}";
+    // w/tw/th are ffmpeg drawtext's own built-ins (video width, this
+    // text's rendered width/height) — right-aligned and vertically
+    // centered in the top band without PHP ever measuring the string.
+    $timerFilter = "drawtext=fontfile={$fontfilePath}:text='{$timerText}':fontsize=30"
+        . ":fontcolor=0xF2C14E:x=w-tw-80:y=14+(" . FORECAST_TOP_WAVE_BAND_H . "-th)/2";
+
+    $inputArgs = '-loop 1 -i ' . escapeshellarg($segments[0]['image']) . ' ';
+    $bgFilter  = '';
+    $bgLabel   = '0:v';
+
+    // Fade each later segment in over its own short window, then latch it
+    // permanently on top with a one-sided enable — the next segment's own
+    // overlay (later in the chain) will cover it again when its turn
+    // comes, so there's no need for an explicit end bound here.
+    for ($i = 1; $i < count($segments); $i++) {
+        $inputArgs .= '-loop 1 -i ' . escapeshellarg($segments[$i]['image']) . ' ';
+        $fadeStart = max(0, $segments[$i]['start'] - FORECAST_SEGMENT_FADE);
+        $bgFilter .= "[{$i}:v]format=rgba,fade=t=in:st={$fadeStart}:d=" . FORECAST_SEGMENT_FADE . ":alpha=1[seg{$i}];";
+        $bgFilter .= "[{$bgLabel}][seg{$i}]overlay=0:0:enable='gte(t\\,{$fadeStart})'[comp{$i}];";
+        $bgLabel = "comp{$i}";
     }
 
-    $filter =
-        "[1:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
+    $audioIdx = count($segments);
+    $barIdx   = $audioIdx + 1;
+
+    $filter = $bgFilter
+        . "[{$audioIdx}:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
         . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
-        . "[1:a]showwaves=s={$topWaveW}x{$topWaveH}:mode=cline:rate=25:colors=0xF2C14E[wraw2];"
+        . "[{$audioIdx}:a]showwaves=s={$topWaveW}x{$topWaveH}:mode=cline:rate=25:colors=0xF2C14E[wraw2];"
         . "[wraw2]colorkey=0x000000:0.15:0.1,format=rgba[wave2];"
-        . "[2:v]{$barGeq}[bar];"
-        . "[0:v][wave2]overlay={$topWaveX}:{$topWaveY}[bg0];"
-        . "[bg0][wave]overlay={$waveX}:{$waveY}[bg1];"
-        . ($timerFilter
-            ? "[bg1][bar]overlay={$barX}:{$barY}[bg2];[bg2]{$timerFilter}[out]"
-            : "[bg1][bar]overlay={$barX}:{$barY}[out]");
+        . "[{$barIdx}:v]{$barGeq}[bar];"
+        . "[{$bgLabel}][wave2]overlay={$topWaveX}:{$topWaveY}[bgw0];"
+        . "[bgw0][wave]overlay={$waveX}:{$waveY}[bgw1];"
+        . "[bgw1][bar]overlay={$barX}:{$barY}[bgw2];"
+        . "[bgw2]{$timerFilter}[out]";
 
     $cmd = sprintf(
-        'ffmpeg -y -loop 1 -i %s -i %s -f lavfi -i %s -filter_complex %s -map %s -map 1:a '
+        'ffmpeg -y %s-i %s -f lavfi -i %s -filter_complex %s -map %s -map %d:a '
         . '-c:v libx264 -pix_fmt yuv420p -c:a aac -b:a 128k -r 25 -shortest %s',
-        escapeshellarg($coverPath),
+        $inputArgs,
         escapeshellarg($audioPath),
         escapeshellarg("color=c=black:s={$barW}x{$barH}:d={$durationSeconds}:r=25"),
         escapeshellarg($filter),
         escapeshellarg('[out]'),
+        $audioIdx,
         escapeshellarg($outputPath)
     );
 
