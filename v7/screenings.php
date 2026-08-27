@@ -39,6 +39,17 @@ const CTX_ANNIVERSARY = '/\s+\d{1,3}(?:st|nd|rd|th)\s+anniversary\b.*$/i';
 // would have.
 const CTX_EDITION_SUFFIX = '/^(?:the\s+)?(?:final|extended|theatrical|unrated|ultimate|complete|director\'?s?)\s+(?:cut|edition|version)$|^redux$/i';
 
+// A documentary/limited series shown episode by episode — "The Yogurt
+// Shop Murders: Episodes 1 and 2", a second screening the same week
+// titled "…: Episodes 3 and 4". Shaped exactly like "Title: Cut" (real
+// title on the left), not "Series: Title" (real title on the right) —
+// grouped with CTX_EDITION_SUFFIX below rather than treated as a series
+// prefix to strip, which would search "Episodes 1 and 2" and find
+// nothing. Unlike an edition cut, which episode range is actually running
+// stays worth keeping in what's shown — see ctx_enrich()'s own check
+// against this same pattern.
+const CTX_EPISODE_SUFFIX = '/^episodes?\s+\d+(?:\s*(?:&|,|and)\s*\d+)*$/i';
+
 // A director's own attribution baked into the title — "Michael Mann's
 // Manhunter", "Tim Burton's Corpse Bride". TMDB's title search does not do
 // this fuzzy a match (searching the full "Michael Mann's Manhunter" finds
@@ -91,8 +102,9 @@ function ctx_clean_title($raw) {
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
         $left = trim($m[1]);
-        if (preg_match(CTX_EDITION_SUFFIX, trim($m[2]))) {
+        if (preg_match(CTX_EDITION_SUFFIX, trim($m[2])) || preg_match(CTX_EPISODE_SUFFIX, trim($m[2]))) {
             $t = $left;                                       // "Manhunter: The Final Cut" → left
+                                                                // "The Yogurt Shop Murders: Episodes 1 and 2" → left
         } elseif (!preg_match('/^\d+$/', $left)) {
             $t = $m[2];                                       // "Discovery Zone: MIRACLE MILE" → right
         }
@@ -195,9 +207,18 @@ function ctx_enrich(array $films) {
         $hint = $f['director_hint'] ?? ctx_title_director_hint($raw) ?? tmdb_known_director_hint($clean);
         $tmdb = fetch_tmdb($clean, ctx_year($raw), $hint);
         if (!empty($tmdb['poster'])) {
-            $f['poster']        = $tmdb['poster'];
-            $f['display_title'] = $clean;
-            $f['series']        = ctx_series($raw);      // now safe to trust
+            $f['poster'] = $tmdb['poster'];
+            // An edition cut drops from what's shown ("Manhunter: The
+            // Final Cut" → "Manhunter") — which episodes are actually
+            // running doesn't; "The Yogurt Shop Murders: Episodes 1 and
+            // 2" stays exactly as scraped even once the show-level poster
+            // and overview it fetched with the cleaned title land on it.
+            if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $raw, $sm) && preg_match(CTX_EPISODE_SUFFIX, trim($sm[2]))) {
+                $f['display_title'] = $raw;
+            } else {
+                $f['display_title'] = $clean;
+                $f['series']        = ctx_series($raw);      // now safe to trust
+            }
             // The cleaned lookup is the one that matched, so its metadata is
             // the metadata for this film.
             foreach (['year', 'runtime', 'overview', 'genres', 'director', 'cast', 'wiki'] as $k) {

@@ -180,6 +180,24 @@ function fetch_tmdb($title, $year = null, $director_hint = null) {
     if ($search === null) return TMDB_EMPTY;   // transient failure — don't cache, retry next time
 
     $hit = tmdb_best($search['results'] ?? [], $title, $director_hint);
+
+    // No movie by this name at all — a real, if less common, shape for a
+    // repertory screening: a documentary/limited series shown episode by
+    // episode ("The Yogurt Shop Murders: Episodes 1 and 2" — no movie
+    // called that, but a real 2025 TMDB series). Only tried when the
+    // movie search found nothing whatsoever, so this can only turn an
+    // empty result into a correct one, never override an already-found
+    // movie — a title that's genuinely both a movie and a show keeps
+    // matching the movie exactly as before.
+    if (!$hit) {
+        $tv = fetch_tmdb_tv($title, $year);
+        if ($tv) {
+            $cache[$cache_key] = $tv;
+            file_put_contents($cache_file, json_encode($cache));
+            return $tv;
+        }
+    }
+
     $out = TMDB_EMPTY;
 
     if ($hit) {
@@ -223,6 +241,72 @@ function fetch_tmdb($title, $year = null, $director_hint = null) {
 
     $cache[$cache_key] = $out;
     file_put_contents($cache_file, json_encode($cache));
+
+    return $out;
+}
+
+/**
+ * fetch_tmdb()'s TV-show fallback — same TMDB_EMPTY shape as the movie
+ * path (poster/year/runtime/overview/genres/director/cast/wiki) so
+ * callers never need to know which kind of match they got. Two fields
+ * are TV's closest analogue rather than a literal match: 'director'
+ * becomes the show's own credited creator(s) (there's no per-show
+ * "director" the way a film has one), and 'runtime' its typical episode
+ * length rather than a single film's runtime — both still land in the
+ * same slot every other caller already reads.
+ *
+ * Not cached under its own key — the caller (fetch_tmdb()) folds the
+ * result into its own movie-shaped cache entry, so a title that's a show
+ * and not a movie only ever needs the one cache lookup either way.
+ */
+function fetch_tmdb_tv($title, $year = null) {
+    $search = tmdb_get(
+        'https://api.themoviedb.org/3/search/tv?api_key=' . TMDB_API_KEY
+        . '&query=' . urlencode($title)
+        . ($year ? '&first_air_date_year=' . urlencode($year) : '')
+    );
+    if (!$search || empty($search['results'])) return null;
+
+    // tmdb_best() reads ['title'] — TV search results carry the name in
+    // ['name'] instead.
+    $results = array_map(function ($r) {
+        $r['title'] = $r['name'] ?? '';
+        return $r;
+    }, $search['results']);
+
+    $hit = tmdb_best($results, $title);
+    if (!$hit) return null;
+
+    $out = TMDB_EMPTY;
+    $out['id']     = isset($hit['id']) ? (int) $hit['id'] : null;
+    $out['poster'] = !empty($hit['poster_path'])
+                   ? 'https://image.tmdb.org/t/p/w300' . $hit['poster_path'] : null;
+    if (!empty($hit['first_air_date'])) $out['year'] = (int) substr($hit['first_air_date'], 0, 4);
+
+    if ($out['id']) {
+        $detail = tmdb_get('https://api.themoviedb.org/3/tv/' . $out['id']
+                         . '?api_key=' . TMDB_API_KEY . '&append_to_response=credits,external_ids');
+
+        if (!empty($detail['episode_run_time'][0])) $out['runtime'] = (int) $detail['episode_run_time'][0];
+        if (!empty($detail['overview'])) $out['overview'] = trim($detail['overview']);
+
+        if (!empty($detail['genres'])) {
+            $names = array_column($detail['genres'], 'name');
+            $out['genres'] = implode(', ', array_slice($names, 0, 2)) ?: null;
+        }
+
+        if (!empty($detail['created_by'])) {
+            $names = array_column($detail['created_by'], 'name');
+            $out['director'] = implode(' & ', array_slice($names, 0, 2)) ?: null;
+        }
+
+        if (!empty($detail['credits']['cast'])) {
+            $names = array_column($detail['credits']['cast'], 'name');
+            $out['cast'] = implode(', ', array_slice($names, 0, 3)) ?: null;
+        }
+
+        $out['wiki'] = wikidata_article($detail['external_ids']['wikidata_id'] ?? null);
+    }
 
     return $out;
 }
