@@ -1636,8 +1636,14 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 36;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    // 78x117, not this theme's original 82x123 — still exactly a 2:3
+    // poster aspect, just small enough that six rows fit the available
+    // height instead of five. Thursday's request specifically; the row
+    // text sits at fixed offsets from each row's own $y, not scaled off
+    // thumbH, so this only changes the thumbnail and the gap between
+    // rows, never text legibility or position.
+    $thumbW = 78;
+    $thumbH = 117;
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
