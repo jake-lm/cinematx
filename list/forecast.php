@@ -552,92 +552,30 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
 
 // ── Segment cards (dynamic video) ───────────────────────────────────────
 //
-// The video no longer holds one static cover for its whole runtime — it
-// opens on this intro card, cuts to one forecast_build_chapter_card() per
-// film as the timeline says it's being discussed, and closes back on this
-// same intro design as a wrap-up (see forecast_generate_video()). Same
-// header treatment as forecast_build_cover() — eyebrow, headline, byline —
-// just without the film list, since there's no single list anymore; a
-// large centered guest photo fills the space that opened up instead of
-// leaving it empty.
-function forecast_build_intro_card(array $episode) {
-    $w = 1080;
-    $h = 1920;
-    $im = imagecreatetruecolor($w, $h);
-
-    $paper = ig_hex($im, '#F4F1EB');
-    $ink   = ig_hex($im, '#14120F');
-    $red   = ig_hex($im, '#922E32');
-    $muted = ig_hex($im, '#6B6659');
-    $placeholder = ig_hex($im, '#E4DECE');
-
-    imagefill($im, 0, 0, $paper);
-    imagefilledrectangle($im, 0, 0, $w, 14, $red);
-
-    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
-    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
-
-    $margin = 80;
-    $y = $topBandEnd + 96;
-
-    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
-    $y += 90;
-
-    $weekOf = 'WEEK OF ' . strtoupper(date('M j', strtotime($episode['week_of'])));
-    $headlineMaxWidth = $w - $margin * 2;
-    $headlineSize = 96;
-    while ($headlineSize > 40) {
-        $bbox = imagettfbbox($headlineSize, 0, IG_FONT_HEADLINE, $weekOf);
-        if ($bbox[2] - $bbox[0] <= $headlineMaxWidth) break;
-        $headlineSize -= 2;
-    }
-    imagettftext($im, $headlineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $weekOf);
-    $y += 70;
-
-    // No duration text here — the live elapsed/total counter now lives in
-    // the top chrome band instead (see forecast_generate_video()), visible
-    // across every segment rather than tied to this one card's layout.
-    imagettftext($im, 34, 0, $margin, $y, $muted, IG_FONT_BODY, 'with ' . $episode['guest_name']);
-    $y += 90;
-
-    // A large centered square photo fills the space the film list used
-    // to — not the small circular badge forecast_build_cover() uses,
-    // since here it's the frame's one dominant image instead of a small
-    // accent in the corner.
-    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
-    $photoSize = min($w - $margin * 2, FORECAST_WAVE_BAND_Y - $y - 80);
-    $px = (int) (($w - $photoSize) / 2);
-    $py = $y + (int) ((FORECAST_WAVE_BAND_Y - $y - $photoSize) / 2);
-
-    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $photoSize, $photoSize) : null;
-    if ($photoSrc) {
-        imagecopy($im, $photoSrc, $px, $py, 0, 0, $photoSize, $photoSize);
-        imagedestroy($photoSrc);
-    } else {
-        imagefilledrectangle($im, $px, $py, $px + $photoSize, $py + $photoSize, $placeholder);
-        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
-        $ibox = imagettfbbox(160, 0, IG_FONT_HEADLINE, $initial);
-        $iw = $ibox[2] - $ibox[0];
-        imagettftext($im, 160, 0, (int) ($px + $photoSize / 2 - $iw / 2), (int) ($py + $photoSize / 2 + 56), $muted, IG_FONT_HEADLINE, $initial);
-    }
-
-    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
-
-    return $im;
-}
+// The video's base state — the intro segment, and the wrap-up at the end
+// reusing the same design — is forecast_build_cover() itself: title,
+// week of, the film list, the guest photo. Nothing new to build for that;
+// see bin/forecast-generate.php's segment assembly, which calls
+// forecast_build_cover() directly the same way the admin preview already
+// does. What follows is only the per-chapter "now watching" card.
 
 // One per chapter — a full-frame "now watching" card: poster, title,
 // venue/director. Same reserved top/bottom bands as every other frame in
 // this video, so ffmpeg's waveform/progress-bar/timer overlays land
-// identically regardless of which card is showing underneath.
+// identically regardless of which card is showing underneath. Also
+// carries over the intro/cover's own branding — the "FILM FORECAST"
+// eyebrow with the guest's name, and the same small circular guest-photo
+// badge forecast_build_cover() uses — so a chapter card still reads as
+// part of the same episode rather than a bare film fact-sheet, in case a
+// viewer starts watching partway through.
+//
 // Mimics list/instagram.php's own single-film spotlight page
-// (ig_build_feature_page_paper()) — hero, kicker, title, deck, divider,
-// overview, director — in Forecast's own paper/red/ink palette and
-// within its reserved top/bottom bands, rather than the small centered
-// poster + one meta line this card used to be. Same hero-fade and
-// text-wrapping techniques (ig_hero_url(), ig_poster_crop_bias(),
-// ig_wrap_lines()) reused as-is rather than re-solved here.
-function forecast_build_chapter_card(array $film) {
+// (ig_build_feature_page_paper()) for everything film-specific — hero,
+// title, deck, divider, overview, director — in Forecast's own
+// paper/red/ink palette. Same hero-fade, text-wrapping, and circle-crop
+// techniques (ig_hero_url(), ig_poster_crop_bias(), ig_wrap_lines(),
+// forecast_circle_crop()) reused as-is rather than re-solved here.
+function forecast_build_chapter_card(array $film, array $episode) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
@@ -660,15 +598,23 @@ function forecast_build_chapter_card(array $film) {
     $textMaxWidth = $w - $margin * 2;
     $title = !empty($film['display_title']) ? $film['display_title'] : $film['title'];
 
-    $y = $topBandEnd + 56;
-    imagettftext($im, 26, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Now Watching'));
+    // Same branding the intro/cover opens on — the eyebrow and the "with
+    // GUEST" byline — so a chapter card still reads as part of this
+    // episode rather than a bare film fact-sheet, in case a viewer starts
+    // watching partway through. "Now Watching" folds into the same line
+    // as the eyebrow instead of its own, to leave more of this card's
+    // height for the film itself.
+    $y = $topBandEnd + 50;
+    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast · Now Watching'));
+    $y += 34;
+    imagettftext($im, 22, 0, $margin, $y, $muted, IG_FONT_BODY, 'with ' . $episode['guest_name']);
     $y += 44;
 
     // Landscape hero, not a portrait poster — the same crop treatment (and
     // the same admin-adjustable crop bias) the Instagram spotlight page
     // uses, so a "now watching" card actually reads like the spotlight
     // it's meant to mimic rather than a poster thumbnail blown up.
-    $heroH   = 700;
+    $heroH   = 640;
     $heroUrl = ig_hero_url($film['poster'] ?? null);
     $hero    = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
@@ -740,6 +686,33 @@ function forecast_build_chapter_card(array $film) {
         imagettftext($im, 23, 0, $margin, $y, $muted, IG_FONT_BODY, $dir);
     }
 
+    // The same small circular guest-photo badge forecast_build_cover()
+    // uses, bottom-right, well clear of the text above it — carrying the
+    // episode's own branding all the way through, not just at the intro.
+    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
+    $badgeD = 130;
+    $bx = $w - $margin - $badgeD;
+    $by = FORECAST_WAVE_BAND_Y - $badgeD - 40;
+
+    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 80);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 3, (int) ($by + $badgeD / 2) + 4, $badgeD + 10, $badgeD + 10, $shadow);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 8, $badgeD + 8, $red);
+
+    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
+    if ($photoSrc) {
+        $circle = forecast_circle_crop($photoSrc, $badgeD);
+        imagedestroy($photoSrc);
+        imagealphablending($im, true);
+        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
+        imagedestroy($circle);
+    } else {
+        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
+        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
+        $ibox = imagettfbbox(46, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 46, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 16), $muted, IG_FONT_HEADLINE, $initial);
+    }
+
     imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
 
     return $im;
@@ -797,11 +770,11 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
 // ── Video assembly ───────────────────────────────────────────────────────
 
 /**
- * Composites an ordered sequence of segment images (intro, one per
- * chapter, wrap-up — see forecast_build_intro_card()/
- * forecast_build_chapter_card()), an animated waveform, a filling
- * progress bar, and a live elapsed/total counter into one mp4 sized to
- * the audio's own duration. Only used for the audio-upload path — a
+ * Composites an ordered sequence of segment images (intro and wrap-up
+ * are forecast_build_cover() itself, one forecast_build_chapter_card()
+ * per chapter in between), an animated waveform, a filling progress bar,
+ * and a live elapsed/total counter into one mp4 sized to the audio's own
+ * duration. Only used for the audio-upload path — a
  * directly-uploaded video skips this and posts as-is.
  *
  * $segments is `[['image' => <path>, 'start' => <seconds>], ...]`,

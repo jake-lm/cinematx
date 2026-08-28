@@ -58,14 +58,18 @@ forecast_write_progress($episode_id, 'running', 0);
 
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
+$totalThisWeek = array_sum(array_map('count', $byDay));
 $chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $duration);
 
 $stamp = time();
 $segmentPaths = [];
 $segments = [];
 
+// The intro and wrap-up are both just forecast_build_cover() itself —
+// the base state this episode opens and closes on (title, week of, the
+// film list, the guest photo) — not a separate card design.
 $introPath = $dir . '/' . $episode_id . '-seg-intro-' . $stamp . '.png';
-$introImg = forecast_build_intro_card($episode + ['duration_seconds' => $duration]);
+$introImg = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, $totalThisWeek);
 imagepng($introImg, $introPath);
 imagedestroy($introImg);
 $segmentPaths[] = $introPath;
@@ -73,7 +77,7 @@ $segments[] = ['image' => $introPath, 'start' => 0];
 
 foreach ($chapters as $i => $c) {
     $path = $dir . '/' . $episode_id . '-seg-' . $i . '-' . $stamp . '.png';
-    $cardImg = forecast_build_chapter_card($c['data']);
+    $cardImg = forecast_build_chapter_card($c['data'], $episode);
     imagepng($cardImg, $path);
     imagedestroy($cardImg);
     $segmentPaths[] = $path;
@@ -87,7 +91,7 @@ foreach ($chapters as $i => $c) {
 $lastStart = $chapters ? end($chapters)['start'] : 0;
 if ($duration - $lastStart > FORECAST_WRAPUP_SECONDS * 2) {
     $wrapupPath = $dir . '/' . $episode_id . '-seg-wrapup-' . $stamp . '.png';
-    $wrapupImg = forecast_build_intro_card($episode + ['duration_seconds' => $duration]);
+    $wrapupImg = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, $totalThisWeek);
     imagepng($wrapupImg, $wrapupPath);
     imagedestroy($wrapupImg);
     $segmentPaths[] = $wrapupPath;

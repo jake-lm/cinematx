@@ -60,8 +60,11 @@ $episodeDuration = (float) ($episode['duration_seconds'] ?? 0);
 $audioUrl = !empty($episode['audio_file']) ? '/uploads/forecast/' . rawurlencode($episode['audio_file']) : null;
 $chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $episodeDuration);
 
+// The intro/wrap-up storyboard frame is just forecast_build_cover()
+// itself — the base state this whole episode opens and closes on — not
+// a separate card design.
 $introStoryboardPath = $dir . '/' . $episode_id . '-storyboard-intro.png';
-$introStoryboardImg = forecast_build_intro_card($episode + ['duration_seconds' => $episodeDuration]);
+$introStoryboardImg = forecast_build_cover($episode + ['duration_seconds' => $episodeDuration], $conn, $films, $totalThisWeek);
 imagepng($introStoryboardImg, $introStoryboardPath);
 imagedestroy($introStoryboardImg);
 $introStoryboardUrl = '/uploads/forecast/' . $episode_id . '-storyboard-intro.png?v=' . filemtime($introStoryboardPath);
@@ -70,7 +73,7 @@ $chapterStoryboardUrls = [];
 foreach ($chapters as $c) {
     $slug = md5($c['film']);
     $path = $dir . '/' . $episode_id . '-storyboard-' . $slug . '.png';
-    $cardImg = forecast_build_chapter_card($c['data']);
+    $cardImg = forecast_build_chapter_card($c['data'], $episode);
     imagepng($cardImg, $path);
     imagedestroy($cardImg);
     $chapterStoryboardUrls[$c['film']] = '/uploads/forecast/' . $episode_id . '-storyboard-' . $slug . '.png?v=' . filemtime($path);
