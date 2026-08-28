@@ -63,12 +63,11 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
       $audioPath = $dir . '/' . $ep['audio_file'];
       if (!file_exists($audioPath)) continue;
 
-      $audioUrl  = ig_public_url('/uploads/forecast/' . rawurlencode($ep['audio_file']));
-      $title     = 'Week of ' . date('F j', strtotime($ep['week_of'])) . ' — with ' . $ep['guest_name'];
+      $audioUrl  = ig_public_url('/uploads/forecast/' . rawurlencode($ep['audio_file']), $audioPath);
+      $title     = 'Week of ' . date('M j, Y', strtotime($ep['week_of'])) . ' — with ' . $ep['guest_name'];
       $pubTs     = $ep['posted_at'] ?: $ep['stamp'];
-      $imageUrl  = !empty($ep['guest_photo'])
-          ? ig_public_url('/uploads/forecast/' . rawurlencode($ep['guest_photo']))
-          : $showImageUrl;
+      $artPath   = forecast_ensure_podcast_art($ep, $conn);
+      $imageUrl  = ig_public_url('/uploads/forecast/' . basename($artPath), $artPath);
   ?>
   <item>
     <title><?php echo $x($title); ?></title>

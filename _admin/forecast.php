@@ -113,8 +113,14 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               $posted     = !empty($ep['posted_media_id']);
             ?>
             <div class="adm-row">
-              <span class="adm-row__thumb">
-                <?php if ($ep['guest_photo']): ?>
+              <span class="adm-row__thumb adm-row__thumb--square">
+                <?php
+                  $artPath = forecast_ensure_podcast_art($ep, $conn);
+                  $artUrl  = ig_public_url('/uploads/forecast/' . basename($artPath), $artPath);
+                ?>
+                <?php if ($artUrl): ?>
+                <img src="<?php echo $e($artUrl); ?>" alt="" loading="lazy" />
+                <?php elseif ($ep['guest_photo']): ?>
                 <img src="/uploads/forecast/<?php echo $e($ep['guest_photo']); ?>" alt="" loading="lazy" />
                 <?php endif; ?>
               </span>

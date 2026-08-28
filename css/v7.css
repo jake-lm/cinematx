@@ -2849,6 +2849,11 @@ button, input, select, textarea {
   display: block;
 }
 
+.adm-row__thumb--square {
+  width: 44px;
+  aspect-ratio: 1/1;
+}
+
 .adm-row__text {
   flex: 1;
   min-width: 0;

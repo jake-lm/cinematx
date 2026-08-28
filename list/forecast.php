@@ -110,6 +110,238 @@ function forecast_feed_description(array $episode) {
     return 'This week\'s Film Forecast, with ' . $episode['guest_name'] . '.';
 }
 
+// ── Podcast episode art (square, for the RSS feed) ──────────────────────
+//
+// Podcast directories show one square image per episode — a raw guest
+// photo (whatever crop/aspect ratio it happened to be uploaded at) never
+// looked right there. This borrows the show's own wordmark language
+// (paper, the red top bar, the big Fraunces lockup — see
+// forecast_build_preshow_card()) with the week's date standing in for the
+// show name, plus a small circular guest-photo badge in the corner — the
+// same visual grammar as the Reel's own badge (forecast_draw_guest_badge())
+// without sharing its Reel-specific band/position constants, since this
+// canvas has no reserved ink band to sit inside.
+
+const FORECAST_ART_SIZE = 1400; // matches assets/forecast-cover.png
+
+function forecast_build_podcast_art(array $episode, $conn, $wallFilmsOverride = null) {
+    $w = $h = FORECAST_ART_SIZE;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $paper       = ig_hex($im, '#F4F1EB');
+    $ink         = ig_hex($im, '#14120F');
+    $red         = ig_hex($im, '#922E32');
+    $muted       = ig_hex($im, '#6B6659');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
+    imagefilledrectangle($im, 0, $h - 14, $w, $h, $red);
+
+    $margin   = 100;
+    $maxWidth = $w - $margin * 2;
+
+    // Computed up front — the guest name line below needs to know where
+    // the badge starts so it can stop clear of it, and the badge itself
+    // is drawn after, once the photo/placeholder is decided.
+    $badgeD      = 280;
+    $badgeMargin = 150;
+    $bx = $w - $badgeMargin - $badgeD;
+    $by = $h - $badgeMargin - $badgeD;
+
+    $y = 14 + 130;
+    imagettftext($im, 32, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast'));
+    $y += 90;
+
+    // "WEEK OF" / the date, as a two-line lockup — the same shared
+    // shrink-to-fit loop forecast_build_preshow_card() uses for its own
+    // two-line wordmark, so a long date can't overflow the canvas any
+    // more than a long show name could there.
+    $lines = ['WEEK OF', strtoupper(date('M j', strtotime($episode['week_of'])))];
+    $lineSize = 190;
+    while ($lineSize > 60) {
+        $fits = true;
+        foreach ($lines as $line) {
+            $bbox = imagettfbbox($lineSize, 0, IG_FONT_HEADLINE, $line);
+            if ($bbox[2] - $bbox[0] > $maxWidth) { $fits = false; break; }
+        }
+        if ($fits) break;
+        $lineSize -= 4;
+    }
+    foreach ($lines as $line) {
+        $y += $lineSize;
+        imagettftext($im, $lineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+    }
+
+    // The year, as a small subtitle under the lockup rather than folded
+    // into the big line itself — keeps that line short enough to stay
+    // legible at the small sizes podcast apps actually render this at.
+    // Padded a touch past the headline's own left edge, the normal way a
+    // subtitle sits slightly indented from the display line above it.
+    $y += 60;
+    imagettftext($im, 44, 0, $margin + 8, $y, $muted, IG_FONT_BODY, date('Y', strtotime($episode['week_of'])));
+
+    // A "wall" of this week's posters as a background texture for the
+    // lower portion of the square — the same automatic one-per-night pick
+    // forecast_week_films() already uses for the Reel cover's own film
+    // list, capped at 24 (3 rows of 8). Bottom-anchored so it always fills
+    // the same footprint regardless of how many posters actually exist,
+    // and floored against the text already drawn above so it can never
+    // climb into the headline even on an unusually cramped date string.
+    $wallCols   = 8;
+    $wallRows   = 3;
+    $wallGutter = 8;
+    $thumbW = (int) floor(($maxWidth - ($wallCols - 1) * $wallGutter) / $wallCols);
+    $thumbH = (int) round($thumbW * 1.5);
+    $gridH  = $wallRows * $thumbH + ($wallRows - 1) * $wallGutter;
+    $wallBottom = $h - 14 - 20;
+    $gridTop = max($y + 30, $wallBottom - $gridH);
+
+    // Once a selection is saved, that's the only real source left for
+    // this week's posters — forecast_week_films() re-scrapes each venue's
+    // *current* live schedule, which no longer carries anything from a
+    // week that's already aired. TMDB lookups don't have that problem
+    // (they're keyed by title, not by a still-live listing), so a saved
+    // selection resolves the same way whether the episode is brand new
+    // or long past. A curated selection is usually well under the grid's
+    // 24-cell capacity, unlike a live week sized to the real thing —
+    // cycled to fill it out rather than leaving most of the wall blank.
+    if ($wallFilmsOverride !== null) {
+        $wallFilms = $wallFilmsOverride;
+    } elseif (!empty($episode['selected_films'])) {
+        $wallFilms = forecast_wall_films_from_selection(json_decode($episode['selected_films'], true) ?: []);
+    } else {
+        $wallFilms = forecast_week_films($conn, $episode['week_of'], $wallCols * $wallRows)['films'];
+    }
+    $wallCapacity = $wallCols * $wallRows;
+    if ($wallFilms && count($wallFilms) < $wallCapacity) {
+        $wallFilms = array_map(fn($i) => $wallFilms[$i % count($wallFilms)], range(0, $wallCapacity - 1));
+    }
+
+    foreach ($wallFilms as $i => $f) {
+        $row = intdiv($i, $wallCols);
+        if ($row >= $wallRows) break;
+        $col = $i % $wallCols;
+        $px = $margin + $col * ($thumbW + $wallGutter);
+        $py = $gridTop + $row * ($thumbH + $wallGutter);
+        $thumb = ig_fetch_thumb($f['poster'] ?? null, $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $px, $py, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $px, $py, $px + $thumbW, $py + $thumbH, $placeholder);
+        }
+    }
+
+    // Fades the top of the grid up into clean paper — same alpha-band
+    // technique forecast_build_chapter_card() uses for its own hero fade,
+    // just running the opposite direction (opaque paper at the grid's top
+    // edge, fully transparent by $fadeH px down) so the wall dissolves in
+    // under the date rather than cutting off hard.
+    $fadeH = min(220, $gridH);
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * ($i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0xF4, 0xF1, 0xEB, $alpha);
+        imagefilledrectangle($im, 0, $gridTop + $i, $w, $gridTop + $i + 1, $band);
+    }
+
+    // "With" / the guest's name, on its own two lines, filling what was
+    // otherwise open space in the lower-left — sized between the small
+    // eyebrow and the huge headline, the pair vertically centered as a
+    // block on the photo badge to its right (same 0.34×size baseline
+    // offset forecast_draw_guest_badge() uses for its own centered
+    // initial), and ig_fit_text()'d so a long name stops clear of the
+    // badge rather than running into it. Sits on top of the poster wall,
+    // so it gets a ~70%-opacity black scrim behind it first to stay
+    // legible over whatever's underneath.
+    $withSize  = 36;
+    $nameSize  = 60;
+    $lineGap   = 64; // baseline-to-baseline
+    $guestGap  = 50;
+    $guestMaxWidth = $bx - $guestGap - $margin;
+
+    $withBaselineY = (int) round($by + $badgeD / 2 - $lineGap / 2 + $withSize * 0.32);
+    $nameBaselineY = $withBaselineY + $lineGap;
+    $nameText = ig_fit_text($episode['guest_name'], IG_FONT_BODY, $nameSize, $guestMaxWidth);
+
+    $withBox = imagettfbbox($withSize, 0, IG_FONT_BODY, 'With');
+    $nameBox = imagettfbbox($nameSize, 0, IG_FONT_BODY, $nameText);
+    $scrimW  = max($withBox[2] - $withBox[0], $nameBox[2] - $nameBox[0]);
+    $scrimPadX = 24; $scrimPadY = 18;
+    $scrim = imagecolorallocatealpha($im, 0x14, 0x12, 0x0F, (int) round(127 * 0.3));
+    imagefilledrectangle(
+        $im,
+        $margin - $scrimPadX,
+        $withBaselineY - $withSize - $scrimPadY,
+        $margin + $scrimW + $scrimPadX,
+        $nameBaselineY + (int) round($nameSize * 0.28) + $scrimPadY,
+        $scrim
+    );
+
+    imagettftext($im, $withSize, 0, $margin, $withBaselineY, $paper, IG_FONT_BODY, 'With');
+    imagettftext($im, $nameSize, 0, $margin, $nameBaselineY, $paper, IG_FONT_BODY, $nameText);
+
+    // Guest-photo badge, bottom-right — same circular-crop technique as
+    // forecast_draw_guest_badge(), independently positioned.
+    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 90);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 4, (int) ($by + $badgeD / 2) + 6, $badgeD + 14, $badgeD + 14, $shadow);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 10, $badgeD + 10, $red);
+
+    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
+    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
+    if ($photoSrc) {
+        $circle = forecast_circle_crop($photoSrc, $badgeD);
+        imagedestroy($photoSrc);
+        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
+        imagedestroy($circle);
+    } else {
+        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
+        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
+        $ibox = imagettfbbox(90, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 90, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 32), $muted, IG_FONT_HEADLINE, $initial);
+    }
+
+    return $im;
+}
+
+// Resolves forecast_save_selection()'s saved keys (ig_film_key()'s
+// "title|venue|location", lowercased) back into just enough film shape
+// for the wall — a poster — via TMDB. Only the title half of each key is
+// actually usable this way; venue/location can't be recovered once the
+// week's live listing is gone, but the wall never displayed them either.
+function forecast_wall_films_from_selection(array $keys) {
+    $out = [];
+    foreach ($keys as $key) {
+        $title = trim(explode('|', $key)[0] ?? '');
+        if ($title === '') continue;
+        $out[] = ['poster' => fetch_tmdb($title)['poster']];
+    }
+    return $out;
+}
+
+// Cached to disk keyed by the fields that actually affect the render — a
+// changed guest photo, week, or selection gets a new filename
+// automatically, so there's no explicit invalidation step, only an
+// orphaned old file left behind (same tradeoff list/instagram.php's
+// poster_cache already makes).
+function forecast_podcast_art_path(array $episode) {
+    $key = $episode['id'] . '|' . $episode['week_of'] . '|' . $episode['guest_name'] . '|'
+         . ($episode['guest_photo'] ?? '') . '|' . ($episode['selected_films'] ?? '');
+    return dirname(__DIR__) . '/uploads/forecast/art-' . substr(md5($key), 0, 12) . '.png';
+}
+
+function forecast_ensure_podcast_art(array $episode, $conn) {
+    $path = forecast_podcast_art_path($episode);
+    if (!file_exists($path)) {
+        $im = forecast_build_podcast_art($episode, $conn);
+        imagepng($im, $path);
+        imagedestroy($im);
+    }
+    return $path;
+}
+
 // ── Media probing ───────────────────────────────────────────────────────
 
 /**
