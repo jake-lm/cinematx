@@ -65,6 +65,15 @@ $stamp = time();
 $segmentPaths = [];
 $segments = [];
 
+// The first few seconds, under the music-only intro before the episode
+// itself starts — see forecast_build_preshow_card().
+$preshowPath = $dir . '/' . $episode_id . '-seg-preshow-' . $stamp . '.png';
+$preshowImg = forecast_build_preshow_card();
+imagepng($preshowImg, $preshowPath);
+imagedestroy($preshowImg);
+$segmentPaths[] = $preshowPath;
+$segments[] = ['image' => $preshowPath, 'start' => 0];
+
 // The intro and wrap-up are both just forecast_build_cover() itself —
 // the base state this episode opens and closes on (title, week of, the
 // film list, the guest photo) — not a separate card design.
@@ -73,7 +82,7 @@ $introImg = forecast_build_cover($episode + ['duration_seconds' => $duration], $
 imagepng($introImg, $introPath);
 imagedestroy($introImg);
 $segmentPaths[] = $introPath;
-$segments[] = ['image' => $introPath, 'start' => 0];
+$segments[] = ['image' => $introPath, 'start' => FORECAST_PRESHOW_SECONDS];
 
 foreach ($chapters as $i => $c) {
     $path = $dir . '/' . $episode_id . '-seg-' . $i . '-' . $stamp . '.png';

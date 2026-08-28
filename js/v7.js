@@ -1440,6 +1440,8 @@
     var episodeId  = section.getAttribute('data-episode-id');
     var csrf       = section.getAttribute('data-csrf');
     var introImage = section.getAttribute('data-intro-image');
+    var preshowImage   = section.getAttribute('data-preshow-image');
+    var preshowSeconds = parseFloat(section.getAttribute('data-preshow-seconds')) || 0;
 
     var dataEl = $('[data-forecast-chapters-data]');
     var initial = { chapters: [], chapterImages: {}, wrapupStart: null };
@@ -1490,8 +1492,13 @@
 
     function updateStoryboard(time) {
       if (!storyboardImg) return;
-      var active = activeChapterAt(time);
-      var url = active ? chapterImages[active.film] : introImage;
+      var url;
+      if (time < preshowSeconds) {
+        url = preshowImage;
+      } else {
+        var active = activeChapterAt(time);
+        url = active ? chapterImages[active.film] : introImage;
+      }
       if (url && storyboardImg.getAttribute('src') !== url) storyboardImg.setAttribute('src', url);
     }
 
@@ -1552,10 +1559,12 @@
     function layoutMarkers() {
       markersWrap.innerHTML = '';
 
-      // The intro is always chapter zero — fixed at the very start, never
-      // draggable and never saved (forecast_resolve_chapters() only ever
-      // produces one entry per selected film, nothing for the bookends).
-      markersWrap.appendChild(buildMarker(0, 'Intro', 'fc-marker--fixed').el);
+      // The preshow and intro are both fixed bookends — never draggable
+      // and never saved (forecast_resolve_chapters() only ever produces
+      // one entry per selected film, nothing for these). The preshow
+      // always runs first, then the intro takes over once it ends.
+      markersWrap.appendChild(buildMarker(0, 'Preshow', 'fc-marker--fixed').el);
+      markersWrap.appendChild(buildMarker(preshowSeconds, 'Intro', 'fc-marker--fixed').el);
 
       chapters.forEach(function (c) {
         var m = buildMarker(c.start, c.title);

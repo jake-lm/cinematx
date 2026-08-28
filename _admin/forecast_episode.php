@@ -60,6 +60,17 @@ $episodeDuration = (float) ($episode['duration_seconds'] ?? 0);
 $audioUrl = !empty($episode['audio_file']) ? '/uploads/forecast/' . rawurlencode($episode['audio_file']) : null;
 $chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $episodeDuration);
 
+// The preshow storyboard frame — no episode data in it, so no reason to
+// rebuild it on every load the way the intro/chapter cards are; render it
+// once and reuse.
+$preshowStoryboardPath = $dir . '/' . $episode_id . '-storyboard-preshow.png';
+if (!file_exists($preshowStoryboardPath)) {
+    $preshowStoryboardImg = forecast_build_preshow_card();
+    imagepng($preshowStoryboardImg, $preshowStoryboardPath);
+    imagedestroy($preshowStoryboardImg);
+}
+$preshowStoryboardUrl = '/uploads/forecast/' . $episode_id . '-storyboard-preshow.png?v=' . filemtime($preshowStoryboardPath);
+
 // The intro/wrap-up storyboard frame is just forecast_build_cover()
 // itself — the base state this whole episode opens and closes on — not
 // a separate card design.
@@ -247,7 +258,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                data-duration="<?php echo $e($episodeDuration); ?>"
                data-episode-id="<?php echo $episode_id; ?>"
                data-csrf="<?php echo $e($_SESSION['admin_csrf']); ?>"
-               data-intro-image="<?php echo $e($introStoryboardUrl); ?>">
+               data-intro-image="<?php echo $e($introStoryboardUrl); ?>"
+               data-preshow-image="<?php echo $e($preshowStoryboardUrl); ?>"
+               data-preshow-seconds="<?php echo FORECAST_PRESHOW_SECONDS; ?>">
         <div class="card__head">
           <span class="card__title">Timeline</span>
           <span class="adm-count" data-forecast-timeline-dirty hidden>Unsaved</span>
@@ -259,7 +272,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
           <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4);">
             <div class="ig-mock">
-              <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($introStoryboardUrl); ?>" alt="Segment preview">
+              <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($preshowStoryboardUrl); ?>" alt="Segment preview">
             </div>
             <div><!-- reserved for future controls --></div>
           </div>

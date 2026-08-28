@@ -171,6 +171,12 @@ const FORECAST_SEGMENT_FADE = 1.0;
 // out at all — see bin/forecast-generate.php's segment assembly.
 const FORECAST_WRAPUP_SECONDS = 15;
 
+// How long the preshow title card holds at the very start of the video,
+// under the short music-only intro before the episode itself begins — see
+// forecast_build_preshow_card() below and bin/forecast-generate.php's
+// segment assembly, which now opens on this instead of the intro/cover.
+const FORECAST_PRESHOW_SECONDS = 5;
+
 // Whether a dedicated closing beat fits at all, and if so where it
 // starts — null otherwise, meaning the last chapter (or the intro, if
 // there are no chapters) just runs to the end instead. Shared by
@@ -648,12 +654,93 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
 
 // ── Segment cards (dynamic video) ───────────────────────────────────────
 //
-// The video's base state — the intro segment, and the wrap-up at the end
-// reusing the same design — is forecast_build_cover() itself: title,
-// week of, the film list, the guest photo. Nothing new to build for that;
-// see bin/forecast-generate.php's segment assembly, which calls
-// forecast_build_cover() directly the same way the admin preview already
-// does. What follows is only the per-chapter "now watching" card.
+// The video opens on forecast_build_preshow_card() (below) for the first
+// FORECAST_PRESHOW_SECONDS, then its base state — the intro segment, and
+// the wrap-up at the end reusing the same design — is forecast_build_cover()
+// itself: title, week of, the film list, the guest photo. Nothing new to
+// build for that; see bin/forecast-generate.php's segment assembly, which
+// calls forecast_build_cover() directly the same way the admin preview
+// already does. What follows the preshow is only the per-chapter "now
+// watching" card.
+
+// The opening title beat — plays under the few seconds of music-only
+// intro before the episode itself starts, so there's something to look at
+// besides a still frame while the audio hasn't said anything yet. Same
+// visual language as the show's own podcast-platform cover art
+// (assets/forecast-cover.png: paper, the red bars, "CINEMA, TX" eyebrow,
+// the big two-line wordmark) rather than a new design, adapted to this
+// frame's portrait aspect and reserved top/bottom bands. No episode data
+// in it at all, deliberately — this is the show's own ident, not this
+// week's — so it's the one card here that takes no arguments and carries
+// no guest badge. A first pass, expected to develop over time.
+function forecast_build_preshow_card() {
+    $w = 1080;
+    $h = 1920;
+    $im = imagecreatetruecolor($w, $h);
+
+    $paper = ig_hex($im, '#F4F1EB');
+    $ink   = ig_hex($im, '#14120F');
+    $red   = ig_hex($im, '#922E32');
+    $muted = ig_hex($im, '#6B6659');
+
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
+    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
+
+    $margin = 80;
+    $maxWidth = $w - $margin * 2;
+
+    // "FILM" / "FORECAST" as two lines at one shared size, not each
+    // shrunk independently to its own best fit — a single size keeps the
+    // wordmark reading as one lockup instead of two mismatched words.
+    $lines = ['FILM', 'FORECAST'];
+    $lineSize = 210;
+    while ($lineSize > 60) {
+        $fits = true;
+        foreach ($lines as $line) {
+            $bbox = imagettfbbox($lineSize, 0, IG_FONT_HEADLINE, $line);
+            if ($bbox[2] - $bbox[0] > $maxWidth) { $fits = false; break; }
+        }
+        if ($fits) break;
+        $lineSize -= 4;
+    }
+
+    $eyebrowSize  = 34;
+    $eyebrowGap   = 44;
+    $titleLineH   = $lineSize + 26;
+    $dividerGap   = 56;
+    $dividerH     = 6;
+    $subGap       = 66;
+    $subSize      = 28;
+
+    $blockH = $eyebrowSize + $eyebrowGap + $titleLineH * count($lines) + $dividerGap + $dividerH + $subGap + $subSize;
+    $contentTop = $topBandEnd;
+    $contentH   = FORECAST_WAVE_BAND_Y - $contentTop;
+    $y = $contentTop + (int) round(($contentH - $blockH) / 2) + $eyebrowSize;
+
+    imagettftext($im, $eyebrowSize, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Cinema, TX'));
+    $y += $eyebrowGap;
+
+    $lastBaseline = $y;
+    foreach ($lines as $line) {
+        $y += $lineSize;
+        imagettftext($im, $lineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $lastBaseline = $y;
+        $y += $titleLineH - $lineSize;
+    }
+
+    $y = $lastBaseline + $dividerGap;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + $dividerH, $red);
+    $y += $dividerH + $subGap;
+
+    imagettftext($im, $subSize, 0, $margin, $y, $muted, IG_FONT_BODY, strtoupper('A Weekly Film Podcast'));
+
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+
+    return $im;
+}
 
 // One per chapter — a full-frame "now watching" card: poster, title,
 // venue/director. Same reserved top/bottom bands as every other frame in
