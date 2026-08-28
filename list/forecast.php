@@ -143,6 +143,24 @@ function forecast_format_duration($seconds) {
 const FORECAST_TOP_WAVE_BAND_H = 130;
 const FORECAST_WAVE_BAND_Y     = 1650;
 
+// The guest-photo badge — one size, one position, on every panel (the
+// cover/intro and every chapter card alike) via forecast_draw_guest_badge()
+// below, rather than each caller picking its own. Sits inside the bottom
+// ink band, not above it, specifically so it can share a vertical center
+// with the waveform ffmpeg composites into that same band afterward (see
+// forecast_generate_video()) — a fixed "media player" row rather than a
+// badge floating separately above a waveform underneath it.
+const FORECAST_BADGE_D = 190;
+const FORECAST_BADGE_MARGIN = 80;
+
+// The Y every bottom-band chrome element (the badge, and ffmpeg's own
+// waveform overlay) centers on — the vertical middle of the ink band
+// itself, so nothing in that band reads as arbitrarily placed relative
+// to anything else in it.
+function forecast_bottom_row_center_y() {
+    return FORECAST_WAVE_BAND_Y + (int) round((1920 - FORECAST_WAVE_BAND_Y) / 2);
+}
+
 // How long each segment-to-segment fade takes in the generated video —
 // see forecast_generate_video(). Short on purpose: a beat between films,
 // not a slow dissolve.
@@ -180,17 +198,67 @@ function forecast_week_by_day($conn, $weekOf) {
     $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
     $films = ctx_enrich($films);
 
-    $byDay = [];
-    $seenTitles = [];
+    // A film playing more than once this week (a repertory favorite
+    // showing Tuesday and Thursday, say) used to just lose every
+    // occurrence after its first — fine when all a film needed was to
+    // exist once in the list, a real gap once the chapter card started
+    // needing to say when it's actually showing. Every occurrence is
+    // now kept as one entry in $showtimes (own timestamp/venue/location
+    // each, in case a same-title booking ever genuinely spans two —
+    // see forecast_format_showtimes()), grouped under the film's first
+    // occurrence rather than becoming a second, duplicate row.
+    $byTitle = [];
+    $order = [];
     foreach ($films as $f) {
         $title = !empty($f['display_title']) ? $f['display_title'] : $f['title'];
         $key = mb_strtolower($title);
-        if (isset($seenTitles[$key])) continue;
-        $seenTitles[$key] = true;
-        $byDay[date('Y-m-d', $f['timestamp'])][] = $f + ['display_title' => $title];
+        $showtime = ['timestamp' => $f['timestamp'], 'venue' => $f['venue'], 'location' => $f['location'] ?? null];
+        if (isset($byTitle[$key])) {
+            $byTitle[$key]['showtimes'][] = $showtime;
+            continue;
+        }
+        $byTitle[$key] = $f + ['display_title' => $title, 'showtimes' => [$showtime]];
+        $order[] = $key;
+    }
+
+    $byDay = [];
+    foreach ($order as $key) {
+        $f = $byTitle[$key];
+        $byDay[date('Y-m-d', $f['timestamp'])][] = $f;
     }
     ksort($byDay);
     return $byDay;
+}
+
+// One line covering every night a film plays this week, not just its
+// first ("Mon, 7:30pm & Thu, 9:00pm" for a repertory favorite showing
+// twice) — the same single value it's always been for the far more
+// common film showing only once. Venue folds in once at the end when
+// every showtime shares one (the normal case); a same-title booking
+// that genuinely spans two venues in one week gets each showtime
+// labeled with its own instead of silently showing the wrong one.
+function forecast_format_showtimes(array $showtimes) {
+    usort($showtimes, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+    $venueKeys = array_unique(array_map(fn($s) => $s['venue'] . '|' . ($s['location'] ?? ''), $showtimes));
+    $sameVenue = count($venueKeys) === 1;
+
+    $parts = [];
+    foreach ($showtimes as $s) {
+        $when = date('D, g:ia', $s['timestamp']);
+        if ($sameVenue) {
+            $parts[] = $when;
+        } else {
+            $venueBit = !empty($s['location']) ? "{$s['venue']} — {$s['location']}" : $s['venue'];
+            $parts[] = "{$when} ({$venueBit})";
+        }
+    }
+
+    $line = implode(' & ', $parts);
+    if ($sameVenue && $showtimes) {
+        $venueBit = !empty($showtimes[0]['location']) ? "{$showtimes[0]['venue']} — {$showtimes[0]['location']}" : $showtimes[0]['venue'];
+        $line .= '   ·   ' . $venueBit;
+    }
+    return $line;
 }
 
 // Every night that has a screening gets its first pick before any night
@@ -370,6 +438,43 @@ function forecast_circle_crop($src, $diameter) {
     return $dst;
 }
 
+// The guest-photo badge, identical on every panel — see FORECAST_BADGE_D
+// and forecast_bottom_row_center_y() above for why. Call this only after
+// the caller has already filled in the ink band
+// (imagefilledrectangle(..., FORECAST_WAVE_BAND_Y, ..., $ink)) — the
+// badge needs to sit on top of that fill, not under it.
+function forecast_draw_guest_badge($im, array $episode) {
+    $w = imagesx($im);
+    $badgeD = FORECAST_BADGE_D;
+    $bx = $w - FORECAST_BADGE_MARGIN - $badgeD;
+    $by = forecast_bottom_row_center_y() - (int) round($badgeD / 2);
+
+    $red   = ig_hex($im, '#922E32');
+    $muted = ig_hex($im, '#6B6659');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
+
+    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 90);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 3, (int) ($by + $badgeD / 2) + 4, $badgeD + 10, $badgeD + 10, $shadow);
+    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 8, $badgeD + 8, $red);
+
+    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
+    if ($photoSrc) {
+        $circle = forecast_circle_crop($photoSrc, $badgeD);
+        imagedestroy($photoSrc);
+        imagealphablending($im, true);
+        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
+        imagedestroy($circle);
+    } else {
+        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
+        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
+        $ibox = imagettfbbox(70, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 70, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 24), $muted, IG_FONT_HEADLINE, $initial);
+    }
+}
+
 function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $totalThisWeek = null, $liveDuration = false, &$durationSlot = null) {
     $w = 1080;
     $h = 1920;
@@ -532,35 +637,11 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
         imagettftext($im, 22, 0, $margin, $y + 30, $red, IG_FONT_BODY, '+ ' . $more . ' more this week');
     }
 
-    // Guest photo — small, bottom-right, its own badge rather than the
-    // frame's dominant image now that the list is. Sits above
-    // FORECAST_WAVE_BAND_Y so it never collides with ffmpeg's waveform/
-    // progress-bar overlay.
-    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
-    $badgeD = 220;
-    $bx = $w - $margin - $badgeD;
-    $by = FORECAST_WAVE_BAND_Y - $badgeD - 40;
-
-    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 80);
-    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 4, (int) ($by + $badgeD / 2) + 6, $badgeD + 16, $badgeD + 16, $shadow);
-    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 10, $badgeD + 10, $red);
-
-    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
-    if ($photoSrc) {
-        $circle = forecast_circle_crop($photoSrc, $badgeD);
-        imagedestroy($photoSrc);
-        imagealphablending($im, true);
-        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
-        imagedestroy($circle);
-    } else {
-        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
-        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
-        $ibox = imagettfbbox(80, 0, IG_FONT_HEADLINE, $initial);
-        $iw = $ibox[2] - $ibox[0];
-        imagettftext($im, 80, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 28), $muted, IG_FONT_HEADLINE, $initial);
-    }
-
+    // Ink band first, badge on top of it — see forecast_draw_guest_badge()
+    // for why the badge needs to sit inside this band now rather than
+    // above it.
     imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+    forecast_draw_guest_badge($im, $episode);
 
     return $im;
 }
@@ -613,14 +694,15 @@ function forecast_build_chapter_card(array $film, array $episode) {
     $textMaxWidth = $w - $margin * 2;
     $title = !empty($film['display_title']) ? $film['display_title'] : $film['title'];
 
-    // Same branding the intro/cover opens on — the eyebrow and the "with
+    // Same branding the intro/cover opens on — the eyebrow (week of,
+    // not "now watching" — this is what episode you're in, the film
+    // title just below already says what's on screen) and the "with
     // GUEST" byline — so a chapter card still reads as part of this
     // episode rather than a bare film fact-sheet, in case a viewer starts
-    // watching partway through. "Now Watching" folds into the same line
-    // as the eyebrow instead of its own, to leave more of this card's
-    // height for the film itself.
+    // watching partway through.
     $y = $topBandEnd + 50;
-    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Film Forecast · Now Watching'));
+    $weekOfLabel = strtoupper('Film Forecast · Week of ' . date('M j', strtotime($episode['week_of'])));
+    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $weekOfLabel);
     $y += 34;
     imagettftext($im, 22, 0, $margin, $y, $muted, IG_FONT_BODY, 'with ' . $episode['guest_name']);
     $y += 44;
@@ -670,16 +752,16 @@ function forecast_build_chapter_card(array $film, array $episode) {
         $y += 38;
     }
 
-    // Showtime + venue/location — the two facts the spotlight page keeps
-    // as pills over its hero; here as a single line in the brand red,
-    // since this frame's real estate is shared with the overview below.
-    $venueBit = !empty($film['location']) ? "{$film['venue']} — {$film['location']}" : ($film['venue'] ?? null);
-    $metaParts = array_filter([
-        !empty($film['timestamp']) ? ig_format_times([$film['timestamp']]) : null,
-        $venueBit,
-    ]);
-    if ($metaParts) {
-        $meta = ig_fit_text(implode('   ·   ', $metaParts), IG_FONT_BODY, 24, $textMaxWidth);
+    // Every night this film actually plays this week, not just one — the
+    // two facts the spotlight page keeps as pills over its hero, folded
+    // into a single line in the brand red since this frame's real estate
+    // is shared with the overview below. Falls back to just $timestamp
+    // if $showtimes is somehow missing (a caller not going through
+    // forecast_week_by_day()) rather than showing nothing.
+    $showtimes = !empty($film['showtimes']) ? $film['showtimes']
+        : (!empty($film['timestamp']) ? [['timestamp' => $film['timestamp'], 'venue' => $film['venue'] ?? null, 'location' => $film['location'] ?? null]] : []);
+    if ($showtimes) {
+        $meta = ig_fit_text(forecast_format_showtimes($showtimes), IG_FONT_BODY, 24, $textMaxWidth);
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $meta);
         $y += 40;
     }
@@ -701,34 +783,12 @@ function forecast_build_chapter_card(array $film, array $episode) {
         imagettftext($im, 23, 0, $margin, $y, $muted, IG_FONT_BODY, $dir);
     }
 
-    // The same small circular guest-photo badge forecast_build_cover()
-    // uses, bottom-right, well clear of the text above it — carrying the
-    // episode's own branding all the way through, not just at the intro.
-    $photoUrl = !empty($episode['guest_photo']) ? '/uploads/forecast/' . $episode['guest_photo'] : null;
-    $badgeD = 130;
-    $bx = $w - $margin - $badgeD;
-    $by = FORECAST_WAVE_BAND_Y - $badgeD - 40;
-
-    $shadow = imagecolorallocatealpha($im, 0, 0, 0, 80);
-    imagefilledellipse($im, (int) ($bx + $badgeD / 2) + 3, (int) ($by + $badgeD / 2) + 4, $badgeD + 10, $badgeD + 10, $shadow);
-    imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD + 8, $badgeD + 8, $red);
-
-    $photoSrc = $photoUrl ? ig_fetch_thumb($photoUrl, $badgeD, $badgeD) : null;
-    if ($photoSrc) {
-        $circle = forecast_circle_crop($photoSrc, $badgeD);
-        imagedestroy($photoSrc);
-        imagealphablending($im, true);
-        imagecopy($im, $circle, $bx, $by, 0, 0, $badgeD, $badgeD);
-        imagedestroy($circle);
-    } else {
-        imagefilledellipse($im, (int) ($bx + $badgeD / 2), (int) ($by + $badgeD / 2), $badgeD, $badgeD, $placeholder);
-        $initial = mb_strtoupper(mb_substr($episode['guest_name'], 0, 1));
-        $ibox = imagettfbbox(46, 0, IG_FONT_HEADLINE, $initial);
-        $iw = $ibox[2] - $ibox[0];
-        imagettftext($im, 46, 0, (int) ($bx + $badgeD / 2 - $iw / 2), (int) ($by + $badgeD / 2 + 16), $muted, IG_FONT_HEADLINE, $initial);
-    }
-
+    // Ink band first, badge on top of it, same shared helper
+    // forecast_build_cover() uses — one size and position on every panel,
+    // carrying the episode's own branding all the way through rather
+    // than just at the intro.
     imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+    forecast_draw_guest_badge($im, $episode);
 
     return $im;
 }
@@ -815,6 +875,14 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * (tested against a two-tone clip: tight scallops during the high-
  * frequency half, wide ones during the low).
  *
+ * The bottom waveform and progress bar both key off
+ * forecast_bottom_row_center_y() and FORECAST_BADGE_D/FORECAST_BADGE_MARGIN
+ * (list/forecast.php's own constants for forecast_draw_guest_badge()) —
+ * one shared row, not independently-chosen offsets: the waveform's
+ * vertical center matches the badge's, and it runs from near the left
+ * edge to just clear of the badge rather than stopping at the standard
+ * content margin.
+ *
  * The progress bar is a geq-generated clip — every pixel's color is a
  * direct function of its X position and the frame time T, `if(X < barW*T/
  * duration, fill, track)`. Two earlier approaches both looked right in
@@ -865,10 +933,26 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
     }
     if ($durationSeconds <= 0) return ['ok' => false, 'error' => 'Could not determine audio duration.'];
 
-    $waveW = 900; $waveH = 160;
-    $waveX = 90;  $waveY = FORECAST_WAVE_BAND_Y + 40;
-    $barX  = 90;  $barY = FORECAST_WAVE_BAND_Y + 230;
-    $barW  = 900; $barH = 8;
+    // Vertically centered on the same row the guest-photo badge sits
+    // on (forecast_bottom_row_center_y(), FORECAST_BADGE_D — see
+    // forecast_draw_guest_badge()) rather than an independently-chosen
+    // offset, and running from near the left edge up to just clear of
+    // the badge rather than stopping at the standard content margin —
+    // one continuous "media player" row, not a badge floating above a
+    // waveform underneath it.
+    $rowCenterY = forecast_bottom_row_center_y();
+    $edgeMargin = 30;
+    $badgeLeft  = 1080 - FORECAST_BADGE_MARGIN - FORECAST_BADGE_D;
+
+    $waveH = 150;
+    $waveY = $rowCenterY - (int) round($waveH / 2);
+    $waveX = $edgeMargin;
+    $waveW = $badgeLeft - $edgeMargin - 30; // 30px clear of the badge
+
+    $barH = 8;
+    $barY = 1920 - $barH - 16;
+    $barX = $edgeMargin;
+    $barW = 1080 - $edgeMargin * 2;
 
     // Plain path, not escapeshellarg()'d — this is a value inside an
     // ffmpeg filter-option string, not a shell argument on its own; the
