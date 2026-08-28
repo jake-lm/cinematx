@@ -251,21 +251,28 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </div>
         <div class="card__body">
           <div class="admin-note" style="margin:0 0 var(--s-3)">
-            Drag each marker to when that film actually comes up — the video cuts to its card there instead of showing the full list the whole time. The preview above follows the marker you're dragging.
+            Drag each marker to when that film actually comes up — the video cuts to its card there instead of showing the full list the whole time. The preview follows the marker you're dragging.
           </div>
 
-          <div class="ig-mock" style="margin-bottom:var(--s-4)">
-            <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($introStoryboardUrl); ?>" alt="Segment preview">
-          </div>
+          <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);">
+            <div>
+              <div class="ig-mock ig-mock--peek" style="margin-bottom:var(--s-4)">
+                <span class="ig-mock__shot">
+                  <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($introStoryboardUrl); ?>" alt="Segment preview">
+                </span>
+              </div>
 
-          <div data-forecast-waveform-wrap style="position:relative">
-            <canvas data-forecast-waveform-canvas style="width:100%;height:110px;display:block;border-radius:var(--radius);background:var(--surface-2)"></canvas>
-            <div data-forecast-markers style="position:absolute;inset:0;top:0;bottom:0"></div>
-          </div>
+              <div data-forecast-waveform-wrap style="position:relative">
+                <canvas data-forecast-waveform-canvas style="width:100%;height:110px;display:block;border-radius:var(--radius);background:var(--surface-2)"></canvas>
+                <div data-forecast-markers style="position:absolute;inset:0;top:0;bottom:0"></div>
+              </div>
 
-          <div style="margin-top:var(--s-4);display:flex;align-items:center;gap:var(--s-3)">
-            <button class="btn btn--quiet btn--sm" type="button" data-forecast-chapters-save disabled>Save chapters</button>
-            <span class="admin-note" style="margin:0" data-forecast-chapters-status></span>
+              <div style="margin-top:var(--s-4);display:flex;align-items:center;gap:var(--s-3)">
+                <button class="btn btn--quiet btn--sm" type="button" data-forecast-chapters-save disabled>Save chapters</button>
+                <span class="admin-note" style="margin:0" data-forecast-chapters-status></span>
+              </div>
+            </div>
+            <div><!-- reserved for future controls --></div>
           </div>
         </div>
       </section>
