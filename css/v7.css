@@ -3281,6 +3281,16 @@ button, input, select, textarea {
   box-shadow: 0 0 0 4px var(--red-wash);
 }
 
+.fc-marker--fixed {
+  cursor: default;
+}
+.fc-marker--fixed .fc-marker__handle {
+  background: var(--text-3);
+}
+.fc-marker--fixed:hover .fc-marker__handle {
+  box-shadow: none;
+}
+
 .fc-marker__label {
   position: absolute;
   bottom: calc(100% + 6px);

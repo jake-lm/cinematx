@@ -2149,6 +2149,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fc-marker:hover .fc-marker__handle {
   box-shadow: 0 0 0 4px var(--red-wash);
 }
+// The intro/wrap-up bookends — always at a fixed position, never a real
+// chapter (see forecast_resolve_chapters(), which only ever produces one
+// per selected film), so nothing here is draggable or gets saved. Ink,
+// not red, so it reads as structural rather than a placeable chapter.
+.fc-marker--fixed {
+  cursor: default;
+  .fc-marker__handle { background: var(--text-3); }
+  &:hover .fc-marker__handle { box-shadow: none; }
+}
 .fc-marker__label {
   position: absolute;
   bottom: calc(100% + 6px);

@@ -153,6 +153,21 @@ const FORECAST_SEGMENT_FADE = 1.0;
 // out at all — see bin/forecast-generate.php's segment assembly.
 const FORECAST_WRAPUP_SECONDS = 15;
 
+// Whether a dedicated closing beat fits at all, and if so where it
+// starts — null otherwise, meaning the last chapter (or the intro, if
+// there are no chapters) just runs to the end instead. Shared by
+// bin/forecast-generate.php (decides whether to render the wrap-up
+// segment) and _admin/forecast_episode.php (shows it on the timeline) so
+// the same threshold can't drift between what the video actually does
+// and what the timeline says it'll do.
+function forecast_wrapup_start(array $chapters, $duration) {
+    $lastStart = $chapters ? end($chapters)['start'] : 0;
+    if ($duration - $lastStart > FORECAST_WRAPUP_SECONDS * 2) {
+        return $duration - FORECAST_WRAPUP_SECONDS;
+    }
+    return null;
+}
+
 // Every unique screening this week (a film playing three nights only
 // counts once), grouped by calendar day and chronologically ordered within
 // each — the one source both the automatic picker and the manual

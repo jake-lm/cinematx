@@ -88,14 +88,14 @@ foreach ($chapters as $i => $c) {
 // end — only if there's actually room for one; on a very short test clip
 // this quietly falls back to letting the last chapter (or the intro, if
 // there are no chapters at all) run to the end instead.
-$lastStart = $chapters ? end($chapters)['start'] : 0;
-if ($duration - $lastStart > FORECAST_WRAPUP_SECONDS * 2) {
+$wrapupStart = forecast_wrapup_start($chapters, $duration);
+if ($wrapupStart !== null) {
     $wrapupPath = $dir . '/' . $episode_id . '-seg-wrapup-' . $stamp . '.png';
     $wrapupImg = forecast_build_cover($episode + ['duration_seconds' => $duration], $conn, $films, $totalThisWeek);
     imagepng($wrapupImg, $wrapupPath);
     imagedestroy($wrapupImg);
     $segmentPaths[] = $wrapupPath;
-    $segments[] = ['image' => $wrapupPath, 'start' => $duration - FORECAST_WRAPUP_SECONDS];
+    $segments[] = ['image' => $wrapupPath, 'start' => $wrapupStart];
 }
 
 $outputName = $episode_id . '-generated-' . $stamp . '.mp4';

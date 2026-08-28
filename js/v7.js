@@ -1442,9 +1442,10 @@
     var introImage = section.getAttribute('data-intro-image');
 
     var dataEl = $('[data-forecast-chapters-data]');
-    var initial = { chapters: [], chapterImages: {} };
+    var initial = { chapters: [], chapterImages: {}, wrapupStart: null };
     try { initial = JSON.parse(dataEl.textContent); } catch (e) {}
     var chapterImages = initial.chapterImages || {};
+    var wrapupStart = initial.wrapupStart;
     var chapters = (initial.chapters || []).map(function (c) {
       return { film: c.film, start: c.start, title: c.title };
     });
@@ -1520,32 +1521,51 @@
       });
     }
 
+    // One marker element, shared by the draggable per-film markers and
+    // the fixed intro/wrap-up bookends — same visual pieces (label,
+    // handle, time) either way, only whether bindDrag() gets called
+    // differs.
+    function buildMarker(start, title, extraClass) {
+      var pct = duration > 0 ? Math.max(0, Math.min(100, (start / duration) * 100)) : 0;
+
+      var el = document.createElement('div');
+      el.className = 'fc-marker' + (extraClass ? ' ' + extraClass : '');
+      el.style.left = pct + '%';
+
+      var label = document.createElement('div');
+      label.className = 'fc-marker__label';
+      label.textContent = title;
+      el.appendChild(label);
+
+      var handle = document.createElement('div');
+      handle.className = 'fc-marker__handle';
+      el.appendChild(handle);
+
+      var timeEl = document.createElement('div');
+      timeEl.className = 'fc-marker__time';
+      timeEl.textContent = formatTime(start);
+      el.appendChild(timeEl);
+
+      return { el: el, timeEl: timeEl };
+    }
+
     function layoutMarkers() {
       markersWrap.innerHTML = '';
+
+      // The intro is always chapter zero — fixed at the very start, never
+      // draggable and never saved (forecast_resolve_chapters() only ever
+      // produces one entry per selected film, nothing for the bookends).
+      markersWrap.appendChild(buildMarker(0, 'Intro', 'fc-marker--fixed').el);
+
       chapters.forEach(function (c) {
-        var pct = duration > 0 ? Math.max(0, Math.min(100, (c.start / duration) * 100)) : 0;
-
-        var el = document.createElement('div');
-        el.className = 'fc-marker';
-        el.style.left = pct + '%';
-
-        var label = document.createElement('div');
-        label.className = 'fc-marker__label';
-        label.textContent = c.title;
-        el.appendChild(label);
-
-        var handle = document.createElement('div');
-        handle.className = 'fc-marker__handle';
-        el.appendChild(handle);
-
-        var timeEl = document.createElement('div');
-        timeEl.className = 'fc-marker__time';
-        timeEl.textContent = formatTime(c.start);
-        el.appendChild(timeEl);
-
-        bindDrag(el, c, timeEl);
-        markersWrap.appendChild(el);
+        var m = buildMarker(c.start, c.title);
+        bindDrag(m.el, c, m.timeEl);
+        markersWrap.appendChild(m.el);
       });
+
+      if (wrapupStart !== null && wrapupStart !== undefined) {
+        markersWrap.appendChild(buildMarker(wrapupStart, 'Wrap-up', 'fc-marker--fixed').el);
+      }
     }
 
     // A sibling of markersWrap, not a child of it — layoutMarkers()

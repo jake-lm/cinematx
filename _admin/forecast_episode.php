@@ -281,6 +281,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <script type="application/json" data-forecast-chapters-data><?php echo json_encode([
           'chapters' => array_map(fn($c) => ['film' => $c['film'], 'start' => $c['start'], 'title' => $c['title']], $chapters),
           'chapterImages' => $chapterStoryboardUrls,
+          'wrapupStart' => forecast_wrapup_start($chapters, $episodeDuration),
       ]); ?></script>
       <?php endif; ?>
 
