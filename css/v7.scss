@@ -2171,6 +2171,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-variant-numeric: tabular-nums;
 }
 
+// The audio's own playback position, distinct from .fc-marker's red
+// (a chapter placement) — ink-colored and not draggable, just tracks
+// currentTime while the episode plays, so a marker and "where I am
+// right now" never read as the same kind of thing.
+.fc-playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  &.is-active { opacity: 1; }
+}
+.fc-playhead__dot {
+  position: absolute;
+  top: -5px; left: 50%;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  transform: translateX(-50%);
+}
+
 // A text-label sibling of .seg (the icon-sized view toggle) — same surface,
 // border and is-on treatment, auto width instead of a fixed 28px square.
 .adm-seg {

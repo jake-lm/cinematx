@@ -3304,6 +3304,31 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.fc-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.fc-playhead.is-active {
+  opacity: 1;
+}
+
+.fc-playhead__dot {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text);
+  transform: translateX(-50%);
+}
+
 .adm-seg {
   display: inline-flex;
   background: var(--surface-2);

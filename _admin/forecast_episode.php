@@ -251,7 +251,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </div>
         <div class="card__body">
           <div class="admin-note" style="margin:0 0 var(--s-3)">
-            Drag each marker to when that film actually comes up — the video cuts to its card there instead of showing the full list the whole time. The preview follows the marker you're dragging.
+            Play the episode back to hear where each film actually comes up, then drag its marker to line up with the playhead. Click anywhere on the waveform to jump there. The preview follows whichever marker you're dragging.
           </div>
 
           <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4);">
@@ -260,6 +260,8 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             </div>
             <div><!-- reserved for future controls --></div>
           </div>
+
+          <audio data-forecast-audio-player controls preload="metadata" style="width:100%;margin-bottom:var(--s-3)" src="<?php echo $e($audioUrl); ?>"></audio>
 
           <div data-forecast-waveform-wrap style="position:relative">
             <canvas data-forecast-waveform-canvas style="width:100%;height:110px;display:block;border-radius:var(--radius);background:var(--surface-2)"></canvas>

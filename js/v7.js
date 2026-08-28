@@ -1450,7 +1450,9 @@
     });
 
     var canvas       = section.querySelector('[data-forecast-waveform-canvas]');
+    var waveformWrap = section.querySelector('[data-forecast-waveform-wrap]');
     var markersWrap  = section.querySelector('[data-forecast-markers]');
+    var audioEl      = section.querySelector('[data-forecast-audio-player]');
     var storyboardImg = $('[data-forecast-storyboard-img]');
     var saveBtn      = section.querySelector('[data-forecast-chapters-save]');
     var dirtyChip    = section.querySelector('[data-forecast-timeline-dirty]');
@@ -1546,6 +1548,58 @@
       });
     }
 
+    // A sibling of markersWrap, not a child of it — layoutMarkers()
+    // rebuilds markersWrap's contents from scratch (innerHTML = ''), and
+    // this needs to survive that.
+    var playhead = null;
+    if (waveformWrap && audioEl) {
+      playhead = document.createElement('div');
+      playhead.className = 'fc-playhead';
+      var dot = document.createElement('div');
+      dot.className = 'fc-playhead__dot';
+      playhead.appendChild(dot);
+      waveformWrap.appendChild(playhead);
+    }
+
+    function updatePlayhead(time) {
+      if (!playhead || duration <= 0) return;
+      var pct = Math.max(0, Math.min(100, (time / duration) * 100));
+      playhead.style.left = pct + '%';
+      playhead.classList.add('is-active');
+      updateStoryboard(time);
+    }
+
+    if (audioEl) {
+      var playheadRAF = null;
+      function tickPlayhead() {
+        updatePlayhead(audioEl.currentTime);
+        playheadRAF = requestAnimationFrame(tickPlayhead);
+      }
+      audioEl.addEventListener('play', function () {
+        if (playheadRAF === null) playheadRAF = requestAnimationFrame(tickPlayhead);
+      });
+      ['pause', 'ended'].forEach(function (evt) {
+        audioEl.addEventListener(evt, function () {
+          if (playheadRAF !== null) { cancelAnimationFrame(playheadRAF); playheadRAF = null; }
+          updatePlayhead(audioEl.currentTime);
+        });
+      });
+      // Covers a seek made while paused (dragging the native scrubber) —
+      // the RAF loop above only runs during actual playback.
+      audioEl.addEventListener('seeked', function () { updatePlayhead(audioEl.currentTime); });
+
+      // Click the waveform itself to jump playback there — markers sit
+      // in their own layer (markersWrap) above the canvas and handle
+      // their own pointer events, so a click that lands on one never
+      // reaches this listener.
+      canvas.addEventListener('click', function (e) {
+        var rect = canvas.getBoundingClientRect();
+        var pct = rect.width > 0 ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) : 0;
+        audioEl.currentTime = pct * duration;
+        updatePlayhead(audioEl.currentTime);
+      });
+    }
+
     function drawWaveform(peaks) {
       var dpr = window.devicePixelRatio || 1;
       var rect = canvas.getBoundingClientRect();
@@ -1636,6 +1690,7 @@
 
     layoutMarkers();
     updateStoryboard(0);
+    updatePlayhead(0);
     loadWaveform();
     window.addEventListener('resize', function () { loadWaveform(); });
   }
