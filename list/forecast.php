@@ -630,15 +630,24 @@ function forecast_build_intro_card(array $episode) {
 // venue/director. Same reserved top/bottom bands as every other frame in
 // this video, so ffmpeg's waveform/progress-bar/timer overlays land
 // identically regardless of which card is showing underneath.
+// Mimics list/instagram.php's own single-film spotlight page
+// (ig_build_feature_page_paper()) — hero, kicker, title, deck, divider,
+// overview, director — in Forecast's own paper/red/ink palette and
+// within its reserved top/bottom bands, rather than the small centered
+// poster + one meta line this card used to be. Same hero-fade and
+// text-wrapping techniques (ig_hero_url(), ig_poster_crop_bias(),
+// ig_wrap_lines()) reused as-is rather than re-solved here.
 function forecast_build_chapter_card(array $film) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
 
-    $paper = ig_hex($im, '#F4F1EB');
-    $ink   = ig_hex($im, '#14120F');
-    $red   = ig_hex($im, '#922E32');
-    $muted = ig_hex($im, '#6B6659');
+    $paper   = ig_hex($im, '#F4F1EB');
+    $ink     = ig_hex($im, '#14120F');
+    $red     = ig_hex($im, '#922E32');
+    $muted   = ig_hex($im, '#6B6659');
+    $divider = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
 
     imagefill($im, 0, 0, $paper);
@@ -648,53 +657,87 @@ function forecast_build_chapter_card(array $film) {
     imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
 
     $margin = 80;
-    $y = $topBandEnd + 90;
-
-    imagettftext($im, 28, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Now Watching'));
-    $y += 60;
-
-    $posterW = 620;
-    $posterH = 930; // 2:3, standard poster aspect
-    $posterX = (int) (($w - $posterW) / 2);
-    $posterY = $y;
-
+    $textMaxWidth = $w - $margin * 2;
     $title = !empty($film['display_title']) ? $film['display_title'] : $film['title'];
-    $poster = ig_fetch_thumb($film['poster'] ?? null, $posterW, $posterH);
-    if ($poster) {
-        imagecopy($im, $poster, $posterX, $posterY, 0, 0, $posterW, $posterH);
-        imagedestroy($poster);
+
+    $y = $topBandEnd + 56;
+    imagettftext($im, 26, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Now Watching'));
+    $y += 44;
+
+    // Landscape hero, not a portrait poster — the same crop treatment (and
+    // the same admin-adjustable crop bias) the Instagram spotlight page
+    // uses, so a "now watching" card actually reads like the spotlight
+    // it's meant to mimic rather than a poster thumbnail blown up.
+    $heroH   = 700;
+    $heroUrl = ig_hero_url($film['poster'] ?? null);
+    $hero    = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
+    if ($hero) {
+        imagecopy($im, $hero, 0, $y, 0, 0, $w, $heroH);
+        imagedestroy($hero);
     } else {
-        imagefilledrectangle($im, $posterX, $posterY, $posterX + $posterW, $posterY + $posterH, $placeholder);
-        $fallback = ig_wrap_lines(mb_strtoupper($title), IG_FONT_HEADLINE, 44, $posterW - 80, 4);
-        $fy = $posterY + (int) ($posterH / 2) - (count($fallback) * 25);
-        foreach ($fallback as $line) {
-            $lbox = imagettfbbox(44, 0, IG_FONT_HEADLINE, $line);
-            $lx = $posterX + (int) (($posterW - ($lbox[2] - $lbox[0])) / 2);
-            imagettftext($im, 44, 0, $lx, $fy, $muted, IG_FONT_HEADLINE, $line);
-            $fy += 56;
+        imagefilledrectangle($im, 0, $y, $w, $y + $heroH, $placeholder);
+        $initial = mb_strtoupper(mb_substr($title, 0, 1));
+        $ibox = imagettfbbox(110, 0, IG_FONT_HEADLINE, $initial);
+        $iw = $ibox[2] - $ibox[0];
+        imagettftext($im, 110, 0, (int) (($w - $iw) / 2), $y + (int) ($heroH / 2) + 38, $muted, IG_FONT_HEADLINE, $initial);
+    }
+
+    // Fades the hero into the paper background over its last stretch,
+    // same alpha-band technique ig_build_feature_page_paper() uses —
+    // GD has no gradient primitive of its own.
+    $fadeH = 100;
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * (1 - $i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0xF4, 0xF1, 0xEB, $alpha);
+        imagefilledrectangle($im, 0, $y + $heroH - $fadeH + $i, $w, $y + $heroH - $fadeH + $i + 1, $band);
+    }
+    $y += $heroH + 44;
+
+    $titleLines = ig_wrap_lines(mb_strtoupper($title), IG_FONT_HEADLINE, 50, $textMaxWidth, 2);
+    foreach ($titleLines as $line) {
+        imagettftext($im, 50, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $y += 60;
+    }
+
+    // Genre + runtime, the same deck line the spotlight page keeps under
+    // its title (minus year — less relevant once a film is already
+    // showing than what it is and how long it runs).
+    $deckParts = array_filter([$film['genres'] ?? null, !empty($film['runtime']) ? round($film['runtime']) . ' min' : null]);
+    if ($deckParts) {
+        $deck = ig_fit_text(implode('  ·  ', $deckParts), IG_FONT_BODY, 24, $textMaxWidth);
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, $deck);
+        $y += 38;
+    }
+
+    // Showtime + venue/location — the two facts the spotlight page keeps
+    // as pills over its hero; here as a single line in the brand red,
+    // since this frame's real estate is shared with the overview below.
+    $venueBit = !empty($film['location']) ? "{$film['venue']} — {$film['location']}" : ($film['venue'] ?? null);
+    $metaParts = array_filter([
+        !empty($film['timestamp']) ? ig_format_times([$film['timestamp']]) : null,
+        $venueBit,
+    ]);
+    if ($metaParts) {
+        $meta = ig_fit_text(implode('   ·   ', $metaParts), IG_FONT_BODY, 24, $textMaxWidth);
+        imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $meta);
+        $y += 40;
+    }
+
+    $y += 14;
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 34;
+
+    if (!empty($film['overview'])) {
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 25, $textMaxWidth, 5) as $line) {
+            imagettftext($im, 25, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
+            $y += 36;
         }
     }
 
-    $y = $posterY + $posterH + 60;
-    $textMaxWidth = $w - $margin * 2;
-
-    $titleSize = 60;
-    while ($titleSize > 32) {
-        $bbox = imagettfbbox($titleSize, 0, IG_FONT_HEADLINE, mb_strtoupper($title));
-        if ($bbox[2] - $bbox[0] <= $textMaxWidth) break;
-        $titleSize -= 2;
-    }
-    $tbox = imagettfbbox($titleSize, 0, IG_FONT_HEADLINE, mb_strtoupper($title));
-    $tx = (int) (($w - ($tbox[2] - $tbox[0])) / 2);
-    imagettftext($im, $titleSize, 0, $tx, $y, $ink, IG_FONT_HEADLINE, mb_strtoupper($title));
-    $y += 56;
-
-    $metaParts = array_filter([$film['director'] ?? null, $film['venue'] ?? null]);
-    if ($metaParts) {
-        $meta = ig_fit_text(implode('   ·   ', $metaParts), IG_FONT_BODY, 30, $textMaxWidth);
-        $mbox = imagettfbbox(30, 0, IG_FONT_BODY, $meta);
-        $mx = (int) (($w - ($mbox[2] - $mbox[0])) / 2);
-        imagettftext($im, 30, 0, $mx, $y, $muted, IG_FONT_BODY, $meta);
+    if (!empty($film['director'])) {
+        $y += 12;
+        $dir = ig_fit_text('Dir. ' . $film['director'], IG_FONT_BODY, 23, $textMaxWidth);
+        imagettftext($im, 23, 0, $margin, $y, $muted, IG_FONT_BODY, $dir);
     }
 
     imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
