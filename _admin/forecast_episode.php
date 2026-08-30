@@ -37,7 +37,7 @@ $currentKeys = array_map('ig_film_key', $films);
 
 $savedRaw  = $episode['selected_films'] ?? null;
 $hasSaved  = $savedRaw !== null && $savedRaw !== '';
-$savedKeys = $hasSaved ? (json_decode($savedRaw, true) ?: []) : array_map('ig_film_key', array_slice(forecast_round_robin_order($byDay), 0, 9));
+$savedKeys = $hasSaved ? (json_decode($savedRaw, true) ?: []) : array_map('ig_film_key', forecast_flat_week_films($byDay));
 $sortedSaved = $savedKeys; sort($sortedSaved);
 $sortedCurrent = $currentKeys; sort($sortedCurrent);
 $dirty = $previewSubmitted && ($sortedCurrent !== $sortedSaved);
@@ -93,6 +93,19 @@ foreach ($chapters as $c) {
 $genStatus   = forecast_generation_status($episode_id);
 $generating  = $genStatus && ($genStatus['status'] ?? '') === 'running';
 $genError    = $genStatus && ($genStatus['status'] ?? '') === 'error' ? ($genStatus['error'] ?? 'Generation failed.') : null;
+
+// The manual-fallback exports — same running/error shape as the real
+// video, on their own progress files (see forecast_progress_path()'s
+// $kind) so none of the three can block or clobber another's status.
+$packageStatus    = forecast_generation_status($episode_id, 'package');
+$packageRunning   = $packageStatus && ($packageStatus['status'] ?? '') === 'running';
+$packageError     = $packageStatus && ($packageStatus['status'] ?? '') === 'error' ? ($packageStatus['error'] ?? 'Package generation failed.') : null;
+$packageUrl       = !empty($episode['package_file']) ? '/uploads/forecast/' . $episode['package_file'] : null;
+
+$waveformStatus   = forecast_generation_status($episode_id, 'waveform');
+$waveformRunning  = $waveformStatus && ($waveformStatus['status'] ?? '') === 'running';
+$waveformError    = $waveformStatus && ($waveformStatus['status'] ?? '') === 'error' ? ($waveformStatus['error'] ?? 'Waveform generation failed.') : null;
+$waveformUrl      = !empty($episode['waveform_file']) ? '/uploads/forecast/' . $episode['waveform_file'] : null;
 
 $directVideo = !empty($episode['video_file']);
 $hasVideo    = $directVideo || !empty($episode['generated_video']);
@@ -193,21 +206,80 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <?php endif; ?>
             </div>
           </section>
+
+          <section class="card adm-card" style="margin-top:var(--s-5)">
+            <div class="card__head"><span class="card__title">Manual export</span></div>
+            <div class="card__body">
+              <div class="admin-note" style="margin:0 0 var(--s-3)">
+                For days the automated video can't be trusted &mdash; every panel this week as PNGs, plus a transparent waveform clip, to hand-assemble in an editor.
+              </div>
+
+              <div class="admin-note" style="margin:0 0 var(--s-1);font-weight:600;color:var(--text-2)">Panel package</div>
+              <?php if ($packageRunning): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2)" data-forecast-progress-label data-progress-kind="package">Generating&hellip; <?php echo (int) ($packageStatus['percent'] ?? 0); ?>%</div>
+                <progress class="admin-progress" data-forecast-progress data-progress-kind="package" data-episode-id="<?php echo $episode_id; ?>" value="<?php echo (int) ($packageStatus['percent'] ?? 0); ?>" max="100"></progress>
+              <?php else: ?>
+                <?php if ($packageError): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2);color:var(--red-hi)">Failed: <?php echo $e(mb_strimwidth($packageError, 0, 200, '…')); ?></div>
+                <?php endif; ?>
+                <?php if ($packageUrl): ?>
+                <a class="btn btn--quiet btn--sm" href="<?php echo $e($packageUrl); ?>" style="margin-bottom:var(--s-3);display:inline-block">Download package</a>
+                <?php endif; ?>
+                <form action="/_admin/forecast_package.php" method="post" style="margin-bottom:var(--s-4)">
+                  <?php echo admin_csrf_field(); ?>
+                  <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                  <button class="btn btn--block" type="submit"><?php echo $packageUrl ? 'Regenerate package' : 'Generate package'; ?></button>
+                </form>
+              <?php endif; ?>
+
+              <div class="admin-note" style="margin:0 0 var(--s-1);font-weight:600;color:var(--text-2)">Waveform clip</div>
+              <?php if (empty($episode['audio_file'])): ?>
+                <div class="admin-note">Upload an audio file first.</div>
+              <?php elseif ($waveformRunning): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2)" data-forecast-progress-label data-progress-kind="waveform">Generating&hellip; <?php echo (int) ($waveformStatus['percent'] ?? 0); ?>%</div>
+                <progress class="admin-progress" data-forecast-progress data-progress-kind="waveform" data-episode-id="<?php echo $episode_id; ?>" value="<?php echo (int) ($waveformStatus['percent'] ?? 0); ?>" max="100"></progress>
+              <?php else: ?>
+                <?php if ($waveformError): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2);color:var(--red-hi)">Failed: <?php echo $e(mb_strimwidth($waveformError, 0, 200, '…')); ?></div>
+                <?php endif; ?>
+                <?php if ($waveformUrl): ?>
+                <a class="btn btn--quiet btn--sm" href="<?php echo $e($waveformUrl); ?>" style="margin-bottom:var(--s-3);display:inline-block">Download waveform clip</a>
+                <?php endif; ?>
+                <form action="/_admin/forecast_waveform.php" method="post">
+                  <?php echo admin_csrf_field(); ?>
+                  <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                  <button class="btn btn--block" type="submit"><?php echo $waveformUrl ? 'Regenerate waveform clip' : 'Generate waveform clip'; ?></button>
+                </form>
+              <?php endif; ?>
+            </div>
+          </section>
         </div>
 
         <section class="card adm-card">
           <div class="card__head">
-            <span class="card__title">Showcase</span>
+            <span class="card__title">Chapters</span>
             <span class="adm-count"><?php echo count($films); ?> selected</span>
           </div>
           <div class="card__body">
             <div class="admin-note" style="margin:0 0 var(--s-3)">
-              Defaults to one film per night. Check or uncheck to pick your own &mdash; "Update preview" shows the change above without saving it.
+              Every film this week gets a chapter by default &mdash; uncheck any you don't want commentary timed to. "Update preview" shows the change above without saving it. Poster crops adjusted here carry over everywhere else that poster is used, including the Instagram carousel.
             </div>
             <form method="get">
+              <?php echo admin_csrf_field(); ?>
               <input type="hidden" name="id" value="<?php echo $episode_id; ?>">
               <input type="hidden" name="preview" value="1">
               <div class="card__body card__body--flush" style="max-height:640px; overflow-y:auto; margin:0 calc(-1 * var(--s-4)); padding:0 var(--s-4)">
+                <div class="adm-crop-row">
+                  <div class="adm-row">
+                    <span class="adm-row__thumb adm-row__thumb--square">
+                      <img src="<?php echo $e($introStoryboardUrl); ?>" alt="" loading="lazy" />
+                    </span>
+                    <span class="adm-row__text">
+                      <span class="adm-row__title">INTRO / WRAP-UP</span>
+                      <span class="adm-row__sub">Always included &mdash; not part of the checklist</span>
+                    </span>
+                  </div>
+                </div>
                 <?php foreach ($byDay as $day => $dayFilms): ?>
                 <div class="adm-row" style="background:var(--surface-2)">
                   <span class="adm-row__text">
@@ -217,15 +289,33 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <?php foreach ($dayFilms as $f):
                   $key = ig_film_key($f);
                   $checked = in_array($key, $currentKeys, true);
+                  $heroUrl = $f['poster'] ? ig_hero_url($f['poster']) : null;
+                  $cropBias = $heroUrl ? ig_poster_crop_bias($heroUrl) : 0.5;
                 ?>
-                <label class="adm-row adm-row--check">
-                  <input type="checkbox" name="films[]" value="<?php echo $e($key); ?>"<?php echo $checked ? ' checked' : ''; ?>>
-                  <span class="adm-row__text">
-                    <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['display_title'])); ?></span>
-                    <span class="adm-row__sub"><?php echo $e($f['venue']); ?></span>
-                  </span>
-                  <span class="adm-row__when"><?php echo $e(date('g:ia', $f['timestamp'])); ?></span>
-                </label>
+                <div class="adm-crop-row">
+                  <label class="adm-row adm-row--check">
+                    <input type="checkbox" name="films[]" value="<?php echo $e($key); ?>"<?php echo $checked ? ' checked' : ''; ?>>
+                    <span class="adm-row__text">
+                      <span class="adm-row__title"><?php echo $e(mb_strtoupper($f['display_title'])); ?></span>
+                      <span class="adm-row__sub"><?php echo $e($f['venue']); ?></span>
+                    </span>
+                    <span class="adm-row__when"><?php echo $e(date('g:ia', $f['timestamp'])); ?></span>
+                  </label>
+                  <?php if ($heroUrl): ?>
+                  <button type="button" class="adm-crop-toggle" data-crop-toggle>Adjust crop</button>
+                  <div class="adm-crop-panel" data-crop-panel
+                       data-crop-endpoint="/_admin/forecast_poster_crop.php"
+                       data-episode-id="<?php echo $episode_id; ?>">
+                    <div class="adm-crop-preview" data-crop-preview
+                         style="background-image:url('<?php echo $e($heroUrl); ?>'); background-position: 50% <?php echo round($cropBias * 100); ?>%;"></div>
+                    <input type="range" class="adm-crop-slider" data-crop-slider min="0" max="100" step="1" value="<?php echo round($cropBias * 100); ?>">
+                    <div class="adm-crop-actions">
+                      <button type="button" class="btn btn--quiet btn--sm" data-crop-save data-poster-url="<?php echo $e($heroUrl); ?>">Save crop</button>
+                      <span class="adm-crop-status" data-crop-status></span>
+                    </div>
+                  </div>
+                  <?php endif; ?>
+                </div>
                 <?php endforeach; ?>
                 <?php endforeach; ?>
                 <?php if (!$byDay): ?>

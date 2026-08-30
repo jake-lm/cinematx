@@ -519,6 +519,18 @@ function forecast_round_robin_order(array $byDay) {
     return $ordered;
 }
 
+// Every unique film this week, in the order it actually plays — not
+// round-robin. What the package export's panel list and
+// forecast_resolve_selection()'s own default both want: the whole week,
+// chronologically, not fairness-across-nights.
+function forecast_flat_week_films(array $byDay) {
+    $flat = [];
+    foreach ($byDay as $dayFilms) {
+        foreach ($dayFilms as $f) $flat[] = $f;
+    }
+    return $flat;
+}
+
 // The automatic cover default — round-robin, capped at $limit rows, with
 // the true remaining count so the cover can show a "+N more this week"
 // line exactly like ig_build_list_page()'s own overflow handling.
@@ -556,24 +568,23 @@ function forecast_save_selection($conn, $episode_id, $uid, array $byDay, array $
 }
 
 /**
- * Which films actually belong on the cover, resolved in the same
- * override-beats-saved-beats-default order the daily carousel's own
- * ig_carousel_selection() already established:
+ * Which films get a spoken-commentary chapter in the real video, resolved
+ * in the same override-beats-saved-beats-default order the daily
+ * carousel's own ig_carousel_selection() already established:
  *   1. $override (film keys from $_GET during live preview) if given at
  *      all — even an empty array, since unchecking everything is a
  *      deliberate choice that deserves to be reflected in the mockup.
  *   2. The episode's saved selected_films, if it's ever been touched.
- *   3. The automatic one-per-night default (forecast_round_robin_order(),
- *      capped the same 9 rows forecast_week_films() uses).
+ *   3. Every film this week, chronologically (forecast_flat_week_films())
+ *      — every film gets a chapter unless explicitly unchecked, now that
+ *      nothing about the cover's own design caps how many films can be
+ *      shown (see forecast_build_cover()'s poster wall).
  * Returns a flat, chronologically-ordered film list either way — the
  * order the checklist itself presents them in, so a saved selection can
  * only ever be a subset of that same order.
  */
 function forecast_resolve_selection(array $episode, array $byDay, $override = null) {
-    $flat = [];
-    foreach ($byDay as $dayFilms) {
-        foreach ($dayFilms as $f) $flat[] = $f;
-    }
+    $flat = forecast_flat_week_films($byDay);
 
     $wantedKeys = null;
     if ($override !== null) {
@@ -586,7 +597,7 @@ function forecast_resolve_selection(array $episode, array $byDay, $override = nu
     }
 
     if ($wantedKeys === null) {
-        return array_slice(forecast_round_robin_order($byDay), 0, 9);
+        return $flat;
     }
 
     $keys = array_flip($wantedKeys);
@@ -785,94 +796,58 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 50;
 
-    $availableHeight = FORECAST_WAVE_BAND_Y - $y - 60;
-    $idealRowHeight  = 135; // thumbH(105) + gap(30), the automatic default's fixed size
+    // A wall of this week's posters as background texture — replaces the
+    // old enumerated list now that every film gets its own dedicated
+    // panel elsewhere (see forecast_build_chapter_card()), so this card
+    // no longer needs to name names, just signal "a lot is playing this
+    // week." Same wall technique forecast_build_podcast_art() uses for
+    // the RSS feed art, adapted to this canvas's portrait shape and
+    // reserved ink bands: cycles to fill if the selection is short,
+    // truncates if it's long, bottom-anchored so it always fills the
+    // same footprint regardless of count. $totalThisWeek is unused now
+    // (kept as a parameter — both call sites still pass it positionally,
+    // not worth a signature change for no behavior).
+    $films = $filmsOverride !== null ? $filmsOverride : forecast_week_films($conn, $episode['week_of'], 60)['films'];
 
-    if ($filmsOverride !== null) {
-        // A manual selection is a deliberate editorial choice — hiding some
-        // of it behind a "+N more" would undercut the whole point of
-        // picking, so this shrinks to fit instead of capping, down to a
-        // legibility floor. Past that floor it does fall back to capping,
-        // same as the automatic default, rather than rendering illegibly
-        // small rows.
-        $films = $filmsOverride;
-        // 95, not lower — the floor title+meta text (18px/14px, set below)
-        // needs about that much room to stay clear of both the row above
-        // and the thumbnail beneath it. Confirmed by rendering a 15-film
-        // test list at a lower floor: title and meta text visibly collided
-        // once rows shrank much past this.
-        $minRowHeight = 95;
-        if (count($films) > 0 && count($films) * $idealRowHeight > $availableHeight) {
-            $fitRows = max(1, (int) floor($availableHeight / $minRowHeight));
-            if (count($films) > $fitRows) {
-                $films = array_slice($films, 0, $fitRows);
-            }
-            $rowHeight = count($films) > 0 ? (int) floor($availableHeight / count($films)) : $idealRowHeight;
-        } else {
-            $rowHeight = $idealRowHeight;
-        }
-        // "+N more" here isn't just an overflow indicator the way it is in
-        // the automatic path below — it also covers films the admin simply
-        // didn't check, so the cover still hints there's more happening
-        // this week even when the showcase is a deliberately short,
-        // comfortably-fitting list.
-        $more = $totalThisWeek !== null ? max(0, $totalThisWeek - count($films)) : 0;
-        $thumbH = max(40, min(105, $rowHeight - 25));
-        $thumbW = (int) round($thumbH * 70 / 105);
-    } else {
-        $thumbW = 70; $thumbH = 105; $rowHeight = $idealRowHeight;
-        $week  = forecast_week_films($conn, $episode['week_of'], (int) floor($availableHeight / $rowHeight));
-        $films = $week['films'];
-        $more  = $week['more'];
+    $wallCols   = 6;
+    $wallGutter = 8;
+    $wallMaxWidth = $w - $margin * 2;
+    $thumbW = (int) floor(($wallMaxWidth - ($wallCols - 1) * $wallGutter) / $wallCols);
+    $thumbH = (int) round($thumbW * 1.5);
+    $wallBottom = FORECAST_WAVE_BAND_Y - 60;
+    $wallTop    = $y + 20;
+    $wallRows   = max(1, (int) floor(($wallBottom - $wallTop + $wallGutter) / ($thumbH + $wallGutter)));
+    $gridH      = $wallRows * $thumbH + ($wallRows - 1) * $wallGutter;
+    $gridTop    = $wallBottom - $gridH;
+
+    $wallCapacity = $wallCols * $wallRows;
+    if ($films && count($films) < $wallCapacity) {
+        $films = array_map(fn($i) => $films[$i % count($films)], range(0, $wallCapacity - 1));
     }
 
-    $textX = $margin + $thumbW + 26;
-    $textMaxWidth = $w - $margin - $textX;
-    $titleSize = $thumbH >= 90 ? 26 : max(18, (int) round($thumbH * 26 / 105));
-    $metaSize  = $thumbH >= 90 ? 20 : max(14, (int) round($thumbH * 20 / 105));
-    // A second, smaller meta line for the director — sized down from
-    // $metaSize the same way $metaSize itself scales off $titleSize, so it
-    // shrinks in step with everything else on a long manual selection
-    // rather than becoming the tallest thing in a cramped row.
-    $metaSize2 = $thumbH >= 90 ? 18 : max(12, (int) round($thumbH * 18 / 105));
-
-    foreach ($films as $f) {
+    foreach ($films as $i => $f) {
+        $row = intdiv($i, $wallCols);
+        if ($row >= $wallRows) break;
+        $col = $i % $wallCols;
+        $px = $margin + $col * ($thumbW + $wallGutter);
+        $py = $gridTop + $row * ($thumbH + $wallGutter);
         $thumb = ig_fetch_thumb($f['poster'] ?? null, $thumbW, $thumbH);
         if ($thumb) {
-            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagecopy($im, $thumb, $px, $py, 0, 0, $thumbW, $thumbH);
             imagedestroy($thumb);
         } else {
-            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            imagefilledrectangle($im, $px, $py, $px + $thumbW, $py + $thumbH, $placeholder);
         }
-
-        // Offset from fixed font-size padding, not a fraction of thumbH —
-        // a fraction shrinks the gap between lines just as fast as it
-        // shrinks the thumbnail, but the floored font sizes below don't
-        // shrink nearly that fast, so a fraction-based offset lets the
-        // lines run into each other on a long manual selection. Three
-        // lines (title, venue/time, director) still fit well inside even
-        // the shrunk floor row height this way — verified by rendering a
-        // 15-film test list end to end before this shipped.
-        $titleY = $y + $titleSize + 8;
-        $metaY  = $titleY + $metaSize + 8;
-        $metaY2 = $metaY + $metaSize2 + 6;
-
-        $title = ig_fit_text(mb_strtoupper($f['display_title']), IG_FONT_HEADLINE, $titleSize, $textMaxWidth);
-        imagettftext($im, $titleSize, 0, $textX, $titleY, $ink, IG_FONT_HEADLINE, $title);
-
-        $meta = ig_fit_text($f['venue'] . '  ·  ' . date('D, g:ia', $f['timestamp']), IG_FONT_BODY, $metaSize, $textMaxWidth);
-        imagettftext($im, $metaSize, 0, $textX, $metaY, $muted, IG_FONT_BODY, $meta);
-
-        if (!empty($f['director'])) {
-            $director = ig_fit_text('Dir. ' . $f['director'], IG_FONT_BODY, $metaSize2, $textMaxWidth);
-            imagettftext($im, $metaSize2, 0, $textX, $metaY2, $muted, IG_FONT_BODY, $director);
-        }
-
-        $y += $rowHeight;
     }
 
-    if ($more > 0) {
-        imagettftext($im, 22, 0, $margin, $y + 30, $red, IG_FONT_BODY, '+ ' . $more . ' more this week');
+    // Fades the top of the grid up into clean paper — same alpha-band
+    // technique forecast_build_podcast_art() uses for its own wall (GD
+    // has no gradient primitive of its own).
+    $fadeH = min(160, $gridH);
+    for ($i = 0; $i < $fadeH; $i++) {
+        $alpha = (int) round(127 * ($i / $fadeH));
+        $band  = imagecolorallocatealpha($im, 0xF4, 0xF1, 0xEB, $alpha);
+        imagefilledrectangle($im, 0, $gridTop + $i, $w, $gridTop + $i + 1, $band);
     }
 
     // Ink band first, badge on top of it — see forecast_draw_guest_badge()
@@ -990,7 +965,7 @@ function forecast_build_preshow_card() {
 // paper/red/ink palette. Same hero-fade, text-wrapping, and circle-crop
 // techniques (ig_hero_url(), ig_poster_crop_bias(), ig_wrap_lines(),
 // forecast_circle_crop()) reused as-is rather than re-solved here.
-function forecast_build_chapter_card(array $film, array $episode) {
+function forecast_build_chapter_card(array $film, array $episode, $showShowtimes = true) {
     $w = 1080;
     $h = 1920;
     $im = imagecreatetruecolor($w, $h);
@@ -1079,7 +1054,7 @@ function forecast_build_chapter_card(array $film, array $episode) {
     // forecast_week_by_day()) rather than showing nothing.
     $showtimes = !empty($film['showtimes']) ? $film['showtimes']
         : (!empty($film['timestamp']) ? [['timestamp' => $film['timestamp'], 'venue' => $film['venue'] ?? null, 'location' => $film['location'] ?? null]] : []);
-    if ($showtimes) {
+    if ($showShowtimes && $showtimes) {
         $meta = ig_fit_text(forecast_format_showtimes($showtimes), IG_FONT_BODY, 24, $textMaxWidth);
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $meta);
         $y += 40;
@@ -1143,22 +1118,27 @@ function forecast_caption(array $episode) {
 // stops a second "Generate" click from starting a duplicate ffmpeg run —
 // no separate lock file needed.
 
-function forecast_progress_path($episode_id) {
-    return dirname(__DIR__) . '/uploads/forecast/' . (int) $episode_id . '-progress.json';
+// $kind distinguishes the real video's progress from the package/waveform
+// exports' own, all three running independently of one another. 'video'
+// keeps the original, un-suffixed filename — nothing about the
+// already-working real pipeline changes shape.
+function forecast_progress_path($episode_id, $kind = 'video') {
+    $suffix = $kind === 'video' ? 'progress' : "{$kind}-progress";
+    return dirname(__DIR__) . '/uploads/forecast/' . (int) $episode_id . "-{$suffix}.json";
 }
 
-function forecast_generation_status($episode_id) {
-    $path = forecast_progress_path($episode_id);
+function forecast_generation_status($episode_id, $kind = 'video') {
+    $path = forecast_progress_path($episode_id, $kind);
     if (!file_exists($path)) return null;
     $data = json_decode(file_get_contents($path), true);
     return is_array($data) ? $data : null;
 }
 
-function forecast_write_progress($episode_id, $status, $percent = null, $error = null) {
+function forecast_write_progress($episode_id, $status, $percent = null, $error = null, $kind = 'video') {
     $data = ['status' => $status];
     if ($percent !== null) $data['percent'] = $percent;
     if ($error !== null) $data['error'] = $error;
-    file_put_contents(forecast_progress_path($episode_id), json_encode($data));
+    file_put_contents(forecast_progress_path($episode_id, $kind), json_encode($data));
 }
 
 // ── Video assembly ───────────────────────────────────────────────────────
@@ -1352,6 +1332,21 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
         escapeshellarg($outputPath)
     );
 
+    return forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $durationSeconds);
+}
+
+/**
+ * Runs an already-built ffmpeg command line via proc_open(), reporting
+ * 0-99 progress off ffmpeg's own stderr `time=` lines as it streams, and
+ * returning ['ok' => true] or ['ok' => false, 'error' => '...'] (the
+ * stderr tail, since a filter-graph syntax error only shows up there, not
+ * in the exit code alone). Shared by forecast_generate_video() and
+ * forecast_generate_waveform_clip() — factored out because the exit-code
+ * handling below has a real, already-debugged gotcha (see the comment at
+ * the $exitCode line) that a second hand-copied version would risk
+ * silently losing.
+ */
+function forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $durationSeconds) {
     $descriptors = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
     $process = proc_open($cmd, $descriptors, $pipes);
     if (!is_resource($process)) {
@@ -1400,6 +1395,52 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
         return ['ok' => false, 'error' => implode("\n", array_slice($lines, -25))];
     }
     return ['ok' => true];
+}
+
+/**
+ * A transparent ProRes 4444 clip carrying only the two gold waveform
+ * bands (same geometry forecast_generate_video() composites into the
+ * real video, so this lines up pixel-for-pixel with it) — no progress
+ * bar, no timer, no segment images. Built for the manual Premiere
+ * fallback: drop this on a track above a hand-placed sequence of panel
+ * stills and the waveform reacts to the real audio without redrawing
+ * anything by hand. No audio track of its own — the editor already has
+ * the master audio on its own track in Premiere.
+ */
+function forecast_generate_waveform_clip($audioPath, $outputPath, $durationSeconds, $onProgress = null) {
+    if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
+    if ($durationSeconds <= 0) return ['ok' => false, 'error' => 'Could not determine audio duration.'];
+
+    $rowCenterY = forecast_bottom_row_center_y();
+    $edgeMargin = 30;
+    $badgeLeft  = 1080 - FORECAST_BADGE_MARGIN - FORECAST_BADGE_D;
+
+    $waveH = 150;
+    $waveY = $rowCenterY - (int) round($waveH / 2);
+    $waveX = $edgeMargin;
+    $waveW = $badgeLeft - $edgeMargin - 30;
+
+    $topWaveW = 700; $topWaveH = 90;
+    $topWaveX = 90;  $topWaveY = (int) (14 + (FORECAST_TOP_WAVE_BAND_H - $topWaveH) / 2);
+
+    $filter = "[0:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
+        . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
+        . "[0:a]showwaves=s={$topWaveW}x{$topWaveH}:mode=cline:rate=25:colors=0xF2C14E[wraw2];"
+        . "[wraw2]colorkey=0x000000:0.15:0.1,format=rgba[wave2];"
+        . "[1:v][wave2]overlay={$topWaveX}:{$topWaveY}[bgw0];"
+        . "[bgw0][wave]overlay={$waveX}:{$waveY}[out]";
+
+    $cmd = sprintf(
+        'ffmpeg -y -i %s -f lavfi -i %s -filter_complex %s -map %s '
+        . '-c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le -shortest %s',
+        escapeshellarg($audioPath),
+        escapeshellarg("color=c=black@0.0:s=1080x1920:d={$durationSeconds}:r=25"),
+        escapeshellarg($filter),
+        escapeshellarg('[out]'),
+        escapeshellarg($outputPath)
+    );
+
+    return forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $durationSeconds);
 }
 
 // ── Publish ──────────────────────────────────────────────────────────────

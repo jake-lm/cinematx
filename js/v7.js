@@ -1191,16 +1191,22 @@
       var form   = btn.closest('form');
       var csrf   = form ? form.querySelector('input[name="csrf"]') : null;
 
+      var endpoint  = panel.getAttribute('data-crop-endpoint') || '/_admin/instagram_poster_crop.php';
+      var episodeId = panel.getAttribute('data-episode-id');
+
       btn.addEventListener('click', function () {
         btn.disabled = true;
         status.textContent = 'Saving…';
         status.classList.add('is-visible');
 
-        post('/_admin/instagram_poster_crop.php', {
+        var body = {
           poster_url: btn.getAttribute('data-poster-url'),
           bias: (parseInt(slider.value, 10) / 100).toFixed(2),
           csrf: csrf ? csrf.value : ''
-        }).then(function (res) {
+        };
+        if (episodeId) body.episode_id = episodeId;
+
+        post(endpoint, body).then(function (res) {
           btn.disabled = false;
           status.textContent = (res && res.ok) ? 'Saved' : 'Failed to save';
           setTimeout(function () { status.classList.remove('is-visible'); }, 1800);
@@ -1448,27 +1454,36 @@
   // client framework, every other action here already re-renders server-
   // side, and the finished view (video player, or the error banner) is
   // already what a fresh load of forecast_episode.php produces.
+  // One poll loop per progress bar on the page — the workshop page can now
+  // show up to three at once (the real video, the panel package, the
+  // waveform clip), each on its own progress file (see
+  // forecast_progress_path()'s $kind in list/forecast.php), so this can no
+  // longer assume there's only one. data-progress-kind is read off each
+  // bar (defaulting to 'video', the original single-bar behavior); its
+  // label is always the immediately preceding sibling, true for all three
+  // sections' markup.
   function initForecastProgress() {
-    var bar = $('[data-forecast-progress]');
-    if (!bar) return;
-    var label = $('[data-forecast-progress-label]');
-    var episodeId = bar.getAttribute('data-episode-id');
+    $$('[data-forecast-progress]').forEach(function (bar) {
+      var kind = bar.getAttribute('data-progress-kind') || 'video';
+      var label = bar.previousElementSibling;
+      var episodeId = bar.getAttribute('data-episode-id');
 
-    var timer = setInterval(function () {
-      fetch('/_admin/forecast_progress.php?id=' + encodeURIComponent(episodeId), { credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data.status === 'running') {
-            var pct = data.percent || 0;
-            bar.value = pct;
-            if (label) label.textContent = 'Generating… ' + pct + '%';
-          } else {
-            clearInterval(timer);
-            location.reload();
-          }
-        })
-        .catch(function () {});
-    }, 2000);
+      var timer = setInterval(function () {
+        fetch('/_admin/forecast_progress.php?id=' + encodeURIComponent(episodeId) + '&kind=' + encodeURIComponent(kind), { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.status === 'running') {
+              var pct = data.percent || 0;
+              bar.value = pct;
+              if (label) label.textContent = 'Generating… ' + pct + '%';
+            } else {
+              clearInterval(timer);
+              location.reload();
+            }
+          })
+          .catch(function () {});
+      }, 2000);
+    });
   }
 
   // ══ Film Forecast — chapter timeline ════════════════════════════════════
