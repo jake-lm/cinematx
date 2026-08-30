@@ -364,6 +364,53 @@
     window.addEventListener('resize', close);
   }
 
+  // ══ Stack options ════════════════════════════════════════════════════════
+  // Whether Alamo/Fathom's chain screenings collapse into one card
+  // (ctx_fold_venue() in v7/screenings.php) is decided server-side at render
+  // time, not a show/hide toggle like every other client-side preference
+  // here — so unlike those, this one has to survive as a real cookie PHP can
+  // read, not just localStorage. Same popover shape as initThemeSwitcher()
+  // otherwise (open/close/place/outside-click/Escape), just one checkbox
+  // instead of swatches, and a page reload instead of an instant repaint —
+  // there's no client-side way to un-collapse a card PHP already merged into
+  // one entry.
+  function initStackMenu() {
+    var trigger = $('#stack-trigger'), menu = $('#stack-menu');
+    if (!trigger || !menu) return;
+
+    document.body.appendChild(menu);
+    var checkbox = $('#stack-toggle', menu);
+
+    function place() {
+      var r = trigger.getBoundingClientRect();
+      var w = menu.offsetWidth;
+      var left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+      menu.style.left = Math.round(left) + 'px';
+      menu.style.top  = Math.round(r.bottom + 8) + 'px';
+    }
+    function open()  { menu.classList.add('is-on'); place(); trigger.setAttribute('aria-expanded', 'true'); }
+    function close() { menu.classList.remove('is-on'); trigger.setAttribute('aria-expanded', 'false'); }
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.classList.contains('is-on')) close(); else open();
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('is-on')) return;
+      if (e.target.closest && (e.target.closest('.stack-menu') || e.target === trigger || trigger.contains(e.target))) return;
+      close();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+
+    checkbox.addEventListener('change', function () {
+      var maxAge = 60 * 60 * 24 * 365; // a year — same "remember it" lifetime as any other saved preference here
+      document.cookie = 'ctx_stack=' + (checkbox.checked ? '1' : '0') + '; path=/; max-age=' + maxAge;
+      location.reload();
+    });
+  }
+
   // ══ Rail ═════════════════════════════════════════════════════════════════
 
   function initRail() {
@@ -1725,7 +1772,7 @@
   }
 
   function boot() {
-    initWelcome(); initTheme(); initThemeSwitcher(); initRail(); initList();
+    initWelcome(); initTheme(); initThemeSwitcher(); initStackMenu(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();

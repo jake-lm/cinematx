@@ -3459,3 +3459,31 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .line__time { color: var(--gold); }
   .deep__time { color: var(--gold); border-color: var(--gold); }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DISPLAY OPTIONS — the "stack chain screenings" popover, next to the
+//  Posters/List segment on The List and the front page's own list module.
+//  A settings toggle, not a view — reuses .theme-menu's exact popover shape
+//  (body-reparented, positioned under its trigger) rather than inventing a
+//  fourth one; see initStackMenu() in v7.js.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.stack-menu {
+  position: fixed;
+  z-index: 720;
+  display: none;
+  width: 200px;
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  &.is-on { display: block; }
+}
+
+.stack-menu__opt {
+  display: flex; align-items: center; gap: var(--s-2);
+  cursor: pointer;
+  font-size: var(--t-xs); font-weight: 500; color: var(--text-2);
+  input { accent-color: var(--red); }
+}

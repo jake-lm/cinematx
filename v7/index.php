@@ -39,9 +39,13 @@ $venues       = ctx_venues($films);
 $counts       = ctx_venue_counts($films);
 
 // A compact front-page module has even less room for a chain's schedule than
-// The List does. Two days, so the threshold is lower.
-$films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
-$films = ctx_fold_venue($films, 'Fathom Events', 2);
+// The List does, so the threshold is lower — but still opt-in via the same
+// stack-options popover and cookie The List uses (ctx_stack_pref()).
+$ctx_stack = ctx_stack_pref();
+if ($ctx_stack) {
+    $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
+    $films = ctx_fold_venue($films, 'Fathom Events', 2);
+}
 
 // A festival's own threshold (3+ distinct films in a day) is fixed rather
 // than tuned per page — see ctx_fold_festival().
@@ -99,6 +103,16 @@ require __DIR__ . '/_chrome.php';
             <button class="seg__btn" data-view="depth" title="In depth"><i class="fa-solid fa-square"></i></button>
             <button class="seg__btn is-on" data-view="grid" title="Posters"><i class="fa-solid fa-grip"></i></button>
             <button class="seg__btn" data-view="rows" title="List"><i class="fa-solid fa-list"></i></button>
+          </div>
+
+          <button class="ibtn" id="stack-trigger" type="button" title="Display options" aria-expanded="false" aria-haspopup="true">
+            <i class="fa-solid fa-sliders"></i>
+          </button>
+          <div class="stack-menu" id="stack-menu">
+            <label class="stack-menu__opt">
+              <input type="checkbox" id="stack-toggle" <?php echo $ctx_stack ? 'checked' : ''; ?>>
+              <span>Stack films</span>
+            </label>
           </div>
 
           <div class="chips">

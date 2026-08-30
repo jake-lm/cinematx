@@ -5577,3 +5577,31 @@ button, input, select, textarea {
   color: var(--gold);
   border-color: var(--gold);
 }
+
+.stack-menu {
+  position: fixed;
+  z-index: 720;
+  display: none;
+  width: 200px;
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+}
+.stack-menu.is-on {
+  display: block;
+}
+
+.stack-menu__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.stack-menu__opt input {
+  accent-color: var(--red);
+}

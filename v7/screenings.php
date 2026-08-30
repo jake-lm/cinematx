@@ -248,6 +248,19 @@ function ctx_bits($s, $venue = true) {
     return $bits;
 }
 
+// Whether a chain's screenings (see ctx_fold_venue() below) should collapse
+// into one card at all — off by default. Folding earned its keep when
+// Paramount's summer classics were also filling the list; with that series
+// over and the schedule quieter, a plain Alamo/Fathom row usually has room
+// to just show as one, and stacking becomes an opt-in for whenever the list
+// gets busy again. A real cookie, not localStorage like every other
+// remembered preference here (theme, rail-collapsed) — this one has to be
+// known before ctx_fold_venue() ever runs, at the top of the page, not
+// toggled after the fact against already-rendered markup.
+function ctx_stack_pref() {
+    return ($_COOKIE['ctx_stack'] ?? '') === '1';
+}
+
 /**
  * Fold one venue's screenings for a day into a single entry.
  *
