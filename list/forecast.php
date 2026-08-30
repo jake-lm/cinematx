@@ -1398,14 +1398,28 @@ function forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $durationSeconds) {
 }
 
 /**
- * A transparent ProRes 4444 clip carrying only the two gold waveform
- * bands (same geometry forecast_generate_video() composites into the
- * real video, so this lines up pixel-for-pixel with it) — no progress
- * bar, no timer, no segment images. Built for the manual Premiere
- * fallback: drop this on a track above a hand-placed sequence of panel
- * stills and the waveform reacts to the real audio without redrawing
- * anything by hand. No audio track of its own — the editor already has
- * the master audio on its own track in Premiere.
+ * A transparent clip carrying only the two gold waveform bands (same
+ * geometry forecast_generate_video() composites into the real video, so
+ * this lines up pixel-for-pixel with it) — no progress bar, no timer, no
+ * segment images. Built for the manual Premiere fallback: drop this on a
+ * track above a hand-placed sequence of panel stills and the waveform
+ * reacts to the real audio without redrawing anything by hand. No audio
+ * track of its own — the editor already has the master audio on its own
+ * track in Premiere.
+ *
+ * QuickTime Animation (qtrle), not ProRes 4444 — tried prores_ks/4444
+ * first (it's the more modern, more compressed choice, and this server's
+ * ffmpeg does have the encoder), but the alpha-carrying pixel format it
+ * needs (yuva444p10le) round-trips the RGB through YUV and back visibly
+ * wrong on this ffmpeg build: the gold wave (0xF2C14E) came back pink,
+ * reproducibly, with or without explicit -colorspace/-color_primaries/
+ * -color_range flags. qtrle stays in RGB the whole way through (no YUV
+ * conversion at all) and came back pixel-correct in the same test. Both
+ * are standard, Premiere-native QuickTime codecs; qtrle is simply the
+ * one that's actually right here. RLE also compresses this specific
+ * content (mostly transparent, a thin bright shape) well despite being
+ * "just" lossless run-length, so the size tradeoff isn't the problem
+ * ProRes 4444 usually justifies.
  */
 function forecast_generate_waveform_clip($audioPath, $outputPath, $durationSeconds, $onProgress = null) {
     if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
@@ -1423,20 +1437,37 @@ function forecast_generate_waveform_clip($audioPath, $outputPath, $durationSecon
     $topWaveW = 700; $topWaveH = 90;
     $topWaveX = 90;  $topWaveY = (int) (14 + (FORECAST_TOP_WAVE_BAND_H - $topWaveH) / 2);
 
+    // Not `overlay` — on this server's ffmpeg (4.4.2), `overlay`'s own
+    // `format` option has no alpha-carrying choice at all (only
+    // yuv420/420p10/422/422p10/444/rgb/gbrp/auto — confirmed via `ffmpeg
+    // -h filter=overlay`), so however the inputs are formatted, its
+    // output silently comes back fully opaque. `pad` genuinely preserves
+    // alpha (confirmed by extracting a frame and reading the alpha
+    // channel directly — transparent both outside and inside the padded
+    // area), so each wave gets padded out to the full frame at its own
+    // position first. The two padded layers never spatially overlap, so
+    // `blend`'s `lighten` mode (max per channel, including alpha)
+    // combines them correctly without ever going through `overlay` —
+    // wherever one layer has real content its brighter, more-opaque
+    // pixel wins over the other layer's transparent black there. Tried
+    // `addition` first: alpha combined fine (0+0 stays transparent), but
+    // summing raw RGB across two straight-alpha layers colored the wave
+    // itself wrong wherever either layer's "empty" pixels weren't
+    // perfectly (0,0,0) — confirmed by extracting a frame, and gone once
+    // switched to `lighten`.
     $filter = "[0:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
-        . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
+        . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba,pad=1080:1920:{$waveX}:{$waveY}:color=black@0.0[layer1];"
         . "[0:a]showwaves=s={$topWaveW}x{$topWaveH}:mode=cline:rate=25:colors=0xF2C14E[wraw2];"
-        . "[wraw2]colorkey=0x000000:0.15:0.1,format=rgba[wave2];"
-        . "[1:v][wave2]overlay={$topWaveX}:{$topWaveY}[bgw0];"
-        . "[bgw0][wave]overlay={$waveX}:{$waveY}[out]";
+        . "[wraw2]colorkey=0x000000:0.15:0.1,format=rgba,pad=1080:1920:{$topWaveX}:{$topWaveY}:color=black@0.0[layer2];"
+        . "[layer1][layer2]blend=all_mode=lighten[out]";
 
     $cmd = sprintf(
-        'ffmpeg -y -i %s -f lavfi -i %s -filter_complex %s -map %s '
-        . '-c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le -shortest %s',
+        'ffmpeg -y -i %s -filter_complex %s -map %s '
+        . '-c:v qtrle -pix_fmt rgba -t %s %s',
         escapeshellarg($audioPath),
-        escapeshellarg("color=c=black@0.0:s=1080x1920:d={$durationSeconds}:r=25"),
         escapeshellarg($filter),
         escapeshellarg('[out]'),
+        escapeshellarg($durationSeconds),
         escapeshellarg($outputPath)
     );
 
