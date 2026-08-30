@@ -609,6 +609,24 @@ function ctx_fold_repeats(array $entries) {
         if (empty($f['showings'])) continue;
         usort($f['showings'], fn($a, $b) => $a['t'] <=> $b['t']);
         $f['timestamp'] = $f['showings'][0]['t'];
+
+        // Alamo books the same film across five locations several times a
+        // day, so an uncapped card can end up with twenty-plus lines — that
+        // reads as noise, not "playing a lot," and the ticket link already
+        // lands on Alamo's own page with every time and location for the
+        // day. Capped to the latest showing of each calendar day: enough to
+        // signal it's playing most days without drowning the card. Only
+        // Alamo — every other venue's showing count is small enough that
+        // the full list is exactly the useful information it looks like.
+        if (($f['venue'] ?? '') === 'Alamo Drafthouse') {
+            $latest = [];
+            foreach ($f['showings'] as $s) {
+                $day = date('Ymd', $s['t']);
+                if (!isset($latest[$day]) || $s['t'] > $latest[$day]['t']) $latest[$day] = $s;
+            }
+            usort($latest, fn($a, $b) => $a['t'] <=> $b['t']);
+            $f['showings'] = array_values($latest);
+        }
     }
     unset($f);
 
