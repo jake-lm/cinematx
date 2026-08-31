@@ -433,7 +433,21 @@ function forecast_week_by_day($conn, $weekOf) {
     $start = strtotime($weekOf);
     $end   = strtotime('+7 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
-    $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true)));
+    // IG_VENUES on its own is the *daily Instagram carousel's* venue
+    // list — Alamo is deliberately excluded from it (it gets its own
+    // separate carousel flow, ig_alamo_films()/_admin/instagram_alamo.php,
+    // for reasons specific to that feature: opt-in stacking, one
+    // repeat-showing card per day). None of that applies to Forecast,
+    // which just wants every film actually playing this week, so Alamo
+    // is added on here rather than into the shared constant — folding it
+    // into IG_VENUES itself would silently pull Alamo into the daily
+    // carousel too. Its five locations collapse under one venue name
+    // ('Alamo Drafthouse') the same way the other three venues would if
+    // they had branches — the title-only dedup below already merges a
+    // film across every location and night it plays into one entry with
+    // several showtimes, exactly like a same-title booking spanning two
+    // "real" venues.
+    $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true) || $f['venue'] === IG_ALAMO_VENUE));
     $films = ctx_enrich($films);
 
     // A film playing more than once this week (a repertory favorite
