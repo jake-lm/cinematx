@@ -43,6 +43,15 @@ if ($ctx_stack) {
 // two folds above are.
 $entries = ctx_fold_festival($entries);
 
+// Independent of the stack-options toggle above — that one is about whether
+// a whole day of Alamo's schedule collapses behind one "N films" card, this
+// is about a single film's own duplicate showings (the same movie at five
+// different Alamo locations) collapsing into one card rather than cluttering
+// the grid with near-identical posters. $per_day=true keeps a film that
+// plays several nights showing on each night's own section — see
+// ctx_fold_repeats()'s doc comment for why that differs from the front page.
+$entries = ctx_fold_repeats($entries, true);
+
 // Every folded card opens a panel; they are collected as we render.
 $ctx_extra_sheets = '';
 

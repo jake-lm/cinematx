@@ -586,8 +586,17 @@ function ctx_fold_children($s, $view) {
  * appeared twice with only the time to tell the cards apart. Entries already
  * folded by ctx_fold_venue() pass through untouched — a venue card is not a
  * film and must not be merged with one.
+ *
+ * $per_day scopes the merge to a single calendar day rather than the whole
+ * range — for The List's day-by-day view, merging a film's whole week into
+ * one entry would pull it out of every day's section but the first it plays,
+ * which the front page's flat "tonight & tomorrow" list never has to worry
+ * about. With it on, a film playing five nights still gets its own card each
+ * night; only that night's same-venue duplicates (Alamo's five locations)
+ * collapse together.
  */
-function ctx_fold_repeats(array $entries) {
+function ctx_fold_repeats(array $entries, $per_day = false) {
+    $tz  = new DateTimeZone('America/Chicago');
     $out = [];
     $at  = [];
 
@@ -595,6 +604,9 @@ function ctx_fold_repeats(array $entries) {
         if (!empty($f['is_group'])) { $out[] = $f; continue; }
 
         $key = ($f['display_title'] ?? $f['title']) . '|' . ($f['venue'] ?? '');
+        if ($per_day) {
+            $key .= '|' . (new DateTime('@' . $f['timestamp']))->setTimezone($tz)->format('Ymd');
+        }
         if (!isset($at[$key])) {
             $f['showings'] = [];
             $at[$key] = count($out);
@@ -627,6 +639,18 @@ function ctx_fold_repeats(array $entries) {
             usort($latest, fn($a, $b) => $a['t'] <=> $b['t']);
             $f['showings'] = array_values($latest);
         }
+
+        // $per_day cards render as a single poster with one time shown — The
+        // List has no per-line time display the way the front page's own
+        // multi-day cards do via ctx_time_lines() — so the displayed time
+        // needs to be the one that's actually shown: the latest survivor
+        // above, matching what was asked for ("probably the latest in the
+        // day"). Left as the earliest showing for the front page's own
+        // un-per_day cards, deliberately unchanged — a film there still
+        // sorts by when it *starts* in that flat tonight/tomorrow list, and
+        // every showing gets its own line regardless of which one
+        // $timestamp happens to be.
+        if ($per_day) $f['timestamp'] = end($f['showings'])['t'];
     }
     unset($f);
 
