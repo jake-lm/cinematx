@@ -911,19 +911,20 @@ function forecast_draw_guest_badge($im, array $episode) {
     }
 }
 
-function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $totalThisWeek = null, $liveDuration = false, &$durationSlot = null) {
+// Draws everything on the intro/wrap-up card except the poster wall
+// itself — top bar/band, "FILM FORECAST" eyebrow, "WEEK OF" headline,
+// guest byline/duration, divider — and returns the y position the wall
+// should start at. Split out of forecast_build_cover() so the animated
+// intro clip's base frame (forecast_generate_intro_animation()) can
+// share it exactly rather than risk drifting from what the static
+// render actually draws.
+function forecast_cover_header($im, array $episode, $liveDuration, &$durationSlot) {
     $w = 1080;
-    $h = 1920;
-    $im = imagecreatetruecolor($w, $h);
-
-    $paper  = ig_hex($im, '#F4F1EB');
     $ink    = ig_hex($im, '#14120F');
     $red    = ig_hex($im, '#922E32');
     $muted  = ig_hex($im, '#6B6659');
     $divider = ig_hex($im, '#DED7C7');
-    $placeholder = ig_hex($im, '#E4DECE');
 
-    imagefill($im, 0, 0, $paper);
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
 
     // Dark, same as the bottom band — so the gold waveform ffmpeg composites
@@ -983,17 +984,28 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 50;
 
-    // A wall of this week's posters as background texture — replaces the
-    // old enumerated list now that every film gets its own dedicated
-    // panel elsewhere (see forecast_build_chapter_card()), so this card
-    // no longer needs to name names, just signal "a lot is playing this
-    // week." Same wall technique forecast_build_podcast_art() uses for
-    // the RSS feed art, adapted to this canvas's portrait shape and
-    // reserved ink bands: cycles to fill if the selection is short,
-    // truncates if it's long, bottom-anchored so it always fills the
-    // same footprint regardless of count. $totalThisWeek is unused now
-    // (kept as a parameter — both call sites still pass it positionally,
-    // not worth a signature change for no behavior).
+    return $y;
+}
+
+// Resolves which films go into the poster wall (cycled to fill if short,
+// truncated if long, posterless ones left out entirely — see the inline
+// comments below) and the grid geometry they land at. Shared by
+// forecast_build_cover()'s own static wall and the animated intro
+// clip's per-poster ffmpeg overlays, so the two can never place a poster
+// in a different spot than the other expects.
+function forecast_wall_layout($filmsOverride, $conn, array $episode, $wallTop) {
+    $w = 1080;
+    $margin = 80;
+    $wallCols   = 6;
+    $wallGutter = 8;
+    $wallMaxWidth = $w - $margin * 2;
+    $thumbW = (int) floor(($wallMaxWidth - ($wallCols - 1) * $wallGutter) / $wallCols);
+    $thumbH = (int) round($thumbW * 1.5);
+    $wallBottom = FORECAST_WAVE_BAND_Y - 60;
+    $wallRows   = max(1, (int) floor(($wallBottom - $wallTop + $wallGutter) / ($thumbH + $wallGutter)));
+    $gridH      = $wallRows * $thumbH + ($wallRows - 1) * $wallGutter;
+    $gridTop    = $wallBottom - $gridH;
+
     $films = $filmsOverride !== null ? $filmsOverride : forecast_week_films($conn, $episode['week_of'], 60)['films'];
     // Left out entirely rather than shown as a blank placeholder tile —
     // a texture wall reads worse with visible gaps in it than it does
@@ -1003,54 +1015,184 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
     // posters to fill the grid instead of leaving most of it blank.
     $films = array_values(array_filter($films, fn($f) => !empty($f['poster'])));
 
-    $wallCols   = 6;
-    $wallGutter = 8;
-    $wallMaxWidth = $w - $margin * 2;
-    $thumbW = (int) floor(($wallMaxWidth - ($wallCols - 1) * $wallGutter) / $wallCols);
-    $thumbH = (int) round($thumbW * 1.5);
-    $wallBottom = FORECAST_WAVE_BAND_Y - 60;
-    $wallTop    = $y + 20;
-    $wallRows   = max(1, (int) floor(($wallBottom - $wallTop + $wallGutter) / ($thumbH + $wallGutter)));
-    $gridH      = $wallRows * $thumbH + ($wallRows - 1) * $wallGutter;
-    $gridTop    = $wallBottom - $gridH;
-
     $wallCapacity = $wallCols * $wallRows;
     if ($films && count($films) < $wallCapacity) {
         $films = array_map(fn($i) => $films[$i % count($films)], range(0, $wallCapacity - 1));
     }
 
+    $cells = [];
     foreach ($films as $i => $f) {
         $row = intdiv($i, $wallCols);
         if ($row >= $wallRows) break;
         $col = $i % $wallCols;
-        $px = $margin + $col * ($thumbW + $wallGutter);
-        $py = $gridTop + $row * ($thumbH + $wallGutter);
-        $thumb = ig_fetch_thumb($f['poster'] ?? null, $thumbW, $thumbH);
+        $cells[] = [
+            'film' => $f,
+            'x' => $margin + $col * ($thumbW + $wallGutter),
+            'y' => $gridTop + $row * ($thumbH + $wallGutter),
+        ];
+    }
+
+    return ['cells' => $cells, 'thumbW' => $thumbW, 'thumbH' => $thumbH, 'gridTop' => $gridTop, 'gridH' => $gridH];
+}
+
+function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $totalThisWeek = null, $liveDuration = false, &$durationSlot = null) {
+    $w = 1080;
+    $h = 1920;
+    $im = imagecreatetruecolor($w, $h);
+
+    $paper  = ig_hex($im, '#F4F1EB');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    imagefill($im, 0, 0, $paper);
+
+    // $totalThisWeek is unused now (kept as a parameter — both call
+    // sites still pass it positionally, not worth a signature change for
+    // no behavior) since the wall below replaced the old enumerated
+    // list's own "+N more" overflow line.
+    $y = forecast_cover_header($im, $episode, $liveDuration, $durationSlot);
+
+    // A wall of this week's posters as background texture — replaces the
+    // old enumerated list now that every film gets its own dedicated
+    // panel elsewhere (see forecast_build_chapter_card()), so this card
+    // no longer needs to name names, just signal "a lot is playing this
+    // week." Same wall technique forecast_build_podcast_art() uses for
+    // the RSS feed art, adapted to this canvas's portrait shape and
+    // reserved ink bands.
+    $wallTop = $y + 20;
+    $layout = forecast_wall_layout($filmsOverride, $conn, $episode, $wallTop);
+
+    foreach ($layout['cells'] as $cell) {
+        $thumb = ig_fetch_thumb($cell['film']['poster'] ?? null, $layout['thumbW'], $layout['thumbH']);
         if ($thumb) {
-            imagecopy($im, $thumb, $px, $py, 0, 0, $thumbW, $thumbH);
+            imagecopy($im, $thumb, $cell['x'], $cell['y'], 0, 0, $layout['thumbW'], $layout['thumbH']);
             imagedestroy($thumb);
         } else {
-            imagefilledrectangle($im, $px, $py, $px + $thumbW, $py + $thumbH, $placeholder);
+            imagefilledrectangle($im, $cell['x'], $cell['y'], $cell['x'] + $layout['thumbW'], $cell['y'] + $layout['thumbH'], $placeholder);
         }
     }
 
     // Fades the top of the grid up into clean paper — same alpha-band
     // technique forecast_build_podcast_art() uses for its own wall (GD
     // has no gradient primitive of its own).
-    $fadeH = min(160, $gridH);
+    $fadeH = min(160, $layout['gridH']);
     for ($i = 0; $i < $fadeH; $i++) {
         $alpha = (int) round(127 * ($i / $fadeH));
         $band  = imagecolorallocatealpha($im, 0xF4, 0xF1, 0xEB, $alpha);
-        imagefilledrectangle($im, 0, $gridTop + $i, $w, $gridTop + $i + 1, $band);
+        imagefilledrectangle($im, 0, $layout['gridTop'] + $i, $w, $layout['gridTop'] + $i + 1, $band);
     }
 
     // Ink band first, badge on top of it — see forecast_draw_guest_badge()
     // for why the badge needs to sit inside this band now rather than
     // above it.
-    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, ig_hex($im, '#14120F'));
     forecast_draw_guest_badge($im, $episode);
 
     return $im;
+}
+
+/**
+ * A short, silent video of the intro card animating in — the poster
+ * wall's tiles fade in one at a time, staggered in random order over the
+ * first few seconds, then holds on the fully-revealed card for a few
+ * more so it's a usable title-card clip once dropped into an editor.
+ * Built for the manual Premiere fallback: the wall's reveal only exists
+ * as motion in the real auto-generated video (or here); a still PNG has
+ * no way to show it. No waveform/timer/progress-bar chrome (those are
+ * specific to the real audio-synced video) and no audio track (the
+ * editor already has the master audio on its own track).
+ *
+ * Technique is the same one forecast_generate_video() already uses
+ * twice — a chain of filters, each a no-op until its own `enable` window
+ * opens — just applied per poster instead of per segment or per day.
+ *
+ * The wall's own top-fade gradient (forecast_build_cover()'s last step)
+ * is left out here — it would need to composite on top of whichever
+ * posters have already appeared at any given moment, a real extra step
+ * this first pass skips in favor of a plain hard edge on each tile.
+ */
+function forecast_generate_intro_animation(array $episode, $conn, $filmsOverride, $outputPath, $onProgress = null) {
+    $tmpDir = sys_get_temp_dir() . '/forecast-intro-anim-' . uniqid();
+    mkdir($tmpDir, 0755, true);
+
+    $baseImg = imagecreatetruecolor(1080, 1920);
+    imagefill($baseImg, 0, 0, ig_hex($baseImg, '#F4F1EB'));
+    $durationSlot = null;
+    $y = forecast_cover_header($baseImg, $episode, false, $durationSlot);
+    imagefilledrectangle($baseImg, 0, FORECAST_WAVE_BAND_Y, 1080, 1920, ig_hex($baseImg, '#14120F'));
+    forecast_draw_guest_badge($baseImg, $episode);
+    $basePath = $tmpDir . '/base.png';
+    imagepng($baseImg, $basePath);
+    imagedestroy($baseImg);
+
+    $wallTop = $y + 20;
+    $layout = forecast_wall_layout($filmsOverride, $conn, $episode, $wallTop);
+    $cells = $layout['cells'];
+    shuffle($cells);
+
+    $animSeconds = 4.0;
+    $holdSeconds = 4.0;
+    $duration = $animSeconds + $holdSeconds;
+    $fadeD = 0.35;
+
+    if (!$cells) {
+        // No posters to animate — still a valid, if plain, title card.
+        $cmd = sprintf(
+            'ffmpeg -y -loop 1 -i %s -t %s -c:v libx264 -pix_fmt yuv420p -r 25 %s',
+            escapeshellarg($basePath), escapeshellarg($duration), escapeshellarg($outputPath)
+        );
+        $result = forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $duration);
+        @unlink($basePath);
+        @rmdir($tmpDir);
+        return $result;
+    }
+
+    $n = count($cells);
+    $inputArgs = '-loop 1 -i ' . escapeshellarg($basePath) . ' ';
+    $filter = '';
+    $bgLabel = '0:v';
+    $cellPaths = [];
+    foreach ($cells as $i => $cell) {
+        $thumb = ig_fetch_thumb($cell['film']['poster'] ?? null, $layout['thumbW'], $layout['thumbH']);
+        $cellPath = $tmpDir . '/cell-' . $i . '.png';
+        if ($thumb) {
+            imagepng($thumb, $cellPath);
+            imagedestroy($thumb);
+        } else {
+            $ph = imagecreatetruecolor($layout['thumbW'], $layout['thumbH']);
+            imagefill($ph, 0, 0, ig_hex($ph, '#E4DECE'));
+            imagepng($ph, $cellPath);
+            imagedestroy($ph);
+        }
+        $cellPaths[] = $cellPath;
+
+        $inputIdx = $i + 1;
+        $inputArgs .= '-loop 1 -i ' . escapeshellarg($cellPath) . ' ';
+        $start = $n > 1 ? round($animSeconds * $i / $n, 2) : 0;
+        $filter .= "[{$inputIdx}:v]format=rgba,fade=t=in:st={$start}:d={$fadeD}:alpha=1[cell{$i}];";
+        $filter .= "[{$bgLabel}][cell{$i}]overlay={$cell['x']}:{$cell['y']}:enable='gte(t\\,{$start})'[wall{$i}];";
+        $bgLabel = "wall{$i}";
+    }
+    // Each loop clause above ends with its own ';' separator, leaving one
+    // trailing after the last — an empty final clause ffmpeg reads as
+    // "No such filter: ''" rather than silently ignoring.
+    $filter = rtrim($filter, ';');
+
+    $cmd = sprintf(
+        'ffmpeg -y %s-filter_complex %s -map %s -t %s -c:v libx264 -pix_fmt yuv420p -r 25 %s',
+        $inputArgs,
+        escapeshellarg($filter),
+        escapeshellarg("[{$bgLabel}]"),
+        escapeshellarg($duration),
+        escapeshellarg($outputPath)
+    );
+
+    $result = forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $duration);
+
+    @unlink($basePath);
+    foreach ($cellPaths as $p) @unlink($p);
+    @rmdir($tmpDir);
+
+    return $result;
 }
 
 // ── Segment cards (dynamic video) ───────────────────────────────────────

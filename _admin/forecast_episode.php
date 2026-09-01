@@ -110,7 +110,7 @@ $genError    = $genStatus && ($genStatus['status'] ?? '') === 'error' ? ($genSta
 
 // The manual-fallback exports — same running/error shape as the real
 // video, on their own progress files (see forecast_progress_path()'s
-// $kind) so none of the three can block or clobber another's status.
+// $kind) so none of the four can block or clobber another's status.
 $packageStatus    = forecast_generation_status($episode_id, 'package');
 $packageRunning   = $packageStatus && ($packageStatus['status'] ?? '') === 'running';
 $packageError     = $packageStatus && ($packageStatus['status'] ?? '') === 'error' ? ($packageStatus['error'] ?? 'Package generation failed.') : null;
@@ -120,6 +120,11 @@ $waveformStatus   = forecast_generation_status($episode_id, 'waveform');
 $waveformRunning  = $waveformStatus && ($waveformStatus['status'] ?? '') === 'running';
 $waveformError    = $waveformStatus && ($waveformStatus['status'] ?? '') === 'error' ? ($waveformStatus['error'] ?? 'Waveform generation failed.') : null;
 $waveformUrl      = !empty($episode['waveform_file']) ? '/uploads/forecast/' . $episode['waveform_file'] : null;
+
+$introAnimStatus  = forecast_generation_status($episode_id, 'intro');
+$introAnimRunning = $introAnimStatus && ($introAnimStatus['status'] ?? '') === 'running';
+$introAnimError   = $introAnimStatus && ($introAnimStatus['status'] ?? '') === 'error' ? ($introAnimStatus['error'] ?? 'Intro animation generation failed.') : null;
+$introAnimUrl     = !empty($episode['intro_animation_file']) ? '/uploads/forecast/' . $episode['intro_animation_file'] : null;
 
 $directVideo = !empty($episode['video_file']);
 $hasVideo    = $directVideo || !empty($episode['generated_video']);
@@ -290,6 +295,25 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                   <?php echo admin_csrf_field(); ?>
                   <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
                   <button class="btn btn--block" type="submit"><?php echo $waveformUrl ? 'Regenerate waveform clip' : 'Generate waveform clip'; ?></button>
+                </form>
+              <?php endif; ?>
+
+              <div class="admin-note" style="margin:var(--s-4) 0 var(--s-1);font-weight:600;color:var(--text-2)">Intro animation</div>
+              <?php if ($introAnimRunning): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2)" data-forecast-progress-label data-progress-kind="intro">Generating&hellip; <?php echo (int) ($introAnimStatus['percent'] ?? 0); ?>%</div>
+                <progress class="admin-progress" data-forecast-progress data-progress-kind="intro" data-episode-id="<?php echo $episode_id; ?>" value="<?php echo (int) ($introAnimStatus['percent'] ?? 0); ?>" max="100"></progress>
+              <?php else: ?>
+                <?php if ($introAnimError): ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2);color:var(--red-hi)">Failed: <?php echo $e(mb_strimwidth($introAnimError, 0, 200, '…')); ?></div>
+                <?php endif; ?>
+                <?php if ($introAnimUrl): ?>
+                <a class="btn btn--quiet btn--sm" href="<?php echo $e($introAnimUrl); ?>" style="margin-bottom:var(--s-3);display:inline-block">Download intro animation</a>
+                <?php endif; ?>
+                <div class="admin-note" style="margin:0 0 var(--s-2)">The poster wall fading in, tile by tile — motion the static intro panel can't show.</div>
+                <form action="/_admin/forecast_intro_animation.php" method="post">
+                  <?php echo admin_csrf_field(); ?>
+                  <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                  <button class="btn btn--block" type="submit"><?php echo $introAnimUrl ? 'Regenerate intro animation' : 'Generate intro animation'; ?></button>
                 </form>
               <?php endif; ?>
             </div>
