@@ -1555,11 +1555,16 @@
 
   // ══ Film Forecast — chapter timeline ════════════════════════════════════
   // A waveform (decoded client-side from the episode's own audio — no
-  // server rendering involved) with one draggable marker per selected
-  // film. Dragging is pure client-side state until "Save chapters" posts
-  // it; the storyboard preview above follows whichever marker is being
-  // dragged so a placement can be sanity-checked without a real ~15-20
-  // minute video render.
+  // server rendering involved) with a bank of every selected film plus
+  // all 7 days, dragged from there onto the waveform to place a marker —
+  // days are "main chapters," films nest under whichever day they land
+  // near (implicit from ordering, not an explicit link — same as how the
+  // server's own default spread works), and either can be used more than
+  // once. Dragging (both from the bank and repositioning an
+  // already-placed marker) is pure client-side state until "Save
+  // chapters" posts it; the storyboard preview above follows whichever
+  // marker is being dragged so a placement can be sanity-checked without
+  // a real ~15-20 minute video render.
   function initForecastTimeline() {
     var section = $('[data-forecast-timeline]');
     if (!section) return;
@@ -1573,12 +1578,12 @@
     var preshowSeconds = parseFloat(section.getAttribute('data-preshow-seconds')) || 0;
 
     var dataEl = $('[data-forecast-chapters-data]');
-    var initial = { chapters: [], chapterImages: {}, wrapupStart: null };
+    var initial = { chapters: [], segmentImages: {}, wrapupStart: null };
     try { initial = JSON.parse(dataEl.textContent); } catch (e) {}
-    var chapterImages = initial.chapterImages || {};
+    var segmentImages = initial.segmentImages || {};
     var wrapupStart = initial.wrapupStart;
     var chapters = (initial.chapters || []).map(function (c) {
-      return { film: c.film, start: c.start, title: c.title };
+      return { type: c.type, film: c.film || null, day: c.day || null, start: c.start, title: c.title };
     });
 
     var canvas       = section.querySelector('[data-forecast-waveform-canvas]');
@@ -1590,9 +1595,12 @@
     var dirtyChip    = section.querySelector('[data-forecast-timeline-dirty]');
     var statusEl     = section.querySelector('[data-forecast-chapters-status]');
     var generateForm = $('[data-forecast-generate-form]');
+    var bank         = section.querySelector('[data-forecast-bank]');
+
+    function chapterKey(c) { return c.type + '|' + (c.type === 'day' ? c.day : c.film); }
 
     var snapshot = function () {
-      return JSON.stringify(chapters.map(function (c) { return [c.film, c.start]; }));
+      return JSON.stringify(chapters.map(function (c) { return [chapterKey(c), c.start]; }));
     };
     var savedSnapshot = snapshot();
 
@@ -1608,9 +1616,9 @@
       return m + ':' + (sec < 10 ? '0' : '') + sec;
     }
 
-    // The chapter that's "active" at a given moment — the last one whose
-    // start is at or before it — same rule the video itself will use to
-    // decide which card is on screen at any given time.
+    // The entry that's "active" at a given moment — the last one whose
+    // start is at or before it, day or film whichever is more recent —
+    // same rule the video itself uses to decide which card is on screen.
     function activeChapterAt(time) {
       var active = null;
       chapters.forEach(function (c) {
@@ -1626,9 +1634,29 @@
         url = preshowImage;
       } else {
         var active = activeChapterAt(time);
-        url = active ? chapterImages[active.film] : introImage;
+        url = active ? segmentImages[chapterKey(active)] : introImage;
       }
       if (url && storyboardImg.getAttribute('src') !== url) storyboardImg.setAttribute('src', url);
+    }
+
+    // How many times each bank item is currently placed — shown as a
+    // small badge on the bank item itself so "already used" is visible
+    // at a glance without having to scan the whole waveform.
+    function updateBankBadges() {
+      if (!bank) return;
+      var counts = {};
+      chapters.forEach(function (c) {
+        var k = chapterKey(c);
+        counts[k] = (counts[k] || 0) + 1;
+      });
+      $$('[data-bank-item]', bank).forEach(function (item) {
+        var k = item.getAttribute('data-type') + '|' + item.getAttribute('data-key');
+        var badge = item.querySelector('[data-bank-badge]');
+        if (!badge) return;
+        var n = counts[k] || 0;
+        badge.textContent = n;
+        badge.hidden = n === 0;
+      });
     }
 
     function bindDrag(el, chapter, timeEl) {
@@ -1642,6 +1670,7 @@
         updateStoryboard(chapter.start);
       }
       el.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('[data-marker-remove]')) return;
         el.setPointerCapture(e.pointerId);
         el.classList.add('is-dragging');
         move(e);
@@ -1657,11 +1686,13 @@
       });
     }
 
-    // One marker element, shared by the draggable per-film markers and
+    // One marker element, shared by the draggable day/film markers and
     // the fixed intro/wrap-up bookends — same visual pieces (label,
-    // handle, time) either way, only whether bindDrag() gets called
-    // differs.
-    function buildMarker(start, title, extraClass) {
+    // handle, time) either way. A removable marker (anything but a fixed
+    // bookend — pass its chapters[] object as $chapter) also gets a
+    // small × that pulls it out of chapters[] entirely, distinct from
+    // bindDrag()'s own reposition-in-place drag.
+    function buildMarker(start, title, extraClass, chapter) {
       var pct = duration > 0 ? Math.max(0, Math.min(100, (start / duration) * 100)) : 0;
 
       var el = document.createElement('div');
@@ -1672,6 +1703,22 @@
       label.className = 'fc-marker__label';
       label.textContent = title;
       el.appendChild(label);
+
+      if (chapter) {
+        var remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'fc-marker__remove';
+        remove.setAttribute('data-marker-remove', '');
+        remove.textContent = '×';
+        remove.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var idx = chapters.indexOf(chapter);
+          if (idx !== -1) chapters.splice(idx, 1);
+          layoutMarkers();
+          markDirty();
+        });
+        label.appendChild(remove);
+      }
 
       var handle = document.createElement('div');
       handle.className = 'fc-marker__handle';
@@ -1688,15 +1735,15 @@
     function layoutMarkers() {
       markersWrap.innerHTML = '';
 
-      // The preshow and intro are both fixed bookends — never draggable
-      // and never saved (forecast_resolve_chapters() only ever produces
-      // one entry per selected film, nothing for these). The preshow
-      // always runs first, then the intro takes over once it ends.
+      // The preshow and intro are both fixed bookends — never draggable,
+      // never removable, never saved (they're not real timeline entries
+      // at all). The preshow always runs first, then the intro takes
+      // over once it ends.
       markersWrap.appendChild(buildMarker(0, 'Preshow', 'fc-marker--fixed').el);
       markersWrap.appendChild(buildMarker(preshowSeconds, 'Intro', 'fc-marker--fixed').el);
 
       chapters.forEach(function (c) {
-        var m = buildMarker(c.start, c.title);
+        var m = buildMarker(c.start, c.title, c.type === 'day' ? 'fc-marker--day' : '', c);
         bindDrag(m.el, c, m.timeEl);
         markersWrap.appendChild(m.el);
       });
@@ -1704,6 +1751,84 @@
       if (wrapupStart !== null && wrapupStart !== undefined) {
         markersWrap.appendChild(buildMarker(wrapupStart, 'Wrap-up', 'fc-marker--fixed').el);
       }
+
+      updateBankBadges();
+    }
+
+    // Drag a bank item onto the waveform to place a new marker — the
+    // bank item itself is never consumed (anything can be used more than
+    // once), just a floating ghost that follows the pointer and, on
+    // release over the waveform, becomes a new chapters[] entry at that
+    // position. Pointer events throughout (not native HTML5 drag/drop),
+    // same technique bindDrag() already uses and for the same reason —
+    // better touch support, one consistent technique for every drag
+    // here.
+    function bindBankDrag(item) {
+      var type  = item.getAttribute('data-type');
+      var key   = item.getAttribute('data-key');
+      var title = item.querySelector('.fc-bank-item__title').textContent;
+      var thumbSrc = item.querySelector('img').getAttribute('src');
+
+      item.addEventListener('pointerdown', function (e) {
+        item.setPointerCapture(e.pointerId);
+
+        var ghost = document.createElement('div');
+        ghost.className = 'fc-drag-ghost';
+        var img = document.createElement('img');
+        img.src = thumbSrc;
+        ghost.appendChild(img);
+        var label = document.createElement('span');
+        label.textContent = title;
+        ghost.appendChild(label);
+        document.body.appendChild(ghost);
+
+        function positionGhost(ev) {
+          ghost.style.left = ev.clientX + 'px';
+          ghost.style.top = ev.clientY + 'px';
+        }
+        positionGhost(e);
+
+        function overWaveform(ev) {
+          var rect = markersWrap.getBoundingClientRect();
+          return ev.clientX >= rect.left && ev.clientX <= rect.right
+            && ev.clientY >= rect.top - 40 && ev.clientY <= rect.bottom + 40;
+        }
+
+        function move(ev) {
+          positionGhost(ev);
+          waveformWrap.classList.toggle('is-drop-target', overWaveform(ev));
+        }
+        item.addEventListener('pointermove', move);
+
+        function finish(ev) {
+          item.removeEventListener('pointermove', move);
+          item.removeEventListener('pointerup', finish);
+          item.removeEventListener('pointercancel', cancel);
+          waveformWrap.classList.remove('is-drop-target');
+          ghost.remove();
+
+          if (overWaveform(ev) && duration > 0) {
+            var rect = markersWrap.getBoundingClientRect();
+            var x = Math.max(0, Math.min(rect.width, ev.clientX - rect.left));
+            var pct = rect.width > 0 ? x / rect.width : 0;
+            var start = Math.round(pct * duration);
+            chapters.push(type === 'day'
+              ? { type: 'day', film: null, day: key, start: start, title: title }
+              : { type: 'film', film: key, day: null, start: start, title: title });
+            layoutMarkers();
+            updateStoryboard(start);
+            markDirty();
+          }
+        }
+        function cancel() { finish({ clientX: -1, clientY: -1 }); }
+
+        item.addEventListener('pointerup', finish);
+        item.addEventListener('pointercancel', cancel);
+      });
+    }
+
+    if (bank) {
+      $$('[data-bank-item]', bank).forEach(bindBankDrag);
     }
 
     // A sibling of markersWrap, not a child of it — layoutMarkers()
@@ -1810,6 +1935,12 @@
         .catch(function () {});
     }
 
+    function serializeChapters() {
+      return JSON.stringify(chapters.map(function (c) {
+        return { type: c.type, film: c.film, day: c.day, start: c.start };
+      }));
+    }
+
     if (saveBtn) {
       saveBtn.addEventListener('click', function () {
         saveBtn.disabled = true;
@@ -1817,7 +1948,7 @@
         post('/_admin/forecast_chapters_save.php', {
           episode_id: episodeId,
           csrf: csrf,
-          chapters: JSON.stringify(chapters.map(function (c) { return { film: c.film, start: c.start }; }))
+          chapters: serializeChapters()
         }).then(function (res) {
           if (res && res.ok) {
             savedSnapshot = snapshot();
@@ -1841,7 +1972,7 @@
       generateForm.addEventListener('submit', function () {
         var input = generateForm.querySelector('[data-forecast-chapters-input]');
         if (input) {
-          input.value = JSON.stringify(chapters.map(function (c) { return { film: c.film, start: c.start }; }));
+          input.value = serializeChapters();
         }
       });
     }

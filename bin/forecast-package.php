@@ -3,13 +3,16 @@
 //  Film Forecast — manual-fallback panel package (background)
 //
 //  Launched detached by _admin/forecast_package.php. Renders the
-//  redesigned intro card plus one card per unique film actually playing
-//  this week (every film, independent of the Chapters checklist — see
-//  forecast_flat_week_films()), no showtimes line (see
-//  forecast_build_chapter_card()'s $showShowtimes), zips them with
-//  zero-padded/slugged names so they sort into air order in any file
-//  browser or Premiere import, and records the zip on the episode row the
-//  same way bin/forecast-generate.php records generated_video.
+//  redesigned intro card, then one day card plus that day's own film
+//  cards (no showtimes line — see forecast_build_chapter_card()'s
+//  $showShowtimes) for each of the week's 7 days in order — every film,
+//  independent of the Chapters checklist. A film playing more than once
+//  this week still only gets one panel, filed under its first day
+//  ($byDay's own dedup), even though a later day's own day card
+//  correctly lists it too. Zips everything with zero-padded/slugged
+//  names so it sorts into the real main/sub-chapter order in any file
+//  browser or Premiere import, and records the zip on the episode row
+//  the same way bin/forecast-generate.php records generated_video.
 // ═══════════════════════════════════════════════════════════════════════════
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -59,15 +62,36 @@ imagepng($introImg, $introPath);
 imagedestroy($introImg);
 $entries[] = $introPath;
 
-$total = count($films);
-foreach ($films as $i => $film) {
-    $slug = ctx_slug($film['display_title'] ?? $film['title']);
-    $path = $tmpDir . '/' . sprintf('%02d', $i + 1) . '-' . $slug . '.png';
-    $cardImg = forecast_build_chapter_card($film, $episode, false);
-    imagepng($cardImg, $path);
-    imagedestroy($cardImg);
-    $entries[] = $path;
-    if ($total > 0) forecast_write_progress($episode_id, 'running', min(90, (int) round(($i + 1) / $total * 90)), null, 'package');
+// Interleaved day/film order — a day panel (the accurate, day-scoped
+// list from forecast_films_for_day(), which unlike $byDay itself
+// correctly includes a film on every day it actually plays) followed by
+// whichever films are filed under that day in $byDay (its own
+// first-occurrence dedup — see the file header). Numbered sequentially
+// across the whole sequence, not per-film, so the zip's own sort order
+// mirrors the real main/sub-chapter hierarchy.
+$weekDays = forecast_week_days($episode['week_of']);
+$total = 7 + count($films);
+$done  = 0;
+$n     = 1;
+foreach ($weekDays as $ymd) {
+    $dayImg = forecast_build_day_card($ymd, forecast_films_for_day($byDay, $ymd), $episode);
+    $dayPath = $tmpDir . '/' . sprintf('%02d', $n++) . '-' . strtolower(date('l', strtotime($ymd))) . '.png';
+    imagepng($dayImg, $dayPath);
+    imagedestroy($dayImg);
+    $entries[] = $dayPath;
+    $done++;
+    forecast_write_progress($episode_id, 'running', min(90, (int) round($done / $total * 90)), null, 'package');
+
+    foreach ($byDay[$ymd] ?? [] as $film) {
+        $slug = ctx_slug($film['display_title'] ?? $film['title']);
+        $path = $tmpDir . '/' . sprintf('%02d', $n++) . '-' . $slug . '.png';
+        $cardImg = forecast_build_chapter_card($film, $episode, false);
+        imagepng($cardImg, $path);
+        imagedestroy($cardImg);
+        $entries[] = $path;
+        $done++;
+        forecast_write_progress($episode_id, 'running', min(90, (int) round($done / $total * 90)), null, 'package');
+    }
 }
 
 $zipName = $episode_id . '-package-' . $stamp . '.zip';

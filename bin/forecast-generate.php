@@ -7,13 +7,14 @@
 //  returns immediately instead of blocking — a real episode has taken
 //  upward of 15-20 minutes end to end, almost all of it the geq-driven
 //  progress bar (one of ffmpeg's slowest filter types). Owns the whole
-//  lifecycle: resolves which films are in the episode and when each one's
-//  chapter starts (the saved selection/chapters, or their automatic
-//  defaults — see forecast_resolve_selection()/forecast_resolve_chapters()
-//  in list/forecast.php), renders the intro/chapter/wrap-up segment
-//  images, runs ffmpeg via forecast_generate_video()'s proc_open()
-//  progress callback, writes uploads/forecast/<id>-progress.json as it
-//  goes, and updates the episode row once finished.
+//  lifecycle: resolves which films are in the episode and when each day/
+//  film entry starts (the saved selection/timeline, or their automatic
+//  defaults — see forecast_resolve_selection()/forecast_resolve_timeline()
+//  in list/forecast.php), renders the preshow/intro/day/chapter/wrap-up
+//  segment images, runs ffmpeg via forecast_generate_video()'s
+//  proc_open() progress callback, writes
+//  uploads/forecast/<id>-progress.json as it goes, and updates the
+//  episode row once finished.
 //  _admin/forecast_progress.php only ever reads that JSON file — it never
 //  touches ffmpeg itself.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -59,7 +60,7 @@ forecast_write_progress($episode_id, 'running', 0);
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
 $totalThisWeek = array_sum(array_map('count', $byDay));
-$chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $duration);
+$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $duration);
 
 $stamp = time();
 $segmentPaths = [];
@@ -84,13 +85,28 @@ imagedestroy($introImg);
 $segmentPaths[] = $introPath;
 $segments[] = ['image' => $introPath, 'start' => FORECAST_PRESHOW_SECONDS];
 
+// A day entry is the "main chapter" — a film entry is its "sub-chapter."
+// Both fold into the same segment list; forecast_generate_video()'s own
+// overlay fold doesn't care which is which, only its separate day-label
+// chain does (via each entry's 'type'/'day' — 'label' is the short
+// weekday name for that on-screen chrome, kept out of
+// forecast_generate_video() itself since it's calendar logic, not video
+// assembly).
 foreach ($chapters as $i => $c) {
     $path = $dir . '/' . $episode_id . '-seg-' . $i . '-' . $stamp . '.png';
-    $cardImg = forecast_build_chapter_card($c['data'], $episode);
+    if ($c['type'] === 'day') {
+        $cardImg = forecast_build_day_card($c['day'], $c['data'], $episode);
+    } else {
+        $cardImg = forecast_build_chapter_card($c['data'], $episode);
+    }
     imagepng($cardImg, $path);
     imagedestroy($cardImg);
     $segmentPaths[] = $path;
-    $segments[] = ['image' => $path, 'start' => $c['start']];
+    $segments[] = [
+        'image' => $path, 'start' => $c['start'], 'type' => $c['type'],
+        'day' => $c['day'] ?? null,
+        'label' => $c['type'] === 'day' ? strtoupper(date('l', strtotime($c['day']))) : null,
+    ];
 }
 
 // A dedicated closing beat, not just the last chapter running to the

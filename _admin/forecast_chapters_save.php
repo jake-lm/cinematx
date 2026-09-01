@@ -1,18 +1,20 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-//  Admin — save chapter marker positions for one episode
+//  Admin — save timeline marker positions for one episode
 //
 //  Mirrors forecast_selection_save.php's shape exactly, one level down:
 //  where that handler validates posted film keys against "what's actually
-//  playing this week," this one validates posted chapters against "what's
-//  actually in the current selection" — a chapter can only ever exist for
-//  a film that's checked, never a stray one left over from before the
-//  selection changed. See forecast_save_chapters() in list/forecast.php.
+//  playing this week," this one validates posted entries against "what's
+//  actually in the current selection" (a film entry) or "one of this
+//  week's 7 real days" (a day entry). See forecast_save_timeline() in
+//  list/forecast.php.
 //
 //  $_POST['chapters'] is a JSON string (built client-side from the
 //  timeline's marker positions), not a nested form array — the timeline
 //  is a JS drag interaction, not a plain HTML form, so there's no benefit
 //  to the usual chapters[0][film]=...&chapters[0][start]=... encoding.
+//  Kept the name 'chapters' for the POST field/DB column — no reason to
+//  churn either just because entries are mixed-type now.
 //
 //  Called by fetch() from the timeline's "Save chapters" button
 //  (js/v7.js), not a page navigation, so this answers with JSON rather
@@ -36,10 +38,11 @@ if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
 $selectedKeys = array_map('ig_film_key', $films);
+$weekDayKeys = forecast_week_days($episode['week_of']);
 
 $posted = json_decode($_POST['chapters'] ?? '[]', true);
 if (!is_array($posted)) $posted = [];
 
-$saved = forecast_save_chapters($conn, $episode_id, $admin_user['id'], $selectedKeys, $posted, (float) ($episode['duration_seconds'] ?? 0));
+$saved = forecast_save_timeline($conn, $episode_id, $admin_user['id'], $selectedKeys, $weekDayKeys, $posted, (float) ($episode['duration_seconds'] ?? 0));
 
 echo json_encode(['ok' => true, 'chapters' => $saved]);

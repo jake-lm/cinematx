@@ -2127,10 +2127,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // ── Film Forecast chapter timeline ───────────────────────────────────────
 //
-// One .fc-marker per selected film, absolutely positioned (left set
-// inline by JS as a % of the waveform's width) over the waveform canvas.
-// Drag updates left + the label; nothing here is a real <input>, the
-// dragged position lives in JS state until "Save chapters" posts it.
+// One .fc-marker per placed day or film, absolutely positioned (left set
+// inline by JS as a % of the waveform's width) over the waveform canvas —
+// dropped there from the bank (below), not pre-placed. Drag updates left
+// + the label; nothing here is a real <input>, the dragged position lives
+// in JS state until "Save chapters" posts it.
 .fc-marker {
   position: absolute;
   top: 0; bottom: 0;
@@ -2155,10 +2156,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fc-marker:hover .fc-marker__handle {
   box-shadow: 0 0 0 4px var(--red-wash);
 }
-// The intro/wrap-up bookends — always at a fixed position, never a real
-// chapter (see forecast_resolve_chapters(), which only ever produces one
-// per selected film), so nothing here is draggable or gets saved. Ink,
-// not red, so it reads as structural rather than a placeable chapter.
+// A day marker — the "main chapter" a film's own marker nests under
+// (implicitly, by where it falls in time, not an explicit link) — same
+// gold the generated video's own persistent day-label chrome uses
+// (forecast_generate_video()'s day-label drawtext chain), so the two
+// read as the same concept.
+.fc-marker--day {
+  .fc-marker__handle { background: #F2C14E; }
+  &.is-dragging .fc-marker__handle,
+  &:hover .fc-marker__handle { box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.25); }
+}
+// The intro/preshow/wrap-up bookends — always at a fixed position, never
+// a real timeline entry (nothing in forecast_resolve_timeline()'s saved/
+// default output ever produces one), so nothing here is draggable,
+// removable, or gets saved. Ink, not red or gold, so it reads as
+// structural rather than a placeable chapter.
 .fc-marker--fixed {
   cursor: default;
   .fc-marker__handle { background: var(--text-3); }
@@ -2177,6 +2189,23 @@ button, input, select, textarea { font: inherit; color: inherit; }
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+// Re-enables pointer events despite the label's own pointer-events:none
+// (that none is what lets a click land on the marker/handle underneath
+// instead of the label text) — a small, always-visible target rather
+// than a hover-reveal, since this admin page also has to work by touch.
+.fc-marker__remove {
+  pointer-events: auto;
+  margin-left: 6px;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: var(--t-3xs);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+  &:hover { opacity: 1; }
 }
 .fc-marker__time {
   position: absolute;
@@ -2207,6 +2236,104 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-radius: 50%;
   background: var(--text);
   transform: translateX(-50%);
+}
+
+// A dashed outline on the waveform while a bank item is being dragged
+// over it — the only feedback that a release right here will actually
+// place something, since there's no native drop-target styling with a
+// pointer-events drag.
+[data-forecast-waveform-wrap].is-drop-target {
+  outline: 2px dashed var(--red);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+// The bank — every selected film plus all 7 days, always available to
+// drag from (never consumed by placing one — see .fc-bank-item__badge
+// below for how "already used" shows instead). Two .fc-bank__row groups,
+// days first, matching the "main chapter" / "sub-chapter" framing.
+.fc-bank {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-height: 260px;
+  overflow-y: auto;
+}
+.fc-bank__section-label {
+  @include label(var(--t-3xs), var(--text-3));
+  margin-top: var(--s-2);
+  &:first-child { margin-top: 0; }
+}
+.fc-bank__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.fc-bank-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: 180px;
+  padding: 4px 8px 4px 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  &:active { cursor: grabbing; }
+}
+.fc-bank-item__thumb {
+  flex: none;
+  width: 32px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-3);
+  img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+}
+.fc-bank-item__title {
+  font-size: var(--t-3xs);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+// Hidden at zero (the common case — most of the bank is unused at any
+// moment), a filled pill once placed at least once so "already used" is
+// visible without scanning the whole waveform for it.
+.fc-bank-item__badge {
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red);
+  color: var(--surface);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+// The floating clone that follows the pointer while dragging a bank item
+// toward the waveform — position set inline (clientX/clientY) by JS.
+.fc-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 4px 10px 4px 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(20, 20, 20, 0.18);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: top; }
+  span { font-size: var(--t-3xs); color: var(--text-2); white-space: nowrap; }
 }
 
 // A text-label sibling of .seg (the icon-sized view toggle) — same surface,

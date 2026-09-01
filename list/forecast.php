@@ -619,6 +619,39 @@ function forecast_flat_week_films(array $byDay) {
     return $flat;
 }
 
+// The 7 calendar dates this episode's week actually spans, Monday..Sunday
+// of week_of — the fixed universe a day-timeline-entry validates against,
+// and what both the admin bank's day section and the day-panel loop
+// iterate over.
+function forecast_week_days($weekOf) {
+    $start = strtotime($weekOf);
+    return array_map(fn($i) => date('Y-m-d', strtotime("+{$i} day", $start)), range(0, 6));
+}
+
+// Every film actually playing on $ymd, with its showtimes[] filtered down
+// to just that day's — forecast_week_by_day()'s own $byDay buckets a
+// multi-day film under its *first* occurrence day only (every showtime is
+// tracked in showtimes[], but the day-keyed array itself only ever gets
+// one entry, filed under whichever date came first), so a day card can't
+// source its list from $byDay directly without silently dropping a film's
+// later-day showings.
+function forecast_films_for_day(array $byDay, $ymd) {
+    $out = [];
+    foreach (forecast_flat_week_films($byDay) as $f) {
+        $onDay = array_values(array_filter($f['showtimes'], fn($s) => date('Y-m-d', $s['timestamp']) === $ymd));
+        if (!$onDay) continue;
+        // Not `$f + ['showtimes' => $onDay]` — array `+` only fills in
+        // keys missing from the left operand, so since $f already has a
+        // (whole-week) 'showtimes' key, that one would silently win and
+        // this filtering would have no effect at all. Caught by
+        // rendering a real day card and finding every one of a film's
+        // showtimes for the *whole week* listed under one single day.
+        $f['showtimes'] = $onDay;
+        $out[] = $f;
+    }
+    return $out;
+}
+
 // The automatic cover default — round-robin, capped at $limit rows, with
 // the true remaining count so the cover can show a "+N more this week"
 // line exactly like ig_build_list_page()'s own overflow handling.
@@ -692,53 +725,154 @@ function forecast_resolve_selection(array $episode, array $byDay, $override = nu
     return array_values(array_filter($flat, fn($f) => isset($keys[ig_film_key($f)])));
 }
 
-// ── Chapters (segment timing) ───────────────────────────────────────────
+// ── Timeline (segment timing) ───────────────────────────────────────────
 //
-// A chapter only ever exists for a film that's currently selected — the
-// checklist stays the single source of truth for *which* films are in the
-// episode, chapters only add *when*. Same reasoning selected_films itself
-// follows relative to the automatic default.
+// Two kinds of entry share one timeline now: 'day' (the week's 7 calendar
+// dates, always all of them, the "main chapters" the host narrates the
+// week through) and 'film' (a "sub-chapter" for a specific film — a
+// selected film only ever exists for one that's currently checked, same
+// as before, but can now appear more than once, since the same film might
+// come up twice in conversation). A film only ever exists for a film
+// that's currently selected — the checklist stays the single source of
+// truth for *which* films are in the episode, the timeline only adds
+// *when* (and, now, *how many times*).
+//
+// Saved JSON shape: {type:'film', film:<key>, start} or
+// {type:'day', day:'YYYY-MM-DD', start}. An entry with no 'type' but a
+// 'film' key is an episode saved before 'day' entries existed — treated
+// as type 'film' on read, no migration needed.
+
+// "Monday, Sep 1" — the day label used on timeline markers/the bank,
+// everywhere except the day card's own oversized all-caps headline
+// (forecast_build_day_card() formats that one inline, deliberately styled
+// differently as the loudest text on that one panel).
+function forecast_day_title($ymd) {
+    return date('l, M j', strtotime($ymd));
+}
 
 /**
- * Every currently-selected film gets a chapter, ordered by start time.
- * A film with a saved start keeps it; a film with none (never placed, or
- * newly checked since chapters were last saved) gets an evenly-spread
- * default based on its position in $selectedFilms — a starting point to
- * drag from, not meant to be precise. Films no longer selected are simply
- * absent from $selectedFilms already, so their old saved chapter (if any)
- * quietly drops out here rather than needing an explicit prune step.
+ * The full timeline — every day plus every film chapter, ordered by
+ * start time. $byDay/$weekOf resolve each day entry's real film list and
+ * validate day values against the week's actual 7 dates.
+ *
+ * Defaults, applied independently so touching one kind never suppresses
+ * the other's:
+ *   - Days are all-or-nothing: 7 evenly spread across the full duration
+ *     if none have ever been saved, otherwise exactly what's saved (even
+ *     if that's fewer than 7 — the admin removed one on purpose via the
+ *     timeline's delete control; re-adding it on every load would make
+ *     deleting a day marker impossible).
+ *   - Films default per-film: a selected film with no saved chapter of
+ *     its own is placed evenly among its own real-world day's other
+ *     still-defaulting films, within that day's span (bounded by the two
+ *     nearest resolved day markers) — so Generate on a totally untouched
+ *     episode still produces a complete, sensibly-timed video, and a
+ *     single manual placement on a busy day doesn't stop its neighbors
+ *     from getting a reasonable starting position too.
  */
-function forecast_resolve_chapters(array $selectedFilms, $savedChaptersJson, $durationSeconds) {
-    $saved = [];
+function forecast_resolve_timeline(array $selectedFilms, array $byDay, $weekOf, $savedChaptersJson, $durationSeconds) {
+    $weekDays = forecast_week_days($weekOf);
+
+    $selectedByKey = [];
+    foreach ($selectedFilms as $f) $selectedByKey[ig_film_key($f)] = $f;
+
+    $savedDays = [];
+    $savedFilms = [];
     if ($savedChaptersJson) {
         foreach ((json_decode($savedChaptersJson, true) ?: []) as $c) {
-            if (isset($c['film'], $c['start'])) $saved[$c['film']] = (float) $c['start'];
+            if (!isset($c['start'])) continue;
+            if (($c['type'] ?? null) === 'day') {
+                if (isset($c['day']) && in_array($c['day'], $weekDays, true)) {
+                    $savedDays[] = ['day' => $c['day'], 'start' => (float) $c['start']];
+                }
+            } elseif (isset($c['film']) && isset($selectedByKey[$c['film']])) {
+                $savedFilms[] = ['film' => $c['film'], 'start' => (float) $c['start']];
+            }
         }
     }
 
-    $count = count($selectedFilms);
-    $chapters = [];
-    foreach (array_values($selectedFilms) as $i => $film) {
-        $key = ig_film_key($film);
-        $start = $saved[$key] ?? ($count > 0 ? round($durationSeconds * $i / $count) : 0);
-        $chapters[] = ['film' => $key, 'start' => (float) $start, 'title' => $film['display_title'] ?? $film['title'], 'data' => $film];
+    $timeline = [];
+
+    if ($savedDays) {
+        foreach ($savedDays as $d) {
+            $timeline[] = [
+                'type' => 'day', 'day' => $d['day'], 'start' => $d['start'],
+                'title' => forecast_day_title($d['day']), 'data' => forecast_films_for_day($byDay, $d['day']),
+            ];
+        }
+    } else {
+        $n = count($weekDays);
+        foreach ($weekDays as $i => $ymd) {
+            $timeline[] = [
+                'type' => 'day', 'day' => $ymd, 'start' => (float) round($durationSeconds * $i / $n),
+                'title' => forecast_day_title($ymd), 'data' => forecast_films_for_day($byDay, $ymd),
+            ];
+        }
     }
 
-    usort($chapters, fn($a, $b) => $a['start'] <=> $b['start']);
-    return $chapters;
+    foreach ($savedFilms as $sf) {
+        $film = $selectedByKey[$sf['film']];
+        $timeline[] = [
+            'type' => 'film', 'film' => $sf['film'], 'start' => $sf['start'],
+            'title' => $film['display_title'] ?? $film['title'], 'data' => $film,
+        ];
+    }
+
+    $savedFilmKeys = array_flip(array_column($savedFilms, 'film'));
+    $needsDefault = array_values(array_filter($selectedFilms, fn($f) => !isset($savedFilmKeys[ig_film_key($f)])));
+    if ($needsDefault) {
+        $dayStarts = [];
+        foreach ($timeline as $t) if ($t['type'] === 'day') $dayStarts[$t['day']] = $t['start'];
+        ksort($dayStarts);
+        $orderedDayYmds = array_keys($dayStarts);
+
+        $byRealDay = [];
+        foreach ($needsDefault as $film) {
+            $onDays = array_unique(array_map(fn($s) => date('Y-m-d', $s['timestamp']), $film['showtimes'] ?? []));
+            $ymd = $onDays ? $onDays[0] : ($orderedDayYmds[0] ?? null);
+            if ($ymd === null) continue;
+            $byRealDay[$ymd][] = $film;
+        }
+
+        foreach ($byRealDay as $ymd => $films) {
+            $spanStart = $dayStarts[$ymd] ?? 0;
+            $idx = array_search($ymd, $orderedDayYmds, true);
+            $nextYmd = $idx !== false && isset($orderedDayYmds[$idx + 1]) ? $orderedDayYmds[$idx + 1] : null;
+            $spanEnd = $nextYmd !== null ? $dayStarts[$nextYmd] : $durationSeconds;
+
+            $count = count($films);
+            foreach ($films as $i => $film) {
+                $start = $spanStart + ($spanEnd - $spanStart) * $i / $count;
+                $timeline[] = [
+                    'type' => 'film', 'film' => ig_film_key($film), 'start' => (float) $start,
+                    'title' => $film['display_title'] ?? $film['title'], 'data' => $film,
+                ];
+            }
+        }
+    }
+
+    usort($timeline, fn($a, $b) => $a['start'] <=> $b['start']);
+    return $timeline;
 }
 
-// Mirrors forecast_save_selection()'s shape exactly: only chapters whose
-// film is actually in the current selection are kept, start times clamped
-// into range so a stray client-side drag can't save something nonsensical.
-function forecast_save_chapters($conn, $episode_id, $uid, array $selectedFilmKeys, array $postedChapters, $durationSeconds) {
-    $validKeys = array_flip($selectedFilmKeys);
+// Mirrors forecast_save_selection()'s shape exactly: only entries whose
+// film is actually in the current selection (or whose day is actually
+// one of this week's 7) are kept, start times clamped into range so a
+// stray client-side drag can't save something nonsensical.
+function forecast_save_timeline($conn, $episode_id, $uid, array $selectedFilmKeys, array $weekDayKeys, array $postedEntries, $durationSeconds) {
+    $validFilmKeys = array_flip($selectedFilmKeys);
+    $validDayKeys  = array_flip($weekDayKeys);
     $out = [];
-    foreach ($postedChapters as $c) {
-        if (!isset($c['film'], $c['start'])) continue;
-        if (!isset($validKeys[$c['film']])) continue;
+    foreach ($postedEntries as $c) {
+        if (!isset($c['start'])) continue;
         $start = max(0, min((float) $durationSeconds, (float) $c['start']));
-        $out[] = ['film' => $c['film'], 'start' => $start];
+        if (($c['type'] ?? null) === 'day') {
+            if (!isset($c['day']) || !isset($validDayKeys[$c['day']])) continue;
+            $out[] = ['type' => 'day', 'day' => $c['day'], 'start' => $start];
+        } else {
+            if (!isset($c['film']) || !isset($validFilmKeys[$c['film']])) continue;
+            $out[] = ['type' => 'film', 'film' => $c['film'], 'start' => $start];
+        }
     }
     usort($out, fn($a, $b) => $a['start'] <=> $b['start']);
     $conn->prepare("UPDATE `forecast_episodes` SET chapters = :chapters WHERE id = :id AND uid = :uid")
@@ -1182,6 +1316,135 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
     return $im;
 }
 
+// One per day — the "main chapter" a film's own chapter card nests under.
+// Same reserved top/bottom bands and branding every other panel carries
+// (see forecast_build_chapter_card()'s own eyebrow/byline, copied here
+// verbatim), but a row list instead of either a single film's own
+// spotlight or the intro's poster-wall texture — naming the actual films
+// playing this day is the whole point of a day card, so it borrows
+// ig_build_list_page_paper()'s row geometry (list/instagram.php) rather
+// than either of those.
+function forecast_build_day_card($dayYmd, array $dayFilms, array $episode) {
+    $w = 1080;
+    $h = 1920;
+    $im = imagecreatetruecolor($w, $h);
+    imagealphablending($im, true);
+
+    $paper   = ig_hex($im, '#F4F1EB');
+    $ink     = ig_hex($im, '#14120F');
+    $red     = ig_hex($im, '#922E32');
+    $muted   = ig_hex($im, '#6B6659');
+    $divider = ig_hex($im, '#DED7C7');
+    $placeholder = ig_hex($im, '#E4DECE');
+
+    imagefill($im, 0, 0, $paper);
+    imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    $topBandEnd = 14 + FORECAST_TOP_WAVE_BAND_H;
+    imagefilledrectangle($im, 0, 14, $w, $topBandEnd, $ink);
+
+    $margin = 80;
+
+    $y = $topBandEnd + 50;
+    $weekOfLabel = strtoupper('Film Forecast · Week of ' . date('M j', strtotime($episode['week_of'])));
+    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $weekOfLabel);
+    $y += 34;
+    imagettftext($im, 22, 0, $margin, $y, $muted, IG_FONT_BODY, 'with ' . $episode['guest_name']);
+    // 90, not a smaller gap — imagettftext()'s y is the text's baseline,
+    // so an 80px headline's own cap-height reaches nearly that far
+    // *above* its baseline; confirmed by rendering a real card and
+    // finding the headline overlapping the byline line above it at a
+    // smaller gap. Same 90px forecast_build_cover() already uses safely
+    // ahead of its own (larger, up to 96px) headline.
+    $y += 90;
+
+    // The day headline — the loudest thing on this panel, same shrink-
+    // to-fit loop forecast_build_cover()'s own "WEEK OF" headline uses.
+    // A real calendar date, not a bare weekday name — this episode spans
+    // one specific week, and it costs nothing to be unambiguous.
+    $headline = strtoupper(date('l, M j', strtotime($dayYmd)));
+    $headlineMaxWidth = $w - $margin * 2;
+    $headlineSize = 80;
+    while ($headlineSize > 40) {
+        $bbox = imagettfbbox($headlineSize, 0, IG_FONT_HEADLINE, $headline);
+        if ($bbox[2] - $bbox[0] <= $headlineMaxWidth) break;
+        $headlineSize -= 2;
+    }
+    imagettftext($im, $headlineSize, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $headline);
+    $y += 50;
+
+    imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
+    $y += 40;
+
+    $thumbW = 82;
+    $thumbH = 123;
+    $textX  = $margin + $thumbW + 28;
+    $rowTextMaxWidth = $w - $margin - $textX;
+
+    $rowHeight   = $thumbH + 30;
+    $footerY     = FORECAST_WAVE_BAND_Y - 60;
+    $rowsAreaEnd = $footerY - 70;
+    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
+
+    $rows  = array_slice($dayFilms, 0, $maxRows);
+    $extra = count($dayFilms) - count($rows);
+
+    if (empty($dayFilms)) {
+        imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for this day yet.');
+    }
+
+    $lastIndex = count($rows) - 1;
+    foreach ($rows as $i => $film) {
+        $title = !empty($film['display_title']) ? $film['display_title'] : $film['title'];
+
+        $thumb = ig_fetch_thumb($film['poster'] ?? null, $thumbW, $thumbH);
+        if ($thumb) {
+            imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
+            imagedestroy($thumb);
+        } else {
+            imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
+            $initial = mb_strtoupper(mb_substr($title, 0, 1));
+            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $iw = $ibox[2] - $ibox[0];
+            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
+        }
+
+        $rowTitle = ig_fit_text(mb_strtoupper($title), IG_FONT_HEADLINE, 32, $rowTextMaxWidth);
+        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $rowTitle);
+
+        // Venue/location off this day's own showtime (forecast_films_for_day()
+        // already filtered showtimes[] down to just today's), not the
+        // film's top-level venue field — the rare case a same-title
+        // booking plays a different venue on a different day still reads
+        // right here.
+        $todaysShowtimes = $film['showtimes'] ?? [];
+        $primary = $todaysShowtimes[0] ?? [];
+        $venueBit = $primary['location'] ? ($primary['venue'] . ' — ' . $primary['location']) : ($primary['venue'] ?? '');
+        if (!empty($film['director'])) $venueBit .= '  ·  dir. ' . $film['director'];
+        $meta = ig_fit_text($venueBit, IG_FONT_BODY, 22, $rowTextMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+
+        $time = ig_fit_text(ig_format_times(array_column($todaysShowtimes, 'timestamp')), IG_FONT_BODY, 22, $rowTextMaxWidth);
+        imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
+
+        $y += $rowHeight;
+        if ($i < $lastIndex) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
+    }
+
+    if ($extra > 0) {
+        imagettftext($im, 22, 0, $margin, $y + 30, $red, IG_FONT_BODY, '+ ' . $extra . ' more today');
+    }
+
+    imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    imagefilledrectangle($im, 0, FORECAST_WAVE_BAND_Y, $w, $h, $ink);
+    forecast_draw_guest_badge($im, $episode);
+
+    return $im;
+}
+
 // ── Caption ──────────────────────────────────────────────────────────────
 
 function forecast_build_caption(array $episode) {
@@ -1404,6 +1667,15 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
     $audioIdx = count($segments);
     $barIdx   = $audioIdx + 1;
 
+    // The gap between the bottom band's own top edge and where the
+    // bottom waveform actually starts — verified empty in every segment
+    // builder (each just ink-fills the whole band and draws nothing
+    // there until the badge) — is where the persistent day label below
+    // lives.
+    $dayLabelGapH = $waveY - FORECAST_WAVE_BAND_Y;
+    $daySegments  = array_values(array_filter($segments, fn($s) => ($s['type'] ?? null) === 'day'));
+    $timerOutLabel = $daySegments ? 'bgw3' : 'out';
+
     $filter = $bgFilter
         . "[{$audioIdx}:a]showwaves=s={$waveW}x{$waveH}:mode=cline:rate=25:colors=0xF2C14E[wraw];"
         . "[wraw]colorkey=0x000000:0.15:0.1,format=rgba[wave];"
@@ -1413,7 +1685,31 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
         . "[{$bgLabel}][wave2]overlay={$topWaveX}:{$topWaveY}[bgw0];"
         . "[bgw0][wave]overlay={$waveX}:{$waveY}[bgw1];"
         . "[bgw1][bar]overlay={$barX}:{$barY}[bgw2];"
-        . "[bgw2]{$timerFilter}[out]";
+        . "[bgw2]{$timerFilter}[{$timerOutLabel}]";
+
+    // The persistent "which day" label — a second, independent drawtext
+    // chain, same enable-window technique the segment overlay fold above
+    // already uses (each filter a no-op outside its own window, chained
+    // so exactly one is ever visible at a time), keyed off just the
+    // day-type segments' own start times rather than every segment's.
+    // Composited last, after the timer — same "chrome that must never be
+    // occluded" reasoning the timer already gets. No explicit end bound
+    // on the last day's window, so the label keeps showing through the
+    // wrap-up segment (still discussing that day at that point).
+    if ($daySegments) {
+        $chainLabel = $timerOutLabel;
+        foreach ($daySegments as $i => $day) {
+            $isLast = $i === count($daySegments) - 1;
+            $enable = $isLast
+                ? "gte(t\\,{$day['start']})"
+                : "between(t\\,{$day['start']}\\,{$daySegments[$i + 1]['start']})";
+            $out = $isLast ? 'out' : "dayov{$i}";
+            $filter .= ";[{$chainLabel}]drawtext=fontfile={$fontfilePath}:text='" . ($day['label'] ?? '')
+                . "':fontsize=30:fontcolor=0xF2C14E:x=30:y=" . FORECAST_WAVE_BAND_Y . "+({$dayLabelGapH}-th)/2"
+                . ":enable='{$enable}'[{$out}]";
+            $chainLabel = $out;
+        }
+    }
 
     $cmd = sprintf(
         'ffmpeg -y %s-i %s -f lavfi -i %s -filter_complex %s -map %s -map %d:a '

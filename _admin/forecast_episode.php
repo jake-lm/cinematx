@@ -58,7 +58,8 @@ $previewUrl = '/uploads/forecast/' . $episode_id . '-preview.png?v=' . filemtime
 // toggle.
 $episodeDuration = (float) ($episode['duration_seconds'] ?? 0);
 $audioUrl = !empty($episode['audio_file']) ? '/uploads/forecast/' . rawurlencode($episode['audio_file']) : null;
-$chapters = forecast_resolve_chapters($films, $episode['chapters'] ?? null, $episodeDuration);
+$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $episodeDuration);
+$weekDays = forecast_week_days($episode['week_of']);
 
 // The preshow storyboard frame — no episode data in it, so no reason to
 // rebuild it on every load the way the intro/chapter cards are; render it
@@ -80,14 +81,27 @@ imagepng($introStoryboardImg, $introStoryboardPath);
 imagedestroy($introStoryboardImg);
 $introStoryboardUrl = '/uploads/forecast/' . $episode_id . '-storyboard-intro.png?v=' . filemtime($introStoryboardPath);
 
-$chapterStoryboardUrls = [];
-foreach ($chapters as $c) {
-    $slug = md5($c['film']);
+// Every selected film plus all 7 days, not just whatever's currently
+// placed on the timeline — the bank needs art for everything available
+// to drag in, regardless of placement. Keyed "film|<key>"/"day|<ymd>" so
+// a film key and a Y-m-d string can never collide.
+$segmentImages = [];
+foreach ($films as $film) {
+    $key = ig_film_key($film);
+    $slug = md5($key);
     $path = $dir . '/' . $episode_id . '-storyboard-' . $slug . '.png';
-    $cardImg = forecast_build_chapter_card($c['data'], $episode);
+    $cardImg = forecast_build_chapter_card($film, $episode);
     imagepng($cardImg, $path);
     imagedestroy($cardImg);
-    $chapterStoryboardUrls[$c['film']] = '/uploads/forecast/' . $episode_id . '-storyboard-' . $slug . '.png?v=' . filemtime($path);
+    $segmentImages['film|' . $key] = '/uploads/forecast/' . $episode_id . '-storyboard-' . $slug . '.png?v=' . filemtime($path);
+}
+foreach ($weekDays as $ymd) {
+    $slug = md5($ymd);
+    $path = $dir . '/' . $episode_id . '-storyboard-day-' . $slug . '.png';
+    $cardImg = forecast_build_day_card($ymd, forecast_films_for_day($byDay, $ymd), $episode);
+    imagepng($cardImg, $path);
+    imagedestroy($cardImg);
+    $segmentImages['day|' . $ymd] = '/uploads/forecast/' . $episode_id . '-storyboard-day-' . $slug . '.png?v=' . filemtime($path);
 }
 
 $genStatus   = forecast_generation_status($episode_id);
@@ -384,14 +398,40 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         </div>
         <div class="card__body">
           <div class="admin-note" style="margin:0 0 var(--s-3)">
-            Play the episode back to hear where each film actually comes up, then drag its marker to line up with the playhead. Click anywhere on the waveform to jump there. The preview follows whichever marker you're dragging.
+            Drag a day or film from the bank onto the waveform where it comes up — a day is a main chapter, a film nests under whichever day you drop it near. Anything can be used more than once. Play the episode back to hear where things actually land, then fine-tune by dragging the marker itself. Click anywhere on the waveform to jump there.
           </div>
 
           <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4);">
             <div class="ig-mock">
               <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($preshowStoryboardUrl); ?>" alt="Segment preview">
             </div>
-            <div><!-- reserved for future controls --></div>
+            <div class="fc-bank" data-forecast-bank>
+              <div class="fc-bank__section-label">Days</div>
+              <div class="fc-bank__row">
+                <?php foreach ($weekDays as $ymd): ?>
+                <div class="fc-bank-item" data-bank-item data-type="day" data-key="<?php echo $e($ymd); ?>">
+                  <span class="fc-bank-item__thumb">
+                    <img src="<?php echo $e($segmentImages['day|' . $ymd] ?? ''); ?>" alt="" loading="lazy">
+                  </span>
+                  <span class="fc-bank-item__title"><?php echo $e(date('D, M j', strtotime($ymd))); ?></span>
+                  <span class="fc-bank-item__badge" data-bank-badge hidden>0</span>
+                </div>
+                <?php endforeach; ?>
+              </div>
+
+              <div class="fc-bank__section-label">Films</div>
+              <div class="fc-bank__row">
+                <?php foreach ($films as $film): $filmKey = ig_film_key($film); ?>
+                <div class="fc-bank-item" data-bank-item data-type="film" data-key="<?php echo $e($filmKey); ?>">
+                  <span class="fc-bank-item__thumb">
+                    <img src="<?php echo $e($segmentImages['film|' . $filmKey] ?? ''); ?>" alt="" loading="lazy">
+                  </span>
+                  <span class="fc-bank-item__title"><?php echo $e($film['display_title'] ?? $film['title']); ?></span>
+                  <span class="fc-bank-item__badge" data-bank-badge hidden>0</span>
+                </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
           </div>
 
           <audio data-forecast-audio-player controls preload="metadata" style="width:100%;margin-bottom:var(--s-3)" src="<?php echo $e($audioUrl); ?>"></audio>
@@ -409,8 +449,11 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       </section>
 
       <script type="application/json" data-forecast-chapters-data><?php echo json_encode([
-          'chapters' => array_map(fn($c) => ['film' => $c['film'], 'start' => $c['start'], 'title' => $c['title']], $chapters),
-          'chapterImages' => $chapterStoryboardUrls,
+          'chapters' => array_map(fn($c) => [
+              'type' => $c['type'], 'film' => $c['film'] ?? null, 'day' => $c['day'] ?? null,
+              'start' => $c['start'], 'title' => $c['title'],
+          ], $chapters),
+          'segmentImages' => $segmentImages,
           'wrapupStart' => forecast_wrapup_start($chapters, $episodeDuration),
       ]); ?></script>
       <?php endif; ?>
