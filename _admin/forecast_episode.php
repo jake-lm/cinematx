@@ -224,7 +224,21 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <div class="card__head"><span class="card__title">Manual export</span></div>
             <div class="card__body">
               <div class="admin-note" style="margin:0 0 var(--s-3)">
-                For days the automated video can't be trusted &mdash; every panel this week as PNGs, plus a transparent waveform clip, to hand-assemble in an editor.
+                For days the automated video can't be trusted &mdash; every panel this week as PNGs, plus a transparent waveform clip, to hand-assemble in an editor. Once you've got a final cut, upload it below.
+              </div>
+
+              <div class="admin-note" style="margin:0 0 var(--s-1);font-weight:600;color:var(--text-2)">Final video</div>
+              <?php if (!empty($episode['video_file'])): ?>
+              <div class="admin-note" style="margin:0 0 var(--s-2)">Current: <?php echo $e($episode['video_file']); ?></div>
+              <?php endif; ?>
+              <div data-forecast-video-upload
+                   data-episode-id="<?php echo $episode_id; ?>"
+                   data-csrf="<?php echo $e($_SESSION['admin_csrf']); ?>"
+                   style="margin-bottom:var(--s-4)">
+                <input type="file" class="field__input" accept="video/mp4,video/quicktime" data-video-upload-input style="margin-bottom:var(--s-2)">
+                <progress class="admin-progress" data-video-upload-progress value="0" max="100" hidden></progress>
+                <div class="admin-note" style="margin:var(--s-2) 0" data-video-upload-status></div>
+                <button class="btn btn--quiet btn--block" type="button" data-video-upload-btn disabled>Upload video</button>
               </div>
 
               <div class="admin-note" style="margin:0 0 var(--s-1);font-weight:600;color:var(--text-2)">Panel package</div>

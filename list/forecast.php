@@ -47,6 +47,49 @@ function forecast_feed_episodes($conn) {
     )->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// ── Uploads ──────────────────────────────────────────────────────────────
+//
+// Shared by _admin/forecast_save.php (the main create/edit form — photo,
+// audio, video, all optional, week_of/guest_name required) and
+// _admin/forecast_video_upload.php (a video_file-only upload from the
+// workshop page, no episode metadata required, JSON response so it can be
+// driven by an XMLHttpRequest with upload progress).
+
+const FORECAST_IMAGE_TYPES = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+const FORECAST_AUDIO_TYPES = ['audio/mpeg' => 'mp3', 'audio/mp4' => 'm4a', 'audio/x-m4a' => 'm4a', 'audio/wav' => 'wav', 'audio/x-wav' => 'wav'];
+const FORECAST_VIDEO_TYPES = ['video/mp4' => 'mp4', 'video/quicktime' => 'mov'];
+
+/**
+ * Validates and moves an upload from $field into uploads/forecast/, named
+ * "<episode id>-<field>-<time>.<ext>". Returns the new filename, or null
+ * if no file was submitted (not an error). Throws RuntimeException on
+ * anything wrong rather than failing the request itself — callers with
+ * different failure shapes (a redirect for a normal form post, JSON for a
+ * fetch/XHR-driven one) each catch it and fail their own way.
+ */
+function forecast_handle_upload($field, $episode_id, array $allowedTypes, $existing) {
+    if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return null;
+    if ($_FILES[$field]['error'] !== UPLOAD_ERR_OK) throw new RuntimeException(ucfirst($field) . ' upload failed.');
+
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime  = finfo_file($finfo, $_FILES[$field]['tmp_name']);
+    finfo_close($finfo);
+    if (!isset($allowedTypes[$mime])) {
+        throw new RuntimeException(ucfirst($field) . ' is not one of the supported file types.');
+    }
+
+    $dir = dirname(__DIR__) . '/uploads/forecast';
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
+
+    $filename = $episode_id . '-' . $field . '-' . time() . '.' . $allowedTypes[$mime];
+    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $dir . '/' . $filename)) {
+        throw new RuntimeException('Could not save the uploaded ' . $field . '.');
+    }
+    if ($existing && file_exists($dir . '/' . $existing)) unlink($dir . '/' . $existing);
+
+    return $filename;
+}
+
 /**
  * Transcodes a just-uploaded audio file to a standard 128kbps MP3 — WAV in
  * particular is valid per the podcast RSS spec but poorly supported by

@@ -1462,6 +1462,73 @@
   // bar (defaulting to 'video', the original single-bar behavior); its
   // label is always the immediately preceding sibling, true for all three
   // sections' markup.
+  // Plain fetch() can't report upload progress (only download/response
+  // streaming), so this is the one Forecast upload driven by
+  // XMLHttpRequest instead of the post() helper everything else here
+  // uses — xhr.upload's own progress event is what drives the bar.
+  function initForecastVideoUpload() {
+    var wrap = $('[data-forecast-video-upload]');
+    if (!wrap) return;
+    var input    = wrap.querySelector('[data-video-upload-input]');
+    var button   = wrap.querySelector('[data-video-upload-btn]');
+    var progress = wrap.querySelector('[data-video-upload-progress]');
+    var status   = wrap.querySelector('[data-video-upload-status]');
+    var episodeId = wrap.getAttribute('data-episode-id');
+    var csrf      = wrap.getAttribute('data-csrf');
+
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      button.disabled = !file;
+      status.textContent = file ? file.name + ' (' + (file.size / 1048576).toFixed(1) + ' MB)' : '';
+    });
+
+    button.addEventListener('click', function () {
+      var file = input.files[0];
+      if (!file) return;
+
+      button.disabled = true;
+      input.disabled = true;
+      progress.hidden = false;
+      progress.value = 0;
+      status.textContent = 'Uploading… 0%';
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/_admin/forecast_video_upload.php');
+
+      xhr.upload.addEventListener('progress', function (e) {
+        if (!e.lengthComputable) return;
+        var pct = Math.round((e.loaded / e.total) * 100);
+        progress.value = pct;
+        status.textContent = 'Uploading… ' + pct + '%';
+      });
+
+      function fail(msg) {
+        status.textContent = msg;
+        button.disabled = false;
+        input.disabled = false;
+        progress.hidden = true;
+      }
+
+      xhr.addEventListener('load', function () {
+        var data = null;
+        try { data = JSON.parse(xhr.responseText); } catch (err) {}
+        if (xhr.status === 200 && data && data.ok) {
+          status.textContent = 'Uploaded — reloading…';
+          location.reload();
+        } else {
+          fail((data && data.error) ? data.error : 'Upload failed.');
+        }
+      });
+      xhr.addEventListener('error', function () { fail('Upload failed.'); });
+
+      var formData = new FormData();
+      formData.append('episode_id', episodeId);
+      formData.append('csrf', csrf);
+      formData.append('video_file', file);
+      xhr.send(formData);
+    });
+  }
+
   function initForecastProgress() {
     $$('[data-forecast-progress]').forEach(function (bar) {
       var kind = bar.getAttribute('data-progress-kind') || 'video';
@@ -1792,7 +1859,7 @@
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();
     initProfileFaceUpload(); initProfileBannerUpload(); initLetterboxdConnect(); initYouMenu();
-    initRoleGroup(); initRoleDrop(); initPosterCrop(); initForecastProgress(); initForecastTimeline();
+    initRoleGroup(); initRoleDrop(); initPosterCrop(); initForecastVideoUpload(); initForecastProgress(); initForecastTimeline();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
