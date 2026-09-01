@@ -82,7 +82,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <div class="admin-note" style="margin:var(--s-2) 0 0">Current: <a href="/_admin/forecast_episode.php?id=<?php echo (int) $editing['id']; ?>"><?php echo $e($editing['audio_file']); ?></a><?php if (!empty($editing['duration_seconds'])): ?> (<?php echo forecast_format_duration($editing['duration_seconds']); ?>)<?php endif; ?> &mdash; pick the showcase and generate the video there.</div>
                 <?php endif; ?>
               </div>
-              <div class="field"><label class="field__label" for="fc-video">Or a finished video <span class="admin-tz">skips generation, posts as-is</span></label>
+              <div class="field"><label class="field__label" for="fc-video">Or a finished video <span class="admin-tz">skips generation, posts as-is, replaces audio_file with its own audio track</span></label>
                 <input class="field__input" id="fc-video" name="video_file" type="file" accept="video/mp4,video/quicktime">
                 <?php if ($editing && !empty($editing['video_file'])): ?>
                 <div class="admin-note" style="margin:var(--s-2) 0 0">Current: <?php echo $e($editing['video_file']); ?></div>

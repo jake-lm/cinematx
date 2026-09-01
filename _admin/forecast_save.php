@@ -10,7 +10,11 @@
 //
 //  duration_seconds is read via ffprobe right after an audio or video file
 //  lands, never typed in by hand, so it can't drift from the real file —
-//  see forecast_probe_duration() in list/forecast.php.
+//  see forecast_probe_duration() in list/forecast.php. A directly-uploaded
+//  video also has its audio track pulled out to become audio_file (see
+//  forecast_extract_audio_from_video()) — the video is treated as the
+//  real final cut, so the podcast RSS feed's audio enclosure should match
+//  it, not some earlier, possibly since-diverged audio upload.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
 admin_check_csrf();
@@ -86,6 +90,23 @@ $audio = forecast_handle_upload('audio_file',  $episode_id, FORECAST_AUDIO_TYPES
 $video = forecast_handle_upload('video_file',  $episode_id, FORECAST_VIDEO_TYPES, $existing['video_file']);
 
 $dir = dirname(__DIR__) . '/uploads/forecast';
+
+// A directly-uploaded video is the finished, final cut (the manual-edit
+// fallback path — see forecast_extract_audio_from_video()'s docblock) —
+// its own audio track is what the podcast RSS feed should actually
+// enclose, not whatever audio_file happened to be uploaded, in this same
+// request or an earlier one, and may since have diverged from it (a
+// Premiere re-edit, say). Takes priority over a freshly-uploaded
+// audio_file in the same request too, for the same reason: the video is
+// the one guaranteed to be the real final cut.
+if ($video !== null) {
+    $extracted = forecast_extract_audio_from_video($dir, $video, $episode_id);
+    if ($extracted !== null) {
+        $staleAudio = $audio ?? $existing['audio_file'];
+        if ($staleAudio && file_exists($dir . '/' . $staleAudio)) unlink($dir . '/' . $staleAudio);
+        $audio = $extracted;
+    }
+}
 
 // Standardize on MP3 regardless of what was uploaded — see
 // forecast_transcode_audio_to_mp3()'s docblock. Runs synchronously: an

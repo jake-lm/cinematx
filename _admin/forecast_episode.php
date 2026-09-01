@@ -190,18 +190,31 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <?php if ($posted): ?>
                 <div class="admin-note">Already posted &mdash; media id <?php echo $e($episode['posted_media_id']); ?>.</div>
                 <button class="btn btn--block" type="button" disabled>Posted</button>
-              <?php elseif (!$configured): ?>
-                <div class="admin-note"><code>IG_ACCESS_TOKEN</code> / <code>IG_BUSINESS_ACCOUNT_ID</code> aren't set.</div>
-                <button class="btn btn--block" type="button" disabled>Not configured</button>
-              <?php elseif (!$hasVideo): ?>
-                <div class="admin-note">Nothing to post yet &mdash; upload a video or generate one first.</div>
-                <button class="btn btn--block" type="button" disabled>No video yet</button>
               <?php else: ?>
-                <form action="/_admin/forecast_post.php" method="post"
-                      onsubmit="return confirm('Publish this Reel to the live Instagram account now? This cannot be undone.');">
+                <?php if (!$configured): ?>
+                  <div class="admin-note"><code>IG_ACCESS_TOKEN</code> / <code>IG_BUSINESS_ACCOUNT_ID</code> aren't set.</div>
+                  <button class="btn btn--block" type="button" disabled>Not configured</button>
+                <?php elseif (!$hasVideo): ?>
+                  <div class="admin-note">Nothing to post yet &mdash; upload a video or generate one first.</div>
+                  <button class="btn btn--block" type="button" disabled>No video yet</button>
+                <?php else: ?>
+                  <form action="/_admin/forecast_post.php" method="post"
+                        onsubmit="return confirm('Publish this Reel to the live Instagram account now? This cannot be undone.');">
+                    <?php echo admin_csrf_field(); ?>
+                    <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                    <button class="btn btn--block" type="submit">Post to Instagram</button>
+                  </form>
+                <?php endif; ?>
+
+                <form action="/_admin/forecast_mark_posted.php" method="post" style="margin-top:var(--s-4)"
+                      onsubmit="return confirm('Mark this episode as posted without actually posting it? Only do this if you already posted it yourself — it unlocks the podcast RSS feed for this episode.');">
                   <?php echo admin_csrf_field(); ?>
                   <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
-                  <button class="btn btn--block" type="submit">Post to Instagram</button>
+                  <div class="admin-note" style="margin:0 0 var(--s-2)">Already posted it yourself? This unlocks the podcast RSS feed without posting again.</div>
+                  <div class="field"><label class="field__label" for="fc-posted-ref">Instagram link or media id <span class="admin-tz">optional</span></label>
+                    <input class="field__input" id="fc-posted-ref" name="reference" type="text" placeholder="https://instagram.com/reel/...">
+                  </div>
+                  <button class="btn btn--quiet btn--block" type="submit">Mark as already posted</button>
                 </form>
               <?php endif; ?>
             </div>

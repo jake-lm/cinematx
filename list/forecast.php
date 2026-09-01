@@ -80,6 +80,37 @@ function forecast_transcode_audio_to_mp3($dir, $filename) {
     return $mp3Name;
 }
 
+/**
+ * Pulls the audio track out of a directly-uploaded video into its own
+ * MP3 — for the manual-edit fallback path (a finished video edited
+ * outside the auto-pipeline, in Premiere say) where the video is the
+ * real final cut and whatever audio_file happens to be on the episode
+ * may since have diverged from it. The podcast RSS feed's enclosure
+ * always reads audio_file (see forecast-feed.php), so without this the
+ * feed would keep serving stale audio even after the video's replaced.
+ * Returns the new filename, or null if ffmpeg failed — the video upload
+ * itself still succeeds either way, this just leaves audio_file as it
+ * was.
+ */
+function forecast_extract_audio_from_video($dir, $videoFilename, $episode_id) {
+    $videoPath = $dir . '/' . $videoFilename;
+    $mp3Name = $episode_id . '-audio_file-' . time() . '.mp3';
+    $mp3Path = $dir . '/' . $mp3Name;
+
+    $cmd = sprintf(
+        'ffmpeg -y -i %s -vn -c:a libmp3lame -b:a 128k %s 2>&1',
+        escapeshellarg($videoPath),
+        escapeshellarg($mp3Path)
+    );
+    exec($cmd, $output, $exitCode);
+    if ($exitCode !== 0 || !file_exists($mp3Path) || filesize($mp3Path) === 0) {
+        @unlink($mp3Path);
+        return null;
+    }
+
+    return $mp3Name;
+}
+
 function forecast_audio_mime($filename) {
     $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
     switch ($ext) {
