@@ -2248,6 +2248,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-radius: var(--radius);
 }
 
+// Prevents the page from trying to scroll/pinch while dragging across
+// the waveform to scrub — same reasoning .fc-marker's own touch-action
+// already follows.
+[data-forecast-waveform-canvas] {
+  touch-action: none;
+}
+
 // The bank — every selected film plus all 7 days, always available to
 // drag from (never consumed by placing one — see .fc-bank-item__badge
 // below for how "already used" shows instead). Two .fc-bank__row groups,

@@ -755,20 +755,18 @@ function forecast_day_title($ymd) {
  * start time. $byDay/$weekOf resolve each day entry's real film list and
  * validate day values against the week's actual 7 dates.
  *
- * Defaults, applied independently so touching one kind never suppresses
- * the other's:
- *   - Days are all-or-nothing: 7 evenly spread across the full duration
- *     if none have ever been saved, otherwise exactly what's saved (even
- *     if that's fewer than 7 — the admin removed one on purpose via the
- *     timeline's delete control; re-adding it on every load would make
- *     deleting a day marker impossible).
- *   - Films default per-film: a selected film with no saved chapter of
- *     its own is placed evenly among its own real-world day's other
- *     still-defaulting films, within that day's span (bounded by the two
- *     nearest resolved day markers) — so Generate on a totally untouched
- *     episode still produces a complete, sensibly-timed video, and a
- *     single manual placement on a busy day doesn't stop its neighbors
- *     from getting a reasonable starting position too.
+ * Only days default — 7 evenly spread across the full duration if none
+ * have ever been saved, otherwise exactly what's saved (even if that's
+ * fewer than 7 — the admin removed one on purpose via the timeline's
+ * delete control; re-adding it on every load would make deleting a day
+ * marker impossible). Films never auto-place: a fresh episode's bank
+ * starts with every film available and none of them on the timeline yet,
+ * so Generate on a totally untouched episode produces day cards with no
+ * film commentary timed in at all until the admin actually drags some in —
+ * a deliberate choice over auto-placing every selected film, since the
+ * Chapters checklist already defaults to selecting the whole week and a
+ * fully-populated timeline for that many films made an untouched
+ * episode's first real render impractically slow.
  */
 function forecast_resolve_timeline(array $selectedFilms, array $byDay, $weekOf, $savedChaptersJson, $durationSeconds) {
     $weekDays = forecast_week_days($weekOf);
@@ -816,39 +814,6 @@ function forecast_resolve_timeline(array $selectedFilms, array $byDay, $weekOf, 
             'type' => 'film', 'film' => $sf['film'], 'start' => $sf['start'],
             'title' => $film['display_title'] ?? $film['title'], 'data' => $film,
         ];
-    }
-
-    $savedFilmKeys = array_flip(array_column($savedFilms, 'film'));
-    $needsDefault = array_values(array_filter($selectedFilms, fn($f) => !isset($savedFilmKeys[ig_film_key($f)])));
-    if ($needsDefault) {
-        $dayStarts = [];
-        foreach ($timeline as $t) if ($t['type'] === 'day') $dayStarts[$t['day']] = $t['start'];
-        ksort($dayStarts);
-        $orderedDayYmds = array_keys($dayStarts);
-
-        $byRealDay = [];
-        foreach ($needsDefault as $film) {
-            $onDays = array_unique(array_map(fn($s) => date('Y-m-d', $s['timestamp']), $film['showtimes'] ?? []));
-            $ymd = $onDays ? $onDays[0] : ($orderedDayYmds[0] ?? null);
-            if ($ymd === null) continue;
-            $byRealDay[$ymd][] = $film;
-        }
-
-        foreach ($byRealDay as $ymd => $films) {
-            $spanStart = $dayStarts[$ymd] ?? 0;
-            $idx = array_search($ymd, $orderedDayYmds, true);
-            $nextYmd = $idx !== false && isset($orderedDayYmds[$idx + 1]) ? $orderedDayYmds[$idx + 1] : null;
-            $spanEnd = $nextYmd !== null ? $dayStarts[$nextYmd] : $durationSeconds;
-
-            $count = count($films);
-            foreach ($films as $i => $film) {
-                $start = $spanStart + ($spanEnd - $spanStart) * $i / $count;
-                $timeline[] = [
-                    'type' => 'film', 'film' => ig_film_key($film), 'start' => (float) $start,
-                    'title' => $film['display_title'] ?? $film['title'], 'data' => $film,
-                ];
-            }
-        }
     }
 
     usort($timeline, fn($a, $b) => $a['start'] <=> $b['start']);

@@ -1871,15 +1871,31 @@
       // the RAF loop above only runs during actual playback.
       audioEl.addEventListener('seeked', function () { updatePlayhead(audioEl.currentTime); });
 
-      // Click the waveform itself to jump playback there — markers sit
-      // in their own layer (markersWrap) above the canvas and handle
-      // their own pointer events, so a click that lands on one never
-      // reaches this listener.
-      canvas.addEventListener('click', function (e) {
+      // Click-and-drag anywhere on the waveform to scrub playback — a
+      // plain click (no movement) still just jumps there, same as
+      // before. Markers sit in their own layer (markersWrap) above the
+      // canvas and handle their own pointer events, so a drag starting
+      // on one never reaches this listener; the playhead itself has
+      // pointer-events:none (css/v7.scss) specifically so a drag
+      // starting visually "on" it still lands here instead of needing
+      // its own separate handler.
+      var scrubbing = false;
+      function seekFromEvent(e) {
         var rect = canvas.getBoundingClientRect();
         var pct = rect.width > 0 ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) : 0;
         audioEl.currentTime = pct * duration;
         updatePlayhead(audioEl.currentTime);
+      }
+      canvas.addEventListener('pointerdown', function (e) {
+        scrubbing = true;
+        canvas.setPointerCapture(e.pointerId);
+        seekFromEvent(e);
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        if (scrubbing) seekFromEvent(e);
+      });
+      ['pointerup', 'pointercancel'].forEach(function (evt) {
+        canvas.addEventListener(evt, function () { scrubbing = false; });
       });
     }
 
