@@ -896,6 +896,13 @@ function forecast_build_cover(array $episode, $conn, $filmsOverride = null, $tot
     // (kept as a parameter — both call sites still pass it positionally,
     // not worth a signature change for no behavior).
     $films = $filmsOverride !== null ? $filmsOverride : forecast_week_films($conn, $episode['week_of'], 60)['films'];
+    // Left out entirely rather than shown as a blank placeholder tile —
+    // a texture wall reads worse with visible gaps in it than it does
+    // with one film's poster repeating an extra time from the cycle
+    // below. Filtered before the capacity/cycle math runs, not after,
+    // so a short week of mostly-unposterered films still cycles its real
+    // posters to fill the grid instead of leaving most of it blank.
+    $films = array_values(array_filter($films, fn($f) => !empty($f['poster'])));
 
     $wallCols   = 6;
     $wallGutter = 8;
