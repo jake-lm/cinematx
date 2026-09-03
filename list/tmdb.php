@@ -45,8 +45,18 @@ const TMDB_EMPTY = [
 // called it. Anchored to the end so a real title is never cut short.
 const TMDB_FORMATS = '/\s+(?:in|on)?\s*(?:3-?D|IMAX|4K(?:\s+restorations?)?|70\s?mm|35\s?mm|16\s?mm|DCP)\s*$/i';
 
+// A subtitled/dubbed annotation, same idea as TMDB_FORMATS above but a shape
+// its end-anchor can't reach: it sits *before* the trailing format text, not
+// after — "Akira (Subtitled) in 4K" only had "in 4K" stripped by TMDB_FORMATS,
+// leaving "Akira (Subtitled)" as the actual search query, which TMDB matched
+// to nothing and cached as a permanent miss. Not anchored, so it comes off
+// wherever it sits, before TMDB_FORMATS runs on whatever's left.
+const TMDB_LANGUAGE = '/\s*\((?:subtitled|dubbed|subs?|english\s+dub(?:bed)?)\)/i';
+
 function tmdb_query($title) {
-    $q = trim(preg_replace(TMDB_FORMATS, '', trim((string)$title)));
+    $q = trim((string)$title);
+    $q = trim(preg_replace(TMDB_LANGUAGE, '', $q));
+    $q = trim(preg_replace(TMDB_FORMATS, '', $q));
     return $q !== '' ? $q : trim((string)$title);
 }
 

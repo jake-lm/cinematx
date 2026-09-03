@@ -63,5 +63,18 @@ foreach (['Paramount Theatre', 'Austin Film Society', 'Hyperreal Film Club'] as 
     if (empty($venues[$v])) fwrite(STDERR, date('c') . " warm: WARNING — no screenings from $v\n");
 }
 
+// The poster count above says HOW MANY missed; it doesn't say which, so a
+// title TMDB can't match sits silently posterless until someone happens to
+// notice it on Instagram or the site (see "Akira (Subtitled) in 4K" — an
+// exhibition annotation TMDB_FORMATS didn't fully strip, permanently cached
+// as a dead search). Naming them here means a bad title-cleaning pattern
+// shows up in the log the same night it starts screening, not whenever
+// someone spots the gap.
+$posterless = [];
+foreach ($films as $f) if (empty($f['poster'])) $posterless[] = $f['title'] ?? '(untitled)';
+if ($posterless) {
+    fwrite(STDERR, date('c') . ' warm: WARNING — no poster for: ' . implode('; ', array_unique($posterless)) . "\n");
+}
+
 flock($lock, LOCK_UN);
 fclose($lock);
