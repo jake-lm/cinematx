@@ -2283,11 +2283,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // drag from (never consumed by placing one — see .fc-bank-item__badge
 // below for how "already used" shows instead). Two .fc-bank__row groups,
 // days first, matching the "main chapter" / "sub-chapter" framing.
+// Fills its grid cell (the storyboard preview beside it sets the row's
+// real height — see forecast_episode.php's align-items:stretch override
+// on that specific .adm-two, since the class itself defaults to `start`
+// everywhere else it's reused) rather than a fixed cap — three sections
+// (Days/Films/Extra films, the last one added later) already run past
+// what a short fixed height could show without scrolling internally.
 .fc-bank {
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
-  max-height: 260px;
+  height: 100%;
   overflow-y: auto;
 }
 .fc-bank__section-label {

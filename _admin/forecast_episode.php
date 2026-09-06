@@ -474,7 +474,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <?php endif; ?>
           </div>
 
-          <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4);">
+          <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4); align-items:stretch;">
             <div class="ig-mock">
               <img class="ig-mock__image" data-forecast-storyboard-img src="<?php echo $e($preshowStoryboardUrl); ?>" alt="Segment preview">
             </div>
