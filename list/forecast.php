@@ -530,9 +530,10 @@ function forecast_week_by_day($conn, $weekOf) {
     // exist once in the list, a real gap once the chapter card started
     // needing to say when it's actually showing. Every occurrence is
     // now kept as one entry in $showtimes (own timestamp/venue/location
-    // each, in case a same-title booking ever genuinely spans two —
-    // see forecast_format_showtimes()), grouped under the film's first
-    // occurrence rather than becoming a second, duplicate row.
+    // each, in case a same-title booking ever genuinely spans two — see
+    // forecast_build_chapter_card()'s own showtime-pill grid), grouped
+    // under the film's first occurrence rather than becoming a second,
+    // duplicate row.
     $byTitle = [];
     $order = [];
     foreach ($films as $f) {
@@ -554,37 +555,6 @@ function forecast_week_by_day($conn, $weekOf) {
     }
     ksort($byDay);
     return $byDay;
-}
-
-// One line covering every night a film plays this week, not just its
-// first ("Mon, 7:30pm & Thu, 9:00pm" for a repertory favorite showing
-// twice) — the same single value it's always been for the far more
-// common film showing only once. Venue folds in once at the end when
-// every showtime shares one (the normal case); a same-title booking
-// that genuinely spans two venues in one week gets each showtime
-// labeled with its own instead of silently showing the wrong one.
-function forecast_format_showtimes(array $showtimes) {
-    usort($showtimes, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
-    $venueKeys = array_unique(array_map(fn($s) => $s['venue'] . '|' . ($s['location'] ?? ''), $showtimes));
-    $sameVenue = count($venueKeys) === 1;
-
-    $parts = [];
-    foreach ($showtimes as $s) {
-        $when = date('D, g:ia', $s['timestamp']);
-        if ($sameVenue) {
-            $parts[] = $when;
-        } else {
-            $venueBit = !empty($s['location']) ? "{$s['venue']} — {$s['location']}" : $s['venue'];
-            $parts[] = "{$when} ({$venueBit})";
-        }
-    }
-
-    $line = implode(' & ', $parts);
-    if ($sameVenue && $showtimes) {
-        $venueBit = !empty($showtimes[0]['location']) ? "{$showtimes[0]['venue']} — {$showtimes[0]['location']}" : $showtimes[0]['venue'];
-        $line .= '   ·   ' . $venueBit;
-    }
-    return $line;
 }
 
 // Every night that has a screening gets its first pick before any night
@@ -1572,18 +1542,74 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
         $y += 38;
     }
 
-    // Every night this film actually plays this week, not just one — the
-    // two facts the spotlight page keeps as pills over its hero, folded
-    // into a single line in the brand red since this frame's real estate
-    // is shared with the overview below. Falls back to just $timestamp
-    // if $showtimes is somehow missing (a caller not going through
-    // forecast_week_by_day()) rather than showing nothing.
+    // Every night this film actually plays this week, not just one — used
+    // to fold into one compressed red line here, which either ran off the
+    // card past two or three showtimes or, with just one, left this whole
+    // panel with a lot of bare paper before the divider. A small pill per
+    // showtime instead ("letterbox" — ig_pill(), the same shape the
+    // spotlight page already stacks over its hero), two per row, three
+    // rows deep. Sorted so a 7th-plus screening is simply the latest one
+    // left off, not an arbitrary one — a "+N more" footnote isn't worth
+    // the space it would cost at this size. Falls back to just
+    // $timestamp if $showtimes is somehow missing (a caller not going
+    // through forecast_week_by_day()) rather than showing nothing.
     $showtimes = !empty($film['showtimes']) ? $film['showtimes']
         : (!empty($film['timestamp']) ? [['timestamp' => $film['timestamp'], 'venue' => $film['venue'] ?? null, 'location' => $film['location'] ?? null]] : []);
     if ($showShowtimes && $showtimes) {
-        $meta = ig_fit_text(forecast_format_showtimes($showtimes), IG_FONT_BODY, 24, $textMaxWidth);
-        imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $meta);
-        $y += 40;
+        usort($showtimes, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+        $chips = array_slice($showtimes, 0, 6);
+        $venueKeys = array_unique(array_map(fn($s) => $s['venue'] . '|' . ($s['location'] ?? ''), $chips));
+        $sameVenue = count($venueKeys) === 1;
+        $sameVenueName = count(array_unique(array_map(fn($s) => $s['venue'], $chips))) === 1;
+        $sameDay = count(array_unique(array_map(fn($s) => date('Y-m-d', $s['timestamp']), $chips))) === 1;
+
+        $y += 10;
+        $pillFont = 24;
+        $pillH    = 60;
+        $colGap   = 20;
+        $rowGap   = 12;
+        $colW     = (int) (($textMaxWidth - $colGap) / 2);
+
+        foreach ($chips as $i => $s) {
+            // Every showtime shown falling on one day (the common case —
+            // a chain playing a film several times in a single day) drops
+            // the day-of-week entirely: six identical "Sun,"s add nothing
+            // and only push out the one thing genuinely worth the space —
+            // which venue/location, when they're not all the same either.
+            // Spanning multiple days instead keeps the day and drops
+            // venue/location: measured (real render) that neither pill
+            // width nor this font has room for both day and location
+            // together without ellipsizing into an unhelpful "Alamo —
+            // S…" — day-of-week is the more useful of the two when a
+            // film's showtimes are spread across the week rather than
+            // clustered in one day at different theaters.
+            if ($sameDay) {
+                $label = date('g:ia', $s['timestamp']);
+                if (!$sameVenue) {
+                    // Same chain, different location (Alamo's own case)
+                    // — the venue name is implied by every other pill
+                    // already showing it, so only the location, the part
+                    // that actually distinguishes them, is worth the
+                    // width.
+                    $venueBit = $sameVenueName ? ($s['location'] ?? ctx_venue_short($s['venue']))
+                        : (!empty($s['location']) ? ctx_venue_short($s['venue']) . ' — ' . $s['location'] : ctx_venue_short($s['venue']));
+                    $label .= ' · ' . $venueBit;
+                }
+            } else {
+                $label = date('D, g:ia', $s['timestamp']);
+            }
+            $label = ig_fit_text($label, IG_FONT_BODY, $pillFont, $colW - 48);
+
+            $col = $i % 2;
+            $row = (int) ($i / 2);
+            $x1 = $margin + $col * ($colW + $colGap);
+            $y1 = $y + $row * ($pillH + $rowGap);
+            ig_pill($im, $x1, $y1, $x1 + $colW, $y1 + $pillH, $divider);
+            imagettftext($im, $pillFont, 0, $x1 + 24, $y1 + $pillH - 20, $red, IG_FONT_BODY, $label);
+        }
+
+        $rows = (int) ceil(count($chips) / 2);
+        $y += $rows * $pillH + ($rows - 1) * $rowGap + 24;
     }
 
     $y += 14;
