@@ -768,11 +768,15 @@ function forecast_day_title($ymd) {
  * fully-populated timeline for that many films made an untouched
  * episode's first real render impractically slow.
  */
-function forecast_resolve_timeline(array $selectedFilms, array $byDay, $weekOf, $savedChaptersJson, $durationSeconds) {
+function forecast_resolve_timeline(array $selectedFilms, array $byDay, $weekOf, $savedChaptersJson, $durationSeconds, array $extraFilms = []) {
     $weekDays = forecast_week_days($weekOf);
 
     $selectedByKey = [];
     foreach ($selectedFilms as $f) $selectedByKey[ig_film_key($f)] = $f;
+    // A film mentioned that isn't actually screening this week — no real
+    // venue/showtimes to key it by, so it carries its own 'key' (see
+    // forecast_add_extra_film()) instead of one computed from ig_film_key().
+    foreach ($extraFilms as $f) $selectedByKey[$f['key']] = $f;
 
     $savedDays = [];
     $savedFilms = [];
@@ -843,6 +847,67 @@ function forecast_save_timeline($conn, $episode_id, $uid, array $selectedFilmKey
     $conn->prepare("UPDATE `forecast_episodes` SET chapters = :chapters WHERE id = :id AND uid = :uid")
          ->execute([':chapters' => json_encode($out), ':id' => $episode_id, ':uid' => $uid]);
     return $out;
+}
+
+// ── Extra films (mentioned, not actually screening this week) ──────────
+//
+// A host bringing up a film that isn't in this week's real lineup —
+// nothing scraped to select from the checklist, so this is its own small
+// side list, added by TMDB id (tmdb_movie_by_id()) rather than resolved
+// from a title string the way every other film here is. Keyed 'tmdb:<id>'
+// specifically so it can never collide with a real ig_film_key()
+// (title|venue|location) and reads at a glance as not a real screening.
+// Deliberately outside forecast_resolve_selection()'s selected_films: an
+// extra film only ever exists to be placed on the timeline as a chapter,
+// never as a "should this get commentary time" checklist decision.
+
+function forecast_get_extra_films(array $episode) {
+    return json_decode($episode['extra_films'] ?? '', true) ?: [];
+}
+
+/**
+ * Looks $tmdbId up and appends it (deduped) to the episode's extra_films.
+ * Returns the added/existing film record, or null if the id doesn't
+ * resolve to anything on TMDB.
+ */
+function forecast_add_extra_film($conn, $episode_id, $uid, array $episode, $tmdbId) {
+    $key = 'tmdb:' . (int) $tmdbId;
+    $extras = forecast_get_extra_films($episode);
+    foreach ($extras as $f) if ($f['key'] === $key) return $f;
+
+    $movie = tmdb_movie_by_id($tmdbId);
+    if (!$movie || $movie['title'] === '') return null;
+
+    $film = [
+        'key'           => $key,
+        'title'         => $movie['title'],
+        'display_title' => $movie['title'],
+        'poster'        => $movie['poster'],
+        'year'          => $movie['year'],
+        'runtime'       => $movie['runtime'],
+        'overview'      => $movie['overview'],
+        'genres'        => $movie['genres'],
+        'director'      => $movie['director'],
+        'cast'          => $movie['cast'],
+        'wiki'          => $movie['wiki'],
+    ];
+
+    $extras[] = $film;
+    $conn->prepare("UPDATE `forecast_episodes` SET extra_films = :v WHERE id = :id AND uid = :uid")
+         ->execute([':v' => json_encode($extras), ':id' => $episode_id, ':uid' => $uid]);
+
+    return $film;
+}
+
+// No special handling needed for a chapters entry left pointing at a
+// since-removed key — forecast_resolve_timeline() already drops any
+// saved entry whose film isn't in $selectedByKey, the same silent-drop a
+// real film loses its marker to when unchecked from the selection.
+function forecast_remove_extra_film($conn, $episode_id, $uid, array $episode, $key) {
+    $extras = array_values(array_filter(forecast_get_extra_films($episode), fn($f) => $f['key'] !== $key));
+    $conn->prepare("UPDATE `forecast_episodes` SET extra_films = :v WHERE id = :id AND uid = :uid")
+         ->execute([':v' => json_encode($extras), ':id' => $episode_id, ':uid' => $uid]);
+    return $extras;
 }
 
 // ── Transcription (Whisper) ─────────────────────────────────────────────

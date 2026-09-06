@@ -337,3 +337,93 @@ function wikidata_article($qid) {
 function fetch_tmdb_poster($title, $year = null) {
     return fetch_tmdb($title, $year)['poster'];
 }
+
+// ── Manual film lookup (Film Forecast "add a film" search) ──────────────
+//
+// A film mentioned on the episode that isn't actually screening anywhere
+// this week — nothing to scrape a title from, so this is a human picking
+// an exact match by hand instead of tmdb_best() picking one from a title
+// string. Small, deliberately separate from the fetch_tmdb() family
+// above: no cache (this only ever runs from an admin typing/clicking,
+// never a page render), and no title-matching ambiguity to resolve since
+// the id is already exact.
+
+/** Up to 8 candidates for a search box's dropdown — id, title, year, a
+ *  small poster thumb. Nothing else: full detail is only worth fetching
+ *  for whichever one is actually picked (tmdb_movie_by_id() below). */
+function tmdb_search_movies($query) {
+    if (!defined('TMDB_API_KEY') || !TMDB_API_KEY) return [];
+    $query = trim((string) $query);
+    if ($query === '') return [];
+
+    $search = tmdb_get(
+        'https://api.themoviedb.org/3/search/movie?api_key=' . TMDB_API_KEY
+        . '&query=' . urlencode($query)
+    );
+
+    $results = [];
+    foreach (array_slice($search['results'] ?? [], 0, 8) as $r) {
+        if (empty($r['id']) || empty($r['title'])) continue;
+        $results[] = [
+            'id'     => (int) $r['id'],
+            'title'  => $r['title'],
+            'year'   => !empty($r['release_date']) ? (int) substr($r['release_date'], 0, 4) : null,
+            'poster' => !empty($r['poster_path']) ? 'https://image.tmdb.org/t/p/w92' . $r['poster_path'] : null,
+        ];
+    }
+    return $results;
+}
+
+/**
+ * Everything forecast_build_chapter_card() needs for one exact film, by
+ * TMDB id — the admin already resolved which film this is by picking it
+ * out of tmdb_search_movies()'s results, so there's no title/year/
+ * director ambiguity left the way fetch_tmdb()'s tmdb_best() has to
+ * resolve for a scraped listing. One request covers it: /movie/{id} with
+ * credits+external_ids appended is everything fetch_tmdb() otherwise
+ * needs a separate search *and* detail call for.
+ */
+function tmdb_movie_by_id($id) {
+    if (!defined('TMDB_API_KEY') || !TMDB_API_KEY) return null;
+    $id = (int) $id;
+    if (!$id) return null;
+
+    $detail = tmdb_get(
+        'https://api.themoviedb.org/3/movie/' . $id
+        . '?api_key=' . TMDB_API_KEY . '&append_to_response=credits,external_ids'
+    );
+    if (empty($detail['id'])) return null;
+
+    $out = [
+        'id'       => (int) $detail['id'],
+        'title'    => $detail['title'] ?? '',
+        'poster'   => !empty($detail['poster_path']) ? 'https://image.tmdb.org/t/p/w300' . $detail['poster_path'] : null,
+        'year'     => !empty($detail['release_date']) ? (int) substr($detail['release_date'], 0, 4) : null,
+        'runtime'  => !empty($detail['runtime']) ? (int) $detail['runtime'] : null,
+        'overview' => !empty($detail['overview']) ? trim($detail['overview']) : null,
+        'genres'   => null,
+        'director' => null,
+        'cast'     => null,
+        'wiki'     => null,
+    ];
+
+    if (!empty($detail['genres'])) {
+        $names = array_column($detail['genres'], 'name');
+        $out['genres'] = implode(', ', array_slice($names, 0, 2)) ?: null;
+    }
+
+    $dirs = [];
+    foreach ($detail['credits']['crew'] ?? [] as $c) {
+        if (($c['job'] ?? '') === 'Director' && !empty($c['name'])) $dirs[] = $c['name'];
+    }
+    if ($dirs) $out['director'] = implode(' & ', array_slice($dirs, 0, 2));
+
+    if (!empty($detail['credits']['cast'])) {
+        $names = array_column($detail['credits']['cast'], 'name');
+        $out['cast'] = implode(', ', array_slice($names, 0, 3)) ?: null;
+    }
+
+    $out['wiki'] = wikidata_article($detail['external_ids']['wikidata_id'] ?? null);
+
+    return $out;
+}

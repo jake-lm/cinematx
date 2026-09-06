@@ -59,8 +59,9 @@ forecast_write_progress($episode_id, 'running', 0);
 
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
+$extraFilms = forecast_get_extra_films($episode);
 $totalThisWeek = array_sum(array_map('count', $byDay));
-$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $duration);
+$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $duration, $extraFilms);
 
 $stamp = time();
 $segmentPaths = [];

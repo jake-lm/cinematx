@@ -2347,6 +2347,58 @@ button, input, select, textarea { font: inherit; color: inherit; }
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+// Only extra films (manually added, not scraped) carry one — a real
+// film is removed via the checklist, not from here.
+.fc-bank-item__remove {
+  flex: none;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: var(--t-3xs);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+  &:hover { opacity: 1; color: var(--red); }
+}
+
+// The "add a film not in this week's lineup" search — plain text input,
+// a dropdown of TMDB matches appears below it as the admin types (see
+// initForecastFilmSearch() in v7.js), each result itself the "add"
+// action — no separate confirm step, same one-click-does-it convention
+// every other action on this page already follows.
+.fc-bank__search {
+  position: relative;
+}
+.fc-bank__search-results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(20, 20, 20, 0.12);
+}
+.fc-bank__search-result {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  cursor: pointer;
+  &:last-child { border-bottom: none; }
+  &:hover { background: var(--surface-2); }
+  img { width: 28px; height: 42px; flex: none; border-radius: 3px; object-fit: cover; background: var(--surface-3); }
+  span { font-size: var(--t-3xs); color: var(--text-2); }
+}
 
 // The floating clone that follows the pointer while dragging a bank item
 // toward the waveform — position set inline (clientX/clientY) by JS.

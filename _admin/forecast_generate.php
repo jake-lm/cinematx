@@ -48,7 +48,8 @@ if (isset($_POST['chapters'])) {
     $posted = json_decode($_POST['chapters'], true);
     if (is_array($posted)) {
         $weekDayKeys = forecast_week_days($episode['week_of']);
-        forecast_save_timeline($conn, $episode_id, $admin_user['id'], $selectedKeys, $weekDayKeys, $posted, (float) ($episode['duration_seconds'] ?? 0));
+        $extraKeys = array_column(forecast_get_extra_films($episode), 'key');
+        forecast_save_timeline($conn, $episode_id, $admin_user['id'], array_merge($selectedKeys, $extraKeys), $weekDayKeys, $posted, (float) ($episode['duration_seconds'] ?? 0));
     }
 }
 

@@ -58,7 +58,8 @@ $previewUrl = '/uploads/forecast/' . $episode_id . '-preview.png?v=' . filemtime
 // toggle.
 $episodeDuration = (float) ($episode['duration_seconds'] ?? 0);
 $audioUrl = !empty($episode['audio_file']) ? '/uploads/forecast/' . rawurlencode($episode['audio_file']) : null;
-$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $episodeDuration);
+$extraFilms = forecast_get_extra_films($episode);
+$chapters = forecast_resolve_timeline($films, $byDay, $episode['week_of'], $episode['chapters'] ?? null, $episodeDuration, $extraFilms);
 $weekDays = forecast_week_days($episode['week_of']);
 
 // The preshow storyboard frame — no episode data in it, so no reason to
@@ -102,6 +103,18 @@ foreach ($weekDays as $ymd) {
     imagepng($cardImg, $path);
     imagedestroy($cardImg);
     $segmentImages['day|' . $ymd] = '/uploads/forecast/' . $episode_id . '-storyboard-day-' . $slug . '.png?v=' . filemtime($path);
+}
+// A mentioned-but-not-screening film gets the same chapter-card treatment
+// as a real one — forecast_build_chapter_card() already renders cleanly
+// with no venue/showtimes (just omits that line), so no separate design.
+foreach ($extraFilms as $film) {
+    $key = $film['key'];
+    $slug = md5($key);
+    $path = $dir . '/' . $episode_id . '-storyboard-' . $slug . '.png';
+    $cardImg = forecast_build_chapter_card($film, $episode);
+    imagepng($cardImg, $path);
+    imagedestroy($cardImg);
+    $segmentImages['film|' . $key] = '/uploads/forecast/' . $episode_id . '-storyboard-' . $slug . '.png?v=' . filemtime($path);
 }
 
 $genStatus   = forecast_generation_status($episode_id);
@@ -488,6 +501,24 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                   </span>
                   <span class="fc-bank-item__title"><?php echo $e($film['display_title'] ?? $film['title']); ?></span>
                   <span class="fc-bank-item__badge" data-bank-badge hidden>0</span>
+                </div>
+                <?php endforeach; ?>
+              </div>
+
+              <div class="fc-bank__section-label">Extra films <span class="admin-tz">mentioned, not screening this week</span></div>
+              <div class="fc-bank__search" data-forecast-film-search>
+                <input type="text" class="admin-input" placeholder="Search TMDB to add a film…" data-film-search-input autocomplete="off">
+                <div class="fc-bank__search-results" data-film-search-results hidden></div>
+              </div>
+              <div class="fc-bank__row" data-forecast-extra-films>
+                <?php foreach ($extraFilms as $film): $filmKey = $film['key']; ?>
+                <div class="fc-bank-item" data-bank-item data-type="film" data-key="<?php echo $e($filmKey); ?>">
+                  <span class="fc-bank-item__thumb">
+                    <img src="<?php echo $e($segmentImages['film|' . $filmKey] ?? ''); ?>" alt="" loading="lazy">
+                  </span>
+                  <span class="fc-bank-item__title"><?php echo $e($film['display_title'] ?? $film['title']); ?></span>
+                  <span class="fc-bank-item__badge" data-bank-badge hidden>0</span>
+                  <button type="button" class="fc-bank-item__remove" data-extra-film-remove title="Remove">&times;</button>
                 </div>
                 <?php endforeach; ?>
               </div>

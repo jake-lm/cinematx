@@ -37,7 +37,8 @@ if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
 
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_resolve_selection($episode, $byDay);
-$selectedKeys = array_map('ig_film_key', $films);
+$extraFilms = forecast_get_extra_films($episode);
+$selectedKeys = array_merge(array_map('ig_film_key', $films), array_column($extraFilms, 'key'));
 $weekDayKeys = forecast_week_days($episode['week_of']);
 
 $posted = json_decode($_POST['chapters'] ?? '[]', true);

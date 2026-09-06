@@ -3473,6 +3473,71 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.fc-bank-item__remove {
+  flex: none;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font-size: var(--t-3xs);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.fc-bank-item__remove:hover {
+  opacity: 1;
+  color: var(--red);
+}
+
+.fc-bank__search {
+  position: relative;
+}
+
+.fc-bank__search-results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(20, 20, 20, 0.12);
+}
+
+.fc-bank__search-result {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  cursor: pointer;
+}
+.fc-bank__search-result:last-child {
+  border-bottom: none;
+}
+.fc-bank__search-result:hover {
+  background: var(--surface-2);
+}
+.fc-bank__search-result img {
+  width: 28px;
+  height: 42px;
+  flex: none;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--surface-3);
+}
+.fc-bank__search-result span {
+  font-size: var(--t-3xs);
+  color: var(--text-2);
+}
+
 .fc-drag-ghost {
   position: fixed;
   z-index: 1000;

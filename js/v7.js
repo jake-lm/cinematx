@@ -1773,6 +1773,11 @@
       var thumbSrc = item.querySelector('img').getAttribute('src');
 
       item.addEventListener('pointerdown', function (e) {
+        // An extra film's own remove button sits inside this same
+        // draggable item — without this it'd both submit the remove
+        // and start a drag-ghost, same reasoning bindDrag() already
+        // guards against for a marker's own [data-marker-remove].
+        if (e.target.closest('[data-extra-film-remove]')) return;
         item.setPointerCapture(e.pointerId);
 
         var ghost = document.createElement('div');
@@ -1832,6 +1837,98 @@
 
     if (bank) {
       $$('[data-bank-item]', bank).forEach(bindBankDrag);
+    }
+
+    // "Add a film not in this week's lineup" — search-as-you-type
+    // against TMDB, each result its own one-click add. A real POST +
+    // page reload, not fetch()+inject: adding needs the new film's own
+    // storyboard thumbnail rendered server-side (GD, not something to
+    // duplicate in JS), so there's no way to show it correctly without
+    // that reload anyway — see forecast_add_extra_film.php.
+    var filmSearchInput = section.querySelector('[data-film-search-input]');
+    var filmSearchResults = section.querySelector('[data-film-search-results]');
+    if (filmSearchInput && filmSearchResults) {
+      var searchTimer = null;
+      filmSearchInput.addEventListener('input', function () {
+        var q = filmSearchInput.value.trim();
+        clearTimeout(searchTimer);
+        if (q.length < 2) {
+          filmSearchResults.hidden = true;
+          filmSearchResults.innerHTML = '';
+          return;
+        }
+        searchTimer = setTimeout(function () {
+          fetch('/_admin/forecast_tmdb_search.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var results = (data && data.ok && data.results) || [];
+              filmSearchResults.innerHTML = '';
+              results.forEach(function (r) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'fc-bank__search-result';
+                var img = document.createElement('img');
+                img.src = r.poster || '';
+                img.alt = '';
+                btn.appendChild(img);
+                var label = document.createElement('span');
+                label.textContent = r.title + (r.year ? ' (' + r.year + ')' : '');
+                btn.appendChild(label);
+                btn.addEventListener('click', function () {
+                  var form = document.createElement('form');
+                  form.method = 'post';
+                  form.action = '/_admin/forecast_add_extra_film.php';
+                  [['csrf', csrf], ['episode_id', episodeId], ['tmdb_id', r.id]].forEach(function (pair) {
+                    var input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = pair[0];
+                    input.value = pair[1];
+                    form.appendChild(input);
+                  });
+                  document.body.appendChild(form);
+                  form.submit();
+                });
+                filmSearchResults.appendChild(btn);
+              });
+              filmSearchResults.hidden = results.length === 0;
+            })
+            .catch(function () { filmSearchResults.hidden = true; });
+        }, 300);
+      });
+      document.addEventListener('click', function (e) {
+        if (!filmSearchResults.hidden && !e.target.closest('[data-forecast-film-search]')) {
+          filmSearchResults.hidden = true;
+        }
+      });
+    }
+
+    // Removing an extra film is instant (fetch, not a reload) — nothing
+    // to regenerate server-side the way adding one does, and a reload
+    // would throw away any unsaved drag on the timeline. Strips its own
+    // marker(s) from chapters[] too — forecast_remove_extra_film.php
+    // only ever touches extra_films, not chapters, so the client has to.
+    var extraFilmsRow = section.querySelector('[data-forecast-extra-films]');
+    if (extraFilmsRow) {
+      extraFilmsRow.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-extra-film-remove]');
+        if (!btn) return;
+        var item = btn.closest('[data-bank-item]');
+        if (!item) return;
+        var key = item.getAttribute('data-key');
+        post('/_admin/forecast_remove_extra_film.php', { episode_id: episodeId, csrf: csrf, key: key })
+          .then(function (res) {
+            if (!res || !res.ok) return;
+            item.remove();
+            var changed = false;
+            for (var i = chapters.length - 1; i >= 0; i--) {
+              if (chapters[i].type === 'film' && chapters[i].film === key) {
+                chapters.splice(i, 1);
+                changed = true;
+              }
+            }
+            if (changed) { layoutMarkers(); markDirty(); }
+          });
+      });
     }
 
     // A sibling of markersWrap, not a child of it — layoutMarkers()
