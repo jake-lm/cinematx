@@ -845,6 +845,131 @@ function forecast_save_timeline($conn, $episode_id, $uid, array $selectedFilmKey
     return $out;
 }
 
+// ── Transcription (Whisper) ─────────────────────────────────────────────
+//
+// A first-pass at chapter placement: transcribe the episode's own audio,
+// then look for each selected film's title actually being said. Whisper
+// hears speech, not a listing's exact typography, so this only ever
+// suggests — see forecast_match_transcript_films() below — never places
+// a chapter on its own.
+
+/**
+ * Sends $audioPath to OpenAI's Whisper API and returns timestamped
+ * segments. Whisper's hard cap is 25MB — comfortably above a ~10 minute
+ * episode's mp3 (this show's actual length), so no chunking here; a
+ * longer file just fails with a clear error rather than a silent partial
+ * transcript.
+ */
+function forecast_transcribe_audio($audioPath, $onProgress = null) {
+    if (!defined('OPENAI_API_KEY') || !OPENAI_API_KEY) {
+        return ['ok' => false, 'error' => 'OPENAI_API_KEY is not configured.'];
+    }
+    if (!is_file($audioPath)) {
+        return ['ok' => false, 'error' => 'Audio file not found.'];
+    }
+    if (filesize($audioPath) > 25 * 1024 * 1024) {
+        return ['ok' => false, 'error' => 'Audio file is larger than Whisper\'s 25MB limit.'];
+    }
+
+    if ($onProgress) $onProgress(10);
+
+    $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 300,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . OPENAI_API_KEY],
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => [
+            'file'                      => new CURLFile($audioPath),
+            'model'                     => 'whisper-1',
+            'response_format'           => 'verbose_json',
+            'timestamp_granularities[]' => 'segment',
+        ],
+    ]);
+    $response = curl_exec($ch);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($onProgress) $onProgress(85);
+
+    if ($response === false) {
+        return ['ok' => false, 'error' => 'Whisper request failed: ' . $curlErr];
+    }
+    $data = json_decode($response, true);
+    if (!is_array($data) || empty($data['segments'])) {
+        return ['ok' => false, 'error' => $data['error']['message'] ?? 'Whisper returned no segments.'];
+    }
+
+    $segments = [];
+    foreach ($data['segments'] as $s) {
+        $segments[] = [
+            'start' => round((float) ($s['start'] ?? 0), 2),
+            'end'   => round((float) ($s['end'] ?? 0), 2),
+            'text'  => trim((string) ($s['text'] ?? '')),
+        ];
+    }
+
+    if ($onProgress) $onProgress(100);
+    return ['ok' => true, 'segments' => $segments];
+}
+
+/**
+ * Which selected films are actually said aloud, and roughly when. Matched
+ * against ctx_clean_title(), not the raw display title — a host says
+ * "Akira," never "Akira (Subtitled) in 4K" (confirmed against a real
+ * transcript in testing: matching the raw title missed Akira entirely,
+ * since the exhibition annotation is never actually spoken). Also
+ * normalized the same forgiving way tmdb_best() already compares two
+ * titles (lowercase, punctuation to spaces, collapsed whitespace) — a
+ * spoken title is never going to carry a listing's exact punctuation —
+ * then checked as a substring of the whole transcript rather than one
+ * segment at a time, since Whisper's segment breaks land wherever the
+ * audio paused, not wherever a title happens to start or end.
+ *
+ * Returns entries shaped exactly like a saved timeline film entry
+ * (film/title/start) so the caller can push them straight into the
+ * client's chapters array — never saved here, never called anywhere
+ * except an explicit "Suggest chapters" action.
+ */
+function forecast_match_transcript_films(array $segments, array $selectedFilms) {
+    $norm = function ($s) {
+        $s = strtolower((string) $s);
+        return trim(preg_replace('/\s+/', ' ', preg_replace('/[^a-z0-9]+/', ' ', $s)));
+    };
+
+    $full = '';
+    $offsets = []; // ascending [charOffset, segmentStart]
+    foreach ($segments as $s) {
+        $offsets[] = [mb_strlen($full), (float) $s['start']];
+        $full .= ' ' . $norm($s['text'] ?? '');
+    }
+
+    $suggestions = [];
+    foreach ($selectedFilms as $f) {
+        $raw = $f['display_title'] ?? $f['title'] ?? '';
+        $title = $norm(function_exists('ctx_clean_title') ? ctx_clean_title($raw) : $raw);
+        // Too short to mean anything as a substring search ("It", "Us")
+        // — real ambiguity, not worth guessing at.
+        if (mb_strlen($title) < 3) continue;
+
+        $pos = mb_strpos($full, $title);
+        if ($pos === false) continue;
+
+        $start = 0;
+        foreach ($offsets as [$charOffset, $segStart]) {
+            if ($charOffset > $pos) break;
+            $start = $segStart;
+        }
+
+        $suggestions[] = [
+            'film'  => ig_film_key($f),
+            'title' => $f['display_title'] ?? $f['title'],
+            'start' => $start,
+        ];
+    }
+    return $suggestions;
+}
+
 // Crops $src to a centered square, resizes to $diameter, and masks
 // everything outside the circle to transparent — the standard GD approach
 // (no native circular clip), fast enough at badge size to just walk every

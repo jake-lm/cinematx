@@ -1,7 +1,8 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
 //  Admin — poll one episode's generation progress (video, package export,
-//  waveform export, or intro animation — ?kind=, default 'video')
+//  waveform export, intro animation, or transcription — ?kind=, default
+//  'video')
 //
 //  Read-only, JSON — just relays whatever the matching bin/forecast-*.php
 //  worker last wrote to its own uploads/forecast/<id>[-kind]-progress.json.
@@ -21,6 +22,6 @@ if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
     exit;
 }
 
-$kind = in_array($_GET['kind'] ?? 'video', ['video', 'package', 'waveform', 'intro'], true) ? $_GET['kind'] : 'video';
+$kind = in_array($_GET['kind'] ?? 'video', ['video', 'package', 'waveform', 'intro', 'transcribe'], true) ? $_GET['kind'] : 'video';
 $status = forecast_generation_status($episode_id, $kind);
 echo json_encode($status ?: ['status' => 'idle']);

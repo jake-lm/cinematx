@@ -126,6 +126,14 @@ $introAnimRunning = $introAnimStatus && ($introAnimStatus['status'] ?? '') === '
 $introAnimError   = $introAnimStatus && ($introAnimStatus['status'] ?? '') === 'error' ? ($introAnimStatus['error'] ?? 'Intro animation generation failed.') : null;
 $introAnimUrl     = !empty($episode['intro_animation_file']) ? '/uploads/forecast/' . $episode['intro_animation_file'] : null;
 
+// A first pass at chapter placement, not another export — see the
+// Chapters card below. Its transcript lives on the episode row itself
+// (like chapters), not a downloadable file, so there's no "…Url" here.
+$transcribeStatus  = forecast_generation_status($episode_id, 'transcribe');
+$transcribeRunning = $transcribeStatus && ($transcribeStatus['status'] ?? '') === 'running';
+$transcribeError   = $transcribeStatus && ($transcribeStatus['status'] ?? '') === 'error' ? ($transcribeStatus['error'] ?? 'Transcription failed.') : null;
+$hasTranscript     = !empty($episode['transcript']);
+
 $directVideo = !empty($episode['video_file']);
 $hasVideo    = $directVideo || !empty($episode['generated_video']);
 $videoUrl    = $directVideo ? '/uploads/forecast/' . $episode['video_file']
@@ -423,6 +431,34 @@ require dirname(__DIR__) . '/v7/_chrome.php';
         <div class="card__body">
           <div class="admin-note" style="margin:0 0 var(--s-3)">
             Drag a day or film from the bank onto the waveform where it comes up — a day is a main chapter, a film nests under whichever day you drop it near. Anything can be used more than once. Play the episode back to hear where things actually land, then fine-tune by dragging the marker itself. Click anywhere on the waveform to jump there.
+          </div>
+
+          <div style="margin-bottom:var(--s-4)">
+            <div class="admin-note" style="margin:0 0 var(--s-2);font-weight:600;color:var(--text-2)">Transcript</div>
+            <?php if ($transcribeRunning): ?>
+              <div class="admin-note" style="margin:0 0 var(--s-2)" data-forecast-progress-label data-progress-kind="transcribe">Transcribing&hellip; <?php echo (int) ($transcribeStatus['percent'] ?? 0); ?>%</div>
+              <progress class="admin-progress" data-forecast-progress data-progress-kind="transcribe" data-episode-id="<?php echo $episode_id; ?>" value="<?php echo (int) ($transcribeStatus['percent'] ?? 0); ?>" max="100"></progress>
+            <?php else: ?>
+              <?php if ($transcribeError): ?>
+              <div class="admin-note" style="margin:0 0 var(--s-2);color:var(--red-hi)">Failed: <?php echo $e(mb_strimwidth($transcribeError, 0, 200, '…')); ?></div>
+              <?php endif; ?>
+              <div class="admin-note" style="margin:0 0 var(--s-2)">
+                <?php echo $hasTranscript
+                  ? 'Transcribed — "Suggest chapters" below looks for each film actually being said and proposes where.'
+                  : 'Sends the audio to Whisper for a timestamped transcript, used to suggest where each film comes up.'; ?>
+              </div>
+              <div style="display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap">
+                <form action="/_admin/forecast_transcribe.php" method="post">
+                  <?php echo admin_csrf_field(); ?>
+                  <input type="hidden" name="episode_id" value="<?php echo $episode_id; ?>">
+                  <button class="btn btn--quiet btn--sm" type="submit"><?php echo $hasTranscript ? 'Re-transcribe audio' : 'Transcribe audio'; ?></button>
+                </form>
+                <?php if ($hasTranscript): ?>
+                <button class="btn btn--quiet btn--sm" type="button" data-forecast-suggest-chapters>Suggest chapters from transcript</button>
+                <span class="admin-note" style="margin:0" data-forecast-suggest-status></span>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
           </div>
 
           <div class="adm-two" style="grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); margin-bottom:var(--s-4);">

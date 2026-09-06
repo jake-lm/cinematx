@@ -57,6 +57,21 @@ const CTX_EPISODE_SUFFIX = '/^episodes?\s+\d+(?:\s*(?:&|,|and)\s*\d+)*$/i';
 // billing/anniversary text above.
 const CTX_DIRECTOR_PREFIX = '/^([A-Z][\w.]*(?:\s+[A-Z][\w.]*){0,2})\'s\s+/u';
 
+// A subtitled/dubbed aside, wherever it sits — "Akira (Subtitled) in 4K"
+// isn't anchored to the end of the title the way the generic trailing-
+// paren strip below already expects (it's followed by the exhibition
+// format, "in 4K"), so it needs its own pass first. Needed here, not just
+// list/tmdb.php's own TMDB_LANGUAGE: that one only ever touches the TMDB
+// search query, never the title ctx_clean_title() hands back — and
+// forecast_match_transcript_films() (list/forecast.php) matches a host's
+// actual words against exactly that returned title. A host says "Akira,"
+// never "Akira (Subtitled) in 4K".
+const CTX_LANGUAGE_TAG = '/\s*\((?:subtitled|dubbed|subs?|english\s+dub(?:bed)?)\)/i';
+
+// The exhibition format left dangling once CTX_LANGUAGE_TAG runs — same
+// idea as TMDB_FORMATS, needed here for the same reason as above.
+const CTX_FORMAT_TAG = '/\s+(?:in|on)?\s*(?:3-?D|IMAX|4K(?:\s+restorations?)?|70\s?mm|35\s?mm|16\s?mm|DCP)\s*$/i';
+
 // A marathon/round-the-clock screening — Hyperreal's own event name for
 // these bolts the format onto the film title ("IT ENDS Endless Screening
 // presented by NEON"), so TMDB naturally found nothing for "IT ENDS
@@ -99,6 +114,8 @@ function ctx_clean_title($raw) {
     $t = preg_replace(CTX_CONNECTIVES, '', $t);              // "… ft. X"
     $t = preg_replace(CTX_MARATHON_SCREENING, '', $t);       // "… Endless Screening presented by X"
     $t = preg_replace(CTX_ANNIVERSARY, '', $t);              // "… 35th Anniversary…"
+    $t = trim(preg_replace(CTX_LANGUAGE_TAG, '', $t));       // "Akira (Subtitled) in 4K" → "Akira in 4K"
+    $t = trim(preg_replace(CTX_FORMAT_TAG, '', $t));         // "Akira in 4K" → "Akira"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
         $left = trim($m[1]);

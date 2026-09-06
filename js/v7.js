@@ -1996,6 +1996,47 @@
       });
     }
 
+    // A first pass, not a save — matches found in the transcript are
+    // pushed into the same client-side chapters array a manual drag
+    // would populate, so they show up as ordinary draggable/removable
+    // markers and still need "Save chapters" before anything persists.
+    var suggestBtn = section.querySelector('[data-forecast-suggest-chapters]');
+    var suggestStatus = section.querySelector('[data-forecast-suggest-status]');
+    if (suggestBtn) {
+      suggestBtn.addEventListener('click', function () {
+        suggestBtn.disabled = true;
+        if (suggestStatus) suggestStatus.textContent = 'Looking…';
+        fetch('/_admin/forecast_suggest_chapters.php?id=' + encodeURIComponent(episodeId), { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            suggestBtn.disabled = false;
+            if (!data.ok) {
+              if (suggestStatus) suggestStatus.textContent = data.error || 'Could not suggest chapters.';
+              return;
+            }
+            var existing = {};
+            chapters.forEach(function (c) { if (c.type === 'film') existing[c.film] = true; });
+            var added = 0;
+            (data.suggestions || []).forEach(function (s) {
+              if (existing[s.film]) return;
+              chapters.push({ type: 'film', film: s.film, day: null, start: s.start, title: s.title });
+              existing[s.film] = true;
+              added++;
+            });
+            if (added) { layoutMarkers(); markDirty(); }
+            if (suggestStatus) {
+              suggestStatus.textContent = added
+                ? 'Added ' + added + ' suggested marker' + (added === 1 ? '' : 's') + ' — review, then save.'
+                : 'No new mentions found.';
+            }
+          })
+          .catch(function () {
+            suggestBtn.disabled = false;
+            if (suggestStatus) suggestStatus.textContent = 'Request failed.';
+          });
+      });
+    }
+
     layoutMarkers();
     updateStoryboard(0);
     updatePlayhead(0);
