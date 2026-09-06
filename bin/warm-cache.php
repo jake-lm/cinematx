@@ -41,7 +41,7 @@ $now     = time();
 // Enriching is what populates the TMDB cache — poster, year, runtime, plot and
 // the Wikipedia link — so this warms both layers in one pass, by doing exactly
 // what a page request does.
-$films = ctx_enrich(fetch_all_screenings($conn, $now, $now + 7 * 86400, true));
+$films = ctx_enrich(fetch_all_screenings($conn, $now, $now + 8 * 86400, true));
 
 $total = count($films);
 $have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0];

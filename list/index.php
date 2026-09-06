@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — The List
 //
-//  Everything playing in Austin over the next seven days, grouped by day.
+//  Everything playing in Austin over the next eight days, grouped by day.
 //  Carries forward the old page's controls (Today / Tomorrow / This week and
 //  the member-submitted filter) and adds v7's poster grid, row view, venue
 //  narrowing and series parsing.
@@ -13,7 +13,7 @@ require dirname(__DIR__) . '/v7/_lib.php';
 
 $now = $CTX_NOW;
 $tz  = new DateTimeZone('America/Chicago');
-$end = $now + 7 * 86400;
+$end = $now + 8 * 86400;
 
 $films = ctx_enrich(fetch_all_screenings($conn, $now, $end));
 
@@ -144,11 +144,11 @@ require dirname(__DIR__) . '/v7/_chrome.php';
           <span class="card__n">01</span>
           <h1 class="listing__h">The List</h1>
           <?php // The scope word is driven by the Week/Today/Tomorrow control,
-                // not baked in — it used to keep saying "next seven days" while
+                // not baked in — it used to keep saying "next eight days" while
                 // the number beside it changed to today's. ?>
           <span class="listing__sub"><span id="list-count"><?php echo $n_screenings; ?></span>
             <span id="list-noun"><?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?></span>
-            &middot; <span id="list-scope">next seven days</span></span>
+            &middot; <span id="list-scope">next eight days</span></span>
         </div>
 
         <div class="listing__controls">
@@ -190,7 +190,7 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       </div>
 
       <?php if (!$days): ?>
-        <p class="empty">Nothing listed in the next seven days.</p>
+        <p class="empty">Nothing listed in the next eight days.</p>
       <?php else: foreach ($days as $key => $day): ?>
       <section class="day" data-day="<?php echo $key; ?>">
         <div class="day__label">

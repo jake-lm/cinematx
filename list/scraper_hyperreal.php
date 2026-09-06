@@ -17,11 +17,11 @@ function fetch_hyperreal_films($force = false) {
 
 function fetch_hyperreal_films_scrape() {
 
-    // Determine which month(s) to fetch — if the next 7 days spill into the next month, grab both
+    // Determine which month(s) to fetch — if the next 8 days spill into the next month, grab both
     $now    = time();
     $tz     = new DateTimeZone('America/Chicago');
     $months = [date('m-Y', $now)];
-    if (date('n', $now + 7 * 86400) !== date('n', $now)) {
+    if (date('n', $now + 8 * 86400) !== date('n', $now)) {
         $months[] = date('m-Y', strtotime('first day of next month', $now));
     }
 
