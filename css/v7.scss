@@ -2127,6 +2127,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // ── Film Forecast chapter timeline ───────────────────────────────────────
 //
+// [data-forecast-markers] itself spans the whole waveform (inset:0) so
+// markers can be positioned anywhere across it — but left as a normal,
+// hit-testable transparent box, that same full-size div sat in front of
+// the canvas and swallowed every pointerdown, everywhere, before it could
+// reach the canvas's own scrub listener underneath. Only a click that
+// happened to land exactly on a marker ever worked. none here + auto on
+// .fc-marker below (same hole-punch already used for .fc-marker__label
+// vs .fc-marker__remove) lets everywhere else fall through to the canvas.
+[data-forecast-markers] {
+  pointer-events: none;
+}
+
 // One .fc-marker per placed day or film, absolutely positioned (left set
 // inline by JS as a % of the waveform's width) over the waveform canvas —
 // dropped there from the bank (below), not pre-placed. Drag updates left
@@ -2135,6 +2147,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fc-marker {
   position: absolute;
   top: 0; bottom: 0;
+  pointer-events: auto;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
