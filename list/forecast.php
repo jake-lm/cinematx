@@ -1532,6 +1532,38 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
         $y += 60;
     }
 
+    // Every night this film actually plays this week, not just one —
+    // resolved once, up front, since both the venue line below and the
+    // showtime pills further down both read from it. Falls back to just
+    // $timestamp if $showtimes is somehow missing (a caller not going
+    // through forecast_week_by_day()) rather than showing nothing.
+    $showtimes = !empty($film['showtimes']) ? $film['showtimes']
+        : (!empty($film['timestamp']) ? [['timestamp' => $film['timestamp'], 'venue' => $film['venue'] ?? null, 'location' => $film['location'] ?? null]] : []);
+    $chips = [];
+    $sameVenue = $sameVenueName = $sameDay = true;
+    if ($showShowtimes && $showtimes) {
+        usort($showtimes, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
+        $chips = array_slice($showtimes, 0, 6);
+        $venueKeys = array_unique(array_map(fn($s) => $s['venue'] . '|' . ($s['location'] ?? ''), $chips));
+        $sameVenue = count($venueKeys) === 1;
+        $sameVenueName = count(array_unique(array_map(fn($s) => $s['venue'], $chips))) === 1;
+        $sameDay = count(array_unique(array_map(fn($s) => date('Y-m-d', $s['timestamp']), $chips))) === 1;
+    }
+
+    // Which theater, in plain words — nothing on this card said so
+    // before, a real gap once the showtime pills below started leaving
+    // the venue name out whenever every pill already shared one (the
+    // common case). Full name here ("Alamo Drafthouse," not
+    // ctx_venue_short()'s "Alamo") since it's said only once, unlike a
+    // pill sharing its width with a time. Left off when showtimes
+    // genuinely span more than one venue — nothing on a single line
+    // could say both truthfully, and the pills themselves fall back to
+    // spelling out venue + location per showtime in that rarer case.
+    if ($chips && $sameVenueName) {
+        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, $chips[0]['venue']);
+        $y += 38;
+    }
+
     // Genre + runtime, the same deck line the spotlight page keeps under
     // its title (minus year — less relevant once a film is already
     // showing than what it is and how long it runs).
@@ -1542,30 +1574,15 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
         $y += 38;
     }
 
-    // Every night this film actually plays this week, not just one — used
-    // to fold into one compressed red line here, which either ran off the
-    // card past two or three showtimes or, with just one, left this whole
-    // panel with a lot of bare paper before the divider. A small pill per
-    // showtime instead ("letterbox" — ig_pill(), the same shape the
-    // spotlight page already stacks over its hero), two per row, three
-    // rows deep. Sorted so a 7th-plus screening is simply the latest one
-    // left off, not an arbitrary one — a "+N more" footnote isn't worth
-    // the space it would cost at this size. Falls back to just
-    // $timestamp if $showtimes is somehow missing (a caller not going
-    // through forecast_week_by_day()) rather than showing nothing.
-    $showtimes = !empty($film['showtimes']) ? $film['showtimes']
-        : (!empty($film['timestamp']) ? [['timestamp' => $film['timestamp'], 'venue' => $film['venue'] ?? null, 'location' => $film['location'] ?? null]] : []);
-    if ($showShowtimes && $showtimes) {
-        usort($showtimes, fn($a, $b) => $a['timestamp'] <=> $b['timestamp']);
-        $chips = array_slice($showtimes, 0, 6);
-        $venueKeys = array_unique(array_map(fn($s) => $s['venue'] . '|' . ($s['location'] ?? ''), $chips));
-        $sameVenue = count($venueKeys) === 1;
-        $sameVenueName = count(array_unique(array_map(fn($s) => $s['venue'], $chips))) === 1;
-        $sameDay = count(array_unique(array_map(fn($s) => date('Y-m-d', $s['timestamp']), $chips))) === 1;
-
+    // A small pill per showtime ("letterbox" — ig_pill(), the same shape
+    // the spotlight page already stacks over its hero), two per row,
+    // three rows deep. Sorted so a 7th-plus screening is simply the
+    // latest one left off, not an arbitrary one — a "+N more" footnote
+    // isn't worth the space it would cost at this size.
+    if ($chips) {
         $y += 10;
         $pillFont = 24;
-        $pillH    = 60;
+        $pillH    = 56;
         $colGap   = 20;
         $rowGap   = 12;
         $colW     = (int) (($textMaxWidth - $colGap) / 2);
@@ -1575,23 +1592,20 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
             // a chain playing a film several times in a single day) drops
             // the day-of-week entirely: six identical "Sun,"s add nothing
             // and only push out the one thing genuinely worth the space —
-            // which venue/location, when they're not all the same either.
+            // which location, when they're not all the same either (the
+            // venue name itself is already said once above, so a pill
+            // only ever adds location, never the venue name again).
             // Spanning multiple days instead keeps the day and drops
-            // venue/location: measured (real render) that neither pill
-            // width nor this font has room for both day and location
-            // together without ellipsizing into an unhelpful "Alamo —
-            // S…" — day-of-week is the more useful of the two when a
-            // film's showtimes are spread across the week rather than
-            // clustered in one day at different theaters.
+            // location: measured (real render) that neither pill width
+            // nor this font has room for both day and location together
+            // without ellipsizing into an unhelpful "Alamo — S…" — day-
+            // of-week is the more useful of the two once a film's
+            // showtimes are spread across the week rather than
+            // clustered in one day at different locations.
             if ($sameDay) {
                 $label = date('g:ia', $s['timestamp']);
                 if (!$sameVenue) {
-                    // Same chain, different location (Alamo's own case)
-                    // — the venue name is implied by every other pill
-                    // already showing it, so only the location, the part
-                    // that actually distinguishes them, is worth the
-                    // width.
-                    $venueBit = $sameVenueName ? ($s['location'] ?? ctx_venue_short($s['venue']))
+                    $venueBit = $sameVenueName ? $s['location']
                         : (!empty($s['location']) ? ctx_venue_short($s['venue']) . ' — ' . $s['location'] : ctx_venue_short($s['venue']));
                     $label .= ' · ' . $venueBit;
                 }
@@ -1605,11 +1619,11 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
             $x1 = $margin + $col * ($colW + $colGap);
             $y1 = $y + $row * ($pillH + $rowGap);
             ig_pill($im, $x1, $y1, $x1 + $colW, $y1 + $pillH, $divider);
-            imagettftext($im, $pillFont, 0, $x1 + 24, $y1 + $pillH - 20, $red, IG_FONT_BODY, $label);
+            imagettftext($im, $pillFont, 0, $x1 + 24, $y1 + $pillH - 18, $red, IG_FONT_BODY, $label);
         }
 
         $rows = (int) ceil(count($chips) / 2);
-        $y += $rows * $pillH + ($rows - 1) * $rowGap + 24;
+        $y += $rows * $pillH + ($rows - 1) * $rowGap + 20;
     }
 
     $y += 14;
