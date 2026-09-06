@@ -1701,7 +1701,10 @@
 
       var label = document.createElement('div');
       label.className = 'fc-marker__label';
-      label.textContent = title;
+      var labelText = document.createElement('span');
+      labelText.className = 'fc-marker__label-text';
+      labelText.textContent = title;
+      label.appendChild(labelText);
       el.appendChild(label);
 
       if (chapter) {

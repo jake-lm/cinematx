@@ -2189,19 +2189,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .fc-marker__handle { background: var(--text-3); }
   &:hover .fc-marker__handle { box-shadow: none; }
 }
+// Flex rather than a single truncated text node so a long title's
+// ellipsis only eats into .fc-marker__label-text — .fc-marker__remove
+// used to sit after the title in the same truncated box and simply
+// vanished off the end whenever the title alone was already long enough
+// to hit max-width, leaving no way to remove that marker at all.
 .fc-marker__label {
   position: absolute;
   bottom: calc(100% + 6px);
+  display: flex;
+  align-items: center;
   padding: 3px 8px;
   background: var(--text);
   color: var(--surface);
   font-size: var(--t-3xs);
-  white-space: nowrap;
   border-radius: 6px;
   pointer-events: none;
   max-width: 160px;
+}
+.fc-marker__label-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 // Re-enables pointer events despite the label's own pointer-events:none
 // (that none is what lets a click land on the marker/handle underneath
@@ -2209,6 +2219,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // than a hover-reveal, since this admin page also has to work by touch.
 .fc-marker__remove {
   pointer-events: auto;
+  flex: none;
   margin-left: 6px;
   padding: 0 2px;
   background: none;
