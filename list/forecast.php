@@ -1501,7 +1501,7 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
     // the same admin-adjustable crop bias) the Instagram spotlight page
     // uses, so a "now watching" card actually reads like the spotlight
     // it's meant to mimic rather than a poster thumbnail blown up.
-    $heroH   = 640;
+    $heroH   = 704;
     $heroUrl = ig_hero_url($film['poster'] ?? null);
     $hero    = ig_fetch_thumb($heroUrl, $w, $heroH, ig_poster_crop_bias($heroUrl));
     if ($hero) {
@@ -1643,8 +1643,20 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 34;
 
+    // How much of this is above the fold varies a lot — a 2-line title,
+    // a full 6-pill grid, and a long overview can otherwise push a
+    // director credit (or the overview itself) down far enough to land
+    // behind the bottom ink band, silently invisible rather than
+    // visibly cut off, since the band is painted last. Capped at 5 as
+    // before for the common case, but never more than what's actually
+    // left once the director line's own room is reserved — ig_wrap_
+    // lines() already ellipsizes whatever doesn't fit, so a longer
+    // overview on a tighter card just shows fewer lines instead of
+    // ever risking that.
     if (!empty($film['overview'])) {
-        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 25, $textMaxWidth, 5) as $line) {
+        $directorReserve = !empty($film['director']) ? 42 : 0;
+        $maxOverviewLines = max(1, min(5, (int) floor((FORECAST_WAVE_BAND_Y - $y - $directorReserve - 10) / 36)));
+        foreach (ig_wrap_lines($film['overview'], IG_FONT_BODY, 25, $textMaxWidth, $maxOverviewLines) as $line) {
             imagettftext($im, 25, 0, $margin, $y, $ink, IG_FONT_BODY, $line);
             $y += 36;
         }
