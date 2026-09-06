@@ -1559,7 +1559,7 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
     // could say both truthfully, and the pills themselves fall back to
     // spelling out venue + location per showtime in that rarer case.
     if ($chips && $sameVenueName) {
-        imagettftext($im, 24, 0, $margin, $y, $muted, IG_FONT_BODY, $chips[0]['venue']);
+        imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $chips[0]['venue']);
         $y += 38;
     }
 
@@ -1614,11 +1614,24 @@ function forecast_build_chapter_card(array $film, array $episode, $showShowtimes
             }
             $label = ig_fit_text($label, IG_FONT_BODY, $pillFont, $colW - 48);
 
+            // Hugs its own text ("Sun, 7:30pm" — AFS, Hyperreal,
+            // Paramount, one showing) rather than always stretching to
+            // fill half the card — that just relocated the "wasted
+            // space" complaint this whole redesign started from to
+            // inside the pill instead of below the card. Capped at
+            // colW so a longer label (Alamo's day+time+location) still
+            // gets the full column, and the right column always starts
+            // at the same x regardless of what the left one needed, so
+            // a short pill next to a long one doesn't read as
+            // misaligned.
+            $box   = imagettfbbox($pillFont, 0, IG_FONT_BODY, $label);
+            $pillW = min($colW, $box[2] - $box[0] + 48);
+
             $col = $i % 2;
             $row = (int) ($i / 2);
             $x1 = $margin + $col * ($colW + $colGap);
             $y1 = $y + $row * ($pillH + $rowGap);
-            ig_pill($im, $x1, $y1, $x1 + $colW, $y1 + $pillH, $divider);
+            ig_pill($im, $x1, $y1, $x1 + $pillW, $y1 + $pillH, $divider);
             imagettftext($im, $pillFont, 0, $x1 + 24, $y1 + $pillH - 19, $red, IG_FONT_BODY, $label);
         }
 
