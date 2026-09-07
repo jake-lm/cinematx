@@ -18,8 +18,9 @@ require_once __DIR__ . '/cache.php';
 //  door time as the start — always a real clock time, always given.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FLICKCLIQUE_URL   = 'https://www.flickclique.org/austin-flick-clique';
-const FLICKCLIQUE_VENUE = 'Flick Clique';
+const FLICKCLIQUE_URL      = 'https://www.flickclique.org/austin-flick-clique';
+const FLICKCLIQUE_VENUE    = 'Flick Clique';
+const FLICKCLIQUE_LOCATION = 'Sekrit Theater';
 
 function fetch_flickclique_films($force = false) {
     return ctx_cached_scrape('cache_flickclique.json', 6 * 3600, 'fetch_flickclique_films_scrape', $force);
@@ -97,6 +98,13 @@ function fetch_flickclique_films_scrape() {
         $films[] = [
             'title'        => $title,
             'venue'        => FLICKCLIQUE_VENUE,
+            // Only ever one location, but ctx_bits()/ctx_screening_hover()
+            // already join venue+location for every source (built for
+            // Alamo's five, but behavioural, not Alamo-specific) — reusing
+            // it here means "Flick Clique, Sekrit Theater" comes for free
+            // in the row/in-depth/hover views. The List's own poster card
+            // shows just "Sekrit Theater" instead — see list/index.php.
+            'location'     => FLICKCLIQUE_LOCATION,
             // No dedicated per-screening page, cash-at-the-door with no
             // booking system — every screening just links to Flick Clique's
             // one page, easy enough to find the current listing from there.

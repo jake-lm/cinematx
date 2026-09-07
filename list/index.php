@@ -109,9 +109,20 @@ function ctx_screening($s, $view) {
         <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
         <span class="shot__venue">
           <?php // Poster cards are ~120px wide, so the venue is abbreviated here
-                // to leave room for the year and runtime beside it. ?>
+                // to leave room for the year and runtime beside it. Flick
+                // Clique is the one exception: "Flick Clique" names the
+                // series, not a place, so the card shows its actual venue
+                // (the location field) instead — more useful than the
+                // abbreviated series name on a card this cramped. The
+                // in-depth/row/hover views still show both, venue and
+                // location together (see scraper_flickclique.php). ?>
+          <?php
+            $venue_label = ($s['venue'] === 'Flick Clique' && !empty($s['location']))
+                ? $s['location']
+                : ctx_venue_short($s['venue']);
+          ?>
           <?php if ($member): ?><span class="shot__by">&#9679; By a member</span>
-          <?php else: ?><?php echo $e(implode(' · ', array_merge([ctx_venue_short($s['venue'])], ctx_bits($s, false)))); ?><?php endif; ?>
+          <?php else: ?><?php echo $e(implode(' · ', array_merge([$venue_label], ctx_bits($s, false)))); ?><?php endif; ?>
         </span>
       </a>
     <?php } else { ?>
