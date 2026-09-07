@@ -55,13 +55,13 @@ define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStenci
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
-// The three arthouse venues this post is meant to promote — not the chains
+// The arthouse venues this post is meant to promote — not the chains
 // (Alamo Drafthouse, Fathom Events) and not real member-submitted `events`
 // (source 'user', kept out until public engagement is actually on). Alamo
 // is still selectable on a per-day basis, though — see ig_alamo_films().
 // An admin-added screening (source 'admin', see _admin/events.php) is let
 // in regardless of venue name — see ig_arthouse_films()'s filter.
-const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club'];
+const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club', 'Flick Clique'];
 const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
 // The admin page's own "today." Past IG_ADMIN_CUTOVER_HOUR (10pm Central —

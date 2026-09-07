@@ -94,17 +94,13 @@ function fetch_flickclique_films_scrape() {
         // and TMDB match for something that can never show.
         if ($timestamp < $now - 86400) continue;
 
-        $link_node = $xpath->query('.//a[contains(concat(" ",normalize-space(@class)," ")," list-item-content__button ")]', $item)->item(0);
-        $url = $link_node ? trim($link_node->getAttribute('href')) : '';
-
         $films[] = [
             'title'        => $title,
             'venue'        => FLICKCLIQUE_VENUE,
-            // The Facebook event page when Flick Clique has linked one —
-            // the closest thing this venue has to a ticket link, since it's
-            // cash-at-the-door, no booking system. Falls back to the show's
-            // own page otherwise, same as every other source without one.
-            'url'          => $url !== '' ? $url : FLICKCLIQUE_URL,
+            // No dedicated per-screening page, cash-at-the-door with no
+            // booking system — every screening just links to Flick Clique's
+            // one page, easy enough to find the current listing from there.
+            'url'          => FLICKCLIQUE_URL,
             'timestamp'    => $timestamp,
             'display_date' => $dt->format('D, M j · g:ia'),
         ];
