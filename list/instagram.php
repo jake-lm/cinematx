@@ -837,7 +837,14 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -946,7 +953,14 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_MARQUEE_TITLE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1057,7 +1071,14 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_ZINE_TITLE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1167,7 +1188,14 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 32, $textMaxWidth);
         imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_NEWSPRINT_TITLE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1308,7 +1336,14 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             imagettftext($im, 18, 0, $textX + $titleW + 14, $y + 40, $muted, IG_FONT_BODY, $tagText);
         }
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1545,7 +1580,14 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 30, $textMaxWidth);
         imagettftext($im, 30, 0, $textX, $y + 40, $amber, IG_FONT_DARKROOM_TITLE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1676,7 +1718,14 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
         $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 30, $textMaxWidth);
         imagettftext($im, 30, 0, $textX, $y + 40, $plum, IG_FONT_HEADLINE, $title);
 
-        $venue = $film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue'];
+        // Flick Clique names the monthly series, not a place — same reasoning
+        // as the website's own poster card (list/index.php): the location is
+        // what's actually useful on a compact list row, the series name isn't.
+        // Every other venue with a location (Alamo, opted in per day) still
+        // needs both to disambiguate which of five it is.
+        $venue = $film['venue'] === 'Flick Clique' && $film['location']
+            ? $film['location']
+            : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
         $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
         imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
@@ -1835,7 +1884,11 @@ function ig_build_feature_page_paper(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $kicker);
         // 56px caps reach ~52px above their own baseline — a flat leading
@@ -1947,7 +2000,11 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $gold, IG_FONT_BODY, $kicker);
         // Anton reaches noticeably higher above its own baseline than
@@ -2055,7 +2112,11 @@ function ig_build_feature_page_zine(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
         $y += 68;
@@ -2158,7 +2219,11 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, $kicker);
         $y += 68;
@@ -2264,7 +2329,11 @@ function ig_build_feature_page_neon(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $heroH + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
         // Baloo 2's ascent at 46px (measured: 42px) runs shorter than
@@ -2551,7 +2620,11 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $sy + $stampH + 46;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $amber, IG_FONT_BODY, $kicker);
         $y += 66;
@@ -2677,7 +2750,11 @@ function ig_build_feature_page_austin(array $film, $date) {
     $textMaxWidth = $w - $margin * 2;
     $y = $bandY2 + 50;
 
+    // A spotlight page has the room the compact list rows don't — full venue
+    // and location both, unlike ig_build_list_page()'s own Flick Clique
+    // carve-out above, which drops the venue name for lack of space.
     $kicker = strtoupper($film['venue'] ?? '');
+    if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
         imagettftext($im, 24, 0, $margin, $y, $terracotta, IG_FONT_BODY, $kicker);
         $y += 66;
