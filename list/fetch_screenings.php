@@ -4,6 +4,7 @@ require_once __DIR__ . '/scraper_afs.php';
 require_once __DIR__ . '/scraper_hyperreal.php';
 require_once __DIR__ . '/scraper_alamo.php';
 require_once __DIR__ . '/scraper_fathom.php';
+require_once __DIR__ . '/scraper_flickclique.php';
 require_once __DIR__ . '/tmdb.php';
 
 function filter_screenings($films, $now, $end) {
@@ -32,6 +33,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         // untouched and ready — this array entry was always the single
         // point deciding whether Fathom's screenings exist at all.
         // ['films' => filter_screenings(fetch_fathom_films($force), $now, $end), 'venue' => 'Fathom Events'],
+        ['films' => filter_screenings(fetch_flickclique_films($force), $now, $end), 'venue' => 'Flick Clique'],
     ];
     $all_films = [];
     foreach ($sources as $src) {

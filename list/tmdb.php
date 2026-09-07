@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 6;
+const TMDB_CACHE_V = 7;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -76,6 +76,10 @@ const TMDB_KNOWN_DIRECTOR_HINTS = [
     // this exact title across many countries and years; popularity
     // ordering picked a 2022 Spanish short instead.
     'memento mori' => 'Kim Tae-yong',
+    // "Night of the Living Dead" (1968, George A. Romero) — Flick Clique's
+    // Sept. 7 screening. Six exact-title matches on TMDB; an obscure 2026
+    // film edged out the real classic by popularity (9.59 vs 8.78).
+    'night of the living dead' => 'George A. Romero',
 ];
 
 function tmdb_known_director_hint($title) {
