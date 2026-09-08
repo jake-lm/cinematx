@@ -1597,6 +1597,102 @@
     var generateForm = $('[data-forecast-generate-form]');
     var bank         = section.querySelector('[data-forecast-bank]');
 
+    var zoomOutBtn   = section.querySelector('[data-zoom-out]');
+    var zoomInBtn    = section.querySelector('[data-zoom-in]');
+    var zoomLabel    = section.querySelector('[data-zoom-label]');
+    var panLeftBtn   = section.querySelector('[data-zoom-pan-left]');
+    var panRightBtn  = section.querySelector('[data-zoom-pan-right]');
+    var zoomResetBtn = section.querySelector('[data-zoom-reset]');
+
+    // Which marker was last clicked — kept across layoutMarkers()
+    // rebuilds (a fresh DOM tree every time, so a class alone wouldn't
+    // survive one) so a marker stays raised above its neighbors until
+    // another one is picked, not just for the moment it's clicked.
+    var selectedKey = null;
+
+    // The zoomed-in window onto the episode, in seconds — [0, duration]
+    // at 1×. Every place that used to read raw x/width against duration
+    // now goes through timeToPct()/pctToTime() instead, so a marker
+    // drag, a canvas click-scrub, and a bank-item drop all resolve to
+    // the right absolute time regardless of how far zoomed in they are.
+    var ZOOM_LEVELS = [1, 2, 4, 8];
+    var zoomLevel = 1;
+    var viewStart = 0;
+    var viewDuration = duration;
+
+    function timeToPct(t) {
+      return viewDuration > 0 ? Math.max(0, Math.min(1, (t - viewStart) / viewDuration)) : 0;
+    }
+    function pctToTime(pct) {
+      return viewStart + pct * viewDuration;
+    }
+    function inView(t) {
+      return t >= viewStart - 0.001 && t <= viewStart + viewDuration + 0.001;
+    }
+
+    // Re-renders everything that depends on the current view — called
+    // after any zoom or pan change, same set of updates a fresh load
+    // already does once. cachedPeaks may still be null this early (the
+    // waveform's audio fetch/decode is async) — loadWaveform()'s own
+    // eventual draw call picks up whatever view is current by then, so
+    // there's nothing to redraw yet if it hasn't landed.
+    function refreshView() {
+      layoutMarkers();
+      if (audioEl) updatePlayhead(audioEl.currentTime);
+      if (cachedPeaks) drawWaveform(cachedPeaks);
+      updateZoomUI();
+    }
+
+    function setView(newZoomLevel, centerTime) {
+      zoomLevel = newZoomLevel;
+      viewDuration = duration / zoomLevel;
+      viewStart = Math.max(0, Math.min(duration - viewDuration, centerTime - viewDuration / 2));
+      refreshView();
+    }
+
+    function panBy(deltaSeconds) {
+      viewStart = Math.max(0, Math.min(duration - viewDuration, viewStart + deltaSeconds));
+      refreshView();
+    }
+
+    function updateZoomUI() {
+      if (zoomLabel) zoomLabel.textContent = zoomLevel + '×';
+      var atMin = zoomLevel <= ZOOM_LEVELS[0];
+      var atMax = zoomLevel >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+      if (zoomOutBtn) zoomOutBtn.disabled = atMin;
+      if (zoomInBtn) zoomInBtn.disabled = atMax;
+      var zoomed = zoomLevel > 1;
+      if (panLeftBtn) { panLeftBtn.hidden = !zoomed; panLeftBtn.disabled = viewStart <= 0; }
+      if (panRightBtn) { panRightBtn.hidden = !zoomed; panRightBtn.disabled = viewStart + viewDuration >= duration - 0.001; }
+      if (zoomResetBtn) zoomResetBtn.hidden = !zoomed;
+    }
+
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', function () {
+        var idx = ZOOM_LEVELS.indexOf(zoomLevel);
+        if (idx > 0) setView(ZOOM_LEVELS[idx - 1], viewStart + viewDuration / 2);
+      });
+    }
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', function () {
+        var idx = ZOOM_LEVELS.indexOf(zoomLevel);
+        // Centers on the playhead, not the current view — zooming in is
+        // almost always "let me fine-tune near where I just was," and
+        // audioEl.currentTime is exactly that; zooming back out instead
+        // expands around whatever's already on screen.
+        if (idx < ZOOM_LEVELS.length - 1) setView(ZOOM_LEVELS[idx + 1], audioEl ? audioEl.currentTime : (viewStart + viewDuration / 2));
+      });
+    }
+    if (zoomResetBtn) {
+      zoomResetBtn.addEventListener('click', function () { setView(1, 0); });
+    }
+    if (panLeftBtn) {
+      panLeftBtn.addEventListener('click', function () { panBy(-viewDuration * 0.5); });
+    }
+    if (panRightBtn) {
+      panRightBtn.addEventListener('click', function () { panBy(viewDuration * 0.5); });
+    }
+
     function chapterKey(c) { return c.type + '|' + (c.type === 'day' ? c.day : c.film); }
 
     var snapshot = function () {
@@ -1664,7 +1760,11 @@
         var rect = markersWrap.getBoundingClientRect();
         var x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         var pct = rect.width > 0 ? x / rect.width : 0;
-        chapter.start = Math.round(pct * duration);
+        // pctToTime(), not pct*duration — the same pixel of drag distance
+        // covers far less time once zoomed in, which is the entire point;
+        // at 1× (the default) viewDuration === duration and this is
+        // identical to before.
+        chapter.start = Math.round(pctToTime(pct));
         el.style.left = (pct * 100) + '%';
         timeEl.textContent = formatTime(chapter.start);
         updateStoryboard(chapter.start);
@@ -1693,10 +1793,11 @@
     // small × that pulls it out of chapters[] entirely, distinct from
     // bindDrag()'s own reposition-in-place drag.
     function buildMarker(start, title, extraClass, chapter) {
-      var pct = duration > 0 ? Math.max(0, Math.min(100, (start / duration) * 100)) : 0;
+      var pct = timeToPct(start) * 100;
 
       var el = document.createElement('div');
       el.className = 'fc-marker' + (extraClass ? ' ' + extraClass : '');
+      if (chapter && selectedKey === chapterKey(chapter)) el.className += ' is-selected';
       el.style.left = pct + '%';
 
       var label = document.createElement('div');
@@ -1708,6 +1809,17 @@
       el.appendChild(label);
 
       if (chapter) {
+        // Raises this marker (and its label) above every other one —
+        // see .fc-marker.is-selected in css/v7.scss — so a marker sitting
+        // close in time to others, with its label otherwise buried under
+        // theirs, stays visible and its own remove button reachable once
+        // it's the one you actually clicked.
+        el.addEventListener('pointerdown', function () {
+          selectedKey = chapterKey(chapter);
+          $$('.fc-marker.is-selected', markersWrap).forEach(function (m) { m.classList.remove('is-selected'); });
+          el.classList.add('is-selected');
+        });
+
         var remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'fc-marker__remove';
@@ -1741,17 +1853,20 @@
       // The preshow and intro are both fixed bookends — never draggable,
       // never removable, never saved (they're not real timeline entries
       // at all). The preshow always runs first, then the intro takes
-      // over once it ends.
-      markersWrap.appendChild(buildMarker(0, 'Preshow', 'fc-marker--fixed').el);
-      markersWrap.appendChild(buildMarker(preshowSeconds, 'Intro', 'fc-marker--fixed').el);
+      // over once it ends. Skipped (like any marker) once zoomed to a
+      // window that doesn't include them — nothing useful to show at a
+      // position off the visible waveform.
+      if (inView(0)) markersWrap.appendChild(buildMarker(0, 'Preshow', 'fc-marker--fixed').el);
+      if (inView(preshowSeconds)) markersWrap.appendChild(buildMarker(preshowSeconds, 'Intro', 'fc-marker--fixed').el);
 
       chapters.forEach(function (c) {
+        if (!inView(c.start)) return;
         var m = buildMarker(c.start, c.title, c.type === 'day' ? 'fc-marker--day' : '', c);
         bindDrag(m.el, c, m.timeEl);
         markersWrap.appendChild(m.el);
       });
 
-      if (wrapupStart !== null && wrapupStart !== undefined) {
+      if (wrapupStart !== null && wrapupStart !== undefined && inView(wrapupStart)) {
         markersWrap.appendChild(buildMarker(wrapupStart, 'Wrap-up', 'fc-marker--fixed').el);
       }
 
@@ -1819,7 +1934,7 @@
             var rect = markersWrap.getBoundingClientRect();
             var x = Math.max(0, Math.min(rect.width, ev.clientX - rect.left));
             var pct = rect.width > 0 ? x / rect.width : 0;
-            var start = Math.round(pct * duration);
+            var start = Math.round(pctToTime(pct));
             chapters.push(type === 'day'
               ? { type: 'day', film: null, day: key, start: start, title: title }
               : { type: 'film', film: key, day: null, start: start, title: title });
@@ -1946,7 +2061,22 @@
 
     function updatePlayhead(time) {
       if (!playhead || duration <= 0) return;
-      var pct = Math.max(0, Math.min(100, (time / duration) * 100));
+      // Auto-follow: re-center the zoomed view around playback so it
+      // never just plays off the edge and out of sight. The only ways
+      // `time` lands outside the current view at all: playback simply
+      // advancing past its right edge, or the native <audio> element's
+      // own scrubber being dragged (its own control, not this canvas —
+      // every drag/scrub/drop this file drives itself is already
+      // derived from a position within the current view by
+      // construction). Doesn't call refreshView() — that calls this
+      // function, so inlines the same layout/redraw calls instead.
+      if (zoomLevel > 1 && !inView(time)) {
+        viewStart = Math.max(0, Math.min(duration - viewDuration, time - viewDuration / 2));
+        layoutMarkers();
+        if (cachedPeaks) drawWaveform(cachedPeaks);
+        updateZoomUI();
+      }
+      var pct = timeToPct(time) * 100;
       playhead.style.left = pct + '%';
       playhead.classList.add('is-active');
       updateStoryboard(time);
@@ -1983,7 +2113,7 @@
       function seekFromEvent(e) {
         var rect = canvas.getBoundingClientRect();
         var pct = rect.width > 0 ? Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) : 0;
-        audioEl.currentTime = pct * duration;
+        audioEl.currentTime = pctToTime(pct);
         updatePlayhead(audioEl.currentTime);
       }
       canvas.addEventListener('pointerdown', function (e) {
@@ -2007,10 +2137,22 @@
       var ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, rect.width, rect.height);
-      var barW = rect.width / peaks.length;
+
+      // Zoomed in, only the slice of the (fixed-resolution, whole-
+      // episode) peaks array the current view actually covers — same
+      // data, just fewer/wider bars across the same canvas width, which
+      // reads as "zoomed in" the same way a photo crop does.
+      var visible = peaks;
+      if (duration > 0 && viewDuration < duration) {
+        var startIdx = Math.floor((viewStart / duration) * peaks.length);
+        var endIdx = Math.ceil(((viewStart + viewDuration) / duration) * peaks.length);
+        visible = peaks.slice(Math.max(0, startIdx), Math.min(peaks.length, Math.max(startIdx + 1, endIdx)));
+      }
+
+      var barW = rect.width / visible.length;
       var midY = rect.height / 2;
       ctx.fillStyle = '#C9C2B4';
-      peaks.forEach(function (p, i) {
+      visible.forEach(function (p, i) {
         var h = Math.max(2, p * rect.height * 0.85);
         ctx.fillRect(i * barW, midY - h / 2, Math.max(1, barW - 1), h);
       });

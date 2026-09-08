@@ -3264,6 +3264,7 @@ button, input, select, textarea {
   position: absolute;
   top: 0;
   bottom: 0;
+  z-index: 1;
   pointer-events: auto;
   transform: translateX(-50%);
   display: flex;
@@ -3276,6 +3277,9 @@ button, input, select, textarea {
 .fc-marker:active, .fc-marker.is-dragging {
   cursor: grabbing;
 }
+.fc-marker.is-selected {
+  z-index: 30;
+}
 
 .fc-marker__handle {
   width: 3px;
@@ -3287,6 +3291,7 @@ button, input, select, textarea {
 }
 
 .fc-marker.is-dragging .fc-marker__handle,
+.fc-marker.is-selected .fc-marker__handle,
 .fc-marker:hover .fc-marker__handle {
   box-shadow: 0 0 0 4px var(--red-wash);
 }
@@ -3294,7 +3299,7 @@ button, input, select, textarea {
 .fc-marker--day .fc-marker__handle {
   background: #F2C14E;
 }
-.fc-marker--day.is-dragging .fc-marker__handle, .fc-marker--day:hover .fc-marker__handle {
+.fc-marker--day.is-dragging .fc-marker__handle, .fc-marker--day.is-selected .fc-marker__handle, .fc-marker--day:hover .fc-marker__handle {
   box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.25);
 }
 
@@ -3387,6 +3392,21 @@ button, input, select, textarea {
 
 [data-forecast-waveform-canvas] {
   touch-action: none;
+}
+
+.fc-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+
+.fc-zoom__label {
+  min-width: 28px;
+  text-align: center;
+  font-size: var(--t-3xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .fc-bank {

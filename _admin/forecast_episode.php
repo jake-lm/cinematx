@@ -527,6 +527,15 @@ require dirname(__DIR__) . '/v7/_chrome.php';
 
           <audio data-forecast-audio-player controls preload="metadata" style="width:100%;margin-bottom:var(--s-3)" src="<?php echo $e($audioUrl); ?>"></audio>
 
+          <div class="fc-zoom" data-forecast-zoom>
+            <button type="button" class="btn btn--quiet btn--sm" data-zoom-out title="Zoom out">&minus;</button>
+            <span class="fc-zoom__label" data-zoom-label>1&times;</span>
+            <button type="button" class="btn btn--quiet btn--sm" data-zoom-in title="Zoom in">+</button>
+            <button type="button" class="btn btn--quiet btn--sm" data-zoom-pan-left title="Pan left" hidden>&larr;</button>
+            <button type="button" class="btn btn--quiet btn--sm" data-zoom-pan-right title="Pan right" hidden>&rarr;</button>
+            <button type="button" class="btn btn--quiet btn--sm" data-zoom-reset title="Back to full view" hidden>Fit</button>
+          </div>
+
           <div data-forecast-waveform-wrap style="position:relative">
             <canvas data-forecast-waveform-canvas style="width:100%;height:110px;display:block;border-radius:var(--radius);background:var(--surface-2)"></canvas>
             <div data-forecast-markers style="position:absolute;inset:0;top:0;bottom:0"></div>

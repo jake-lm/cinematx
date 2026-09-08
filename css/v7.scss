@@ -2147,6 +2147,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fc-marker {
   position: absolute;
   top: 0; bottom: 0;
+  z-index: 1;
   pointer-events: auto;
   transform: translateX(-50%);
   display: flex;
@@ -2156,6 +2157,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   touch-action: none;
   user-select: none;
   &:active, &.is-dragging { cursor: grabbing; }
+  // Clicked to select — see initForecastTimeline()'s own selectedKey.
+  // Markers close together in time (common once several sit in the same
+  // few seconds) stack their labels on top of each other with no way to
+  // tell one apart or reach its own remove button; raising the clicked
+  // one above every sibling, and keeping it raised rather than only on
+  // hover, means it stays reachable while you actually go remove it.
+  &.is-selected { z-index: 30; }
 }
 .fc-marker__handle {
   width: 3px;
@@ -2166,6 +2174,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: box-shadow 120ms ease;
 }
 .fc-marker.is-dragging .fc-marker__handle,
+.fc-marker.is-selected .fc-marker__handle,
 .fc-marker:hover .fc-marker__handle {
   box-shadow: 0 0 0 4px var(--red-wash);
 }
@@ -2177,6 +2186,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .fc-marker--day {
   .fc-marker__handle { background: #F2C14E; }
   &.is-dragging .fc-marker__handle,
+  &.is-selected .fc-marker__handle,
   &:hover .fc-marker__handle { box-shadow: 0 0 0 4px rgba(242, 193, 78, 0.25); }
 }
 // The intro/preshow/wrap-up bookends — always at a fixed position, never
@@ -2277,6 +2287,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // already follows.
 [data-forecast-waveform-canvas] {
   touch-action: none;
+}
+
+// Zoom in on the waveform for finer marker placement — a click-drag
+// spanning the whole episode only ever resolves to whole seconds at
+// best; zoomed in, the same drag distance covers far less time. Pan
+// left/right and Fit only ever show once actually zoomed in (see
+// initForecastTimeline()'s updateZoomUI()) — meaningless, and
+// confusing to leave clickable, at the default full view.
+.fc-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+}
+.fc-zoom__label {
+  min-width: 28px;
+  text-align: center;
+  font-size: var(--t-3xs);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
 }
 
 // The bank — every selected film plus all 7 days, always available to
