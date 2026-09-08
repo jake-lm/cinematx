@@ -17,6 +17,18 @@
 // ═══════════════════════════════════════════════════════════════════════════
 require_once __DIR__ . '/instagram.php';
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  TEMPORARY — real video-gen testing in progress; a stray click on
+//  "Post to Instagram" during that must not actually publish anything.
+//  Checked by _admin/forecast_post.php only, so nothing else changes:
+//  "Mark as already posted" still works (it only ever writes to this
+//  app's own database, never calls Instagram's API), and the daily
+//  screening carousel (bin/post-instagram.php) is entirely separate
+//  code and unaffected either way. Flip to false, or delete this
+//  constant and its one call site, once testing wraps.
+// ═══════════════════════════════════════════════════════════════════════════
+const FORECAST_IG_POSTING_DISABLED = true;
+
 // ── Data ─────────────────────────────────────────────────────────────────
 
 function forecast_list_episodes($conn) {

@@ -231,7 +231,10 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 <div class="admin-note">Already posted &mdash; media id <?php echo $e($episode['posted_media_id']); ?>.</div>
                 <button class="btn btn--block" type="button" disabled>Posted</button>
               <?php else: ?>
-                <?php if (!$configured): ?>
+                <?php if (FORECAST_IG_POSTING_DISABLED): ?>
+                  <div class="admin-note">Instagram posting is temporarily disabled (video-gen testing in progress) &mdash; see <code>FORECAST_IG_POSTING_DISABLED</code> in <code>list/forecast.php</code>.</div>
+                  <button class="btn btn--block" type="button" disabled>Posting disabled</button>
+                <?php elseif (!$configured): ?>
                   <div class="admin-note"><code>IG_ACCESS_TOKEN</code> / <code>IG_BUSINESS_ACCOUNT_ID</code> aren't set.</div>
                   <button class="btn btn--block" type="button" disabled>Not configured</button>
                 <?php elseif (!$hasVideo): ?>

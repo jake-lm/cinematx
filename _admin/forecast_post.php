@@ -17,6 +17,10 @@ function forecast_post_fail($msg) {
     exit;
 }
 
+if (FORECAST_IG_POSTING_DISABLED) {
+    forecast_post_fail('Instagram posting is temporarily disabled — see FORECAST_IG_POSTING_DISABLED in list/forecast.php.');
+}
+
 $episode_id = (int) ($_POST['episode_id'] ?? 0);
 $episode = forecast_get_episode($conn, $episode_id);
 if (!$episode || (int) $episode['uid'] !== (int) $admin_user['id']) {
