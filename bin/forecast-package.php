@@ -4,14 +4,20 @@
 //
 //  Launched detached by _admin/forecast_package.php. Renders the
 //  redesigned intro card, then one day card plus that day's own film
-//  cards (no showtimes line — see forecast_build_chapter_card()'s
-//  $showShowtimes) for each of the week's 7 days in order — every film,
-//  independent of the Chapters checklist. A film playing more than once
-//  this week still only gets one panel, filed under its first day
-//  ($byDay's own dedup), even though a later day's own day card
-//  correctly lists it too. Zips everything with zero-padded/slugged
-//  names so it sorts into the real main/sub-chapter order in any file
-//  browser or Premiere import, and records the zip on the episode row
+//  cards for each of the week's 7 days in order — every film,
+//  independent of the Chapters checklist. Film cards carry their full
+//  showtime pill grid (forecast_build_chapter_card()'s default
+//  $showShowtimes) same as the real video's — used to pass false here
+//  since a day-scoped panel already implies which day, but that
+//  reasoning stopped holding once a pill carries its own day-of-week
+//  rather than assuming the panel it's on already says so.
+//
+//  A film playing more than once this week still only gets one panel,
+//  filed under its first day ($byDay's own dedup), even though a later
+//  day's own day card correctly lists it too. Zips everything with
+//  zero-padded/slugged names so it sorts into the real main/sub-chapter
+//  order in any file browser or Premiere import, and records the zip
+//  on the episode row
 //  the same way bin/forecast-generate.php records generated_video.
 // ═══════════════════════════════════════════════════════════════════════════
 if (PHP_SAPI !== 'cli') {
@@ -85,7 +91,7 @@ foreach ($weekDays as $ymd) {
     foreach ($byDay[$ymd] ?? [] as $film) {
         $slug = ctx_slug($film['display_title'] ?? $film['title']);
         $path = $tmpDir . '/' . sprintf('%02d', $n++) . '-' . $slug . '.png';
-        $cardImg = forecast_build_chapter_card($film, $episode, false);
+        $cardImg = forecast_build_chapter_card($film, $episode);
         imagepng($cardImg, $path);
         imagedestroy($cardImg);
         $entries[] = $path;
