@@ -11,7 +11,8 @@
 //  film entry starts (the saved selection/timeline, or their automatic
 //  defaults — see forecast_resolve_selection()/forecast_resolve_timeline()
 //  in list/forecast.php), renders the preshow/intro/day/chapter/wrap-up
-//  segment images, runs ffmpeg via forecast_generate_video()'s
+//  segment images plus the animated poster-wall clip that plays over the
+//  intro card, runs ffmpeg via forecast_generate_video()'s
 //  proc_open() progress callback, writes
 //  uploads/forecast/<id>-progress.json as it goes, and updates the
 //  episode row once finished.
@@ -86,6 +87,20 @@ imagedestroy($introImg);
 $segmentPaths[] = $introPath;
 $segments[] = ['image' => $introPath, 'start' => FORECAST_PRESHOW_SECONDS];
 
+// The poster wall's animated reveal, rendered fresh here rather than
+// depending on the separately-triggered "Generate intro animation"
+// Manual export button having ever been pressed for this episode —
+// forecast_generate_video() below just falls back to the static intro
+// card above, exactly today's behavior, if this fails for any reason
+// (rendering it isn't essential the way the audio/segment cards are).
+$introAnimation = null;
+$introAnimPath = $dir . '/' . $episode_id . '-seg-intro-anim-' . $stamp . '.mp4';
+$introAnimResult = forecast_generate_intro_animation($episode, $conn, $films, $introAnimPath);
+if ($introAnimResult['ok']) {
+    $segmentPaths[] = $introAnimPath;
+    $introAnimation = ['path' => $introAnimPath, 'start' => FORECAST_PRESHOW_SECONDS, 'duration' => $introAnimResult['duration']];
+}
+
 // A day entry is the "main chapter" — a film entry is its "sub-chapter."
 // Both fold into the same segment list; forecast_generate_video()'s own
 // overlay fold doesn't care which is which, only its separate day-label
@@ -129,7 +144,7 @@ $outputPath = $dir . '/' . $outputName;
 
 $result = forecast_generate_video($audioPath, $segments, $outputPath, $duration, function ($percent) use ($episode_id) {
     forecast_write_progress($episode_id, 'running', $percent);
-});
+}, $introAnimation);
 
 foreach ($segmentPaths as $p) @unlink($p);
 

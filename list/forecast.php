@@ -1303,7 +1303,12 @@ function forecast_generate_intro_animation(array $episode, $conn, $filmsOverride
         $result = forecast_run_ffmpeg($cmd, $outputPath, $onProgress, $duration);
         @unlink($basePath);
         @rmdir($tmpDir);
-        return $result;
+        // 'duration' alongside 'ok'/'error' so a caller compositing this
+        // clip into the real video (bin/forecast-generate.php) knows
+        // exactly how long it plays without hardcoding a second copy of
+        // $animSeconds + $holdSeconds that could silently drift out of
+        // sync with this one.
+        return $result + ['duration' => $duration];
     }
 
     $n = count($cells);
@@ -1352,7 +1357,7 @@ function forecast_generate_intro_animation(array $episode, $conn, $filmsOverride
     foreach ($cellPaths as $p) @unlink($p);
     @rmdir($tmpDir);
 
-    return $result;
+    return $result + ['duration' => $duration];
 }
 
 // ── Segment cards (dynamic video) ───────────────────────────────────────
@@ -1864,6 +1869,22 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
 // ── Video assembly ───────────────────────────────────────────────────────
 
 /**
+ * $introAnimation, if given (['path', 'start', 'duration'] —
+ * forecast_generate_intro_animation()'s own output, 'start' matching
+ * whichever $segments entry is the intro card), plays on top of that
+ * intro segment for its own first few seconds: an -itsoffset input
+ * (everything else here is a -loop 1 still sharing one implicit global
+ * timeline, but a real rendered clip needs its own timestamps shifted
+ * to the intro's actual start), faded in on the exact same schedule as
+ * the intro card underneath so the two dissolve in together rather than
+ * the static card appearing fully populated only to "reset" to an
+ * empty poster wall a moment later. eof_action=pass once its own
+ * frames run out hands back to that static card — its last frame is
+ * built from the same header/wall-layout code, confirmed pixel-
+ * equivalent, so the handoff is seamless. Left out (the default)
+ * behaves exactly as before: the intro segment is just its own static
+ * card the whole time it's on screen.
+ *
  * Composites an ordered sequence of segment images (intro and wrap-up
  * are forecast_build_cover() itself, one forecast_build_chapter_card()
  * per chapter in between), an animated waveform, a filling progress bar,
@@ -1944,7 +1965,7 @@ function forecast_write_progress($episode_id, $status, $percent = null, $error =
  * just read the pipe as it streams and match that pattern against the
  * already-known total duration.
  */
-function forecast_generate_video($audioPath, array $segments, $outputPath, $durationSeconds, $onProgress = null) {
+function forecast_generate_video($audioPath, array $segments, $outputPath, $durationSeconds, $onProgress = null, $introAnimation = null) {
     if (!file_exists($audioPath)) return ['ok' => false, 'error' => 'Audio file not found.'];
     if (!$segments) return ['ok' => false, 'error' => 'No segments to render.'];
     foreach ($segments as $seg) {
@@ -2014,6 +2035,18 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
     $bgFilter  = '';
     $bgLabel   = '0:v';
 
+    // Reserved up front, not assigned once actually attached below — its
+    // -i flag has to land after every segment's own (so segment indices
+    // stay contiguous with the loop's own $i), but the filter clause
+    // referencing it has to land mid-loop, right after its matching
+    // segment's own overlay. Splitting "where the -i is declared" from
+    // "where the filter text referencing it sits" is what makes both of
+    // those true at once.
+    $hasIntroAnim = $introAnimation && !empty($introAnimation['path']) && file_exists($introAnimation['path']);
+    $introAnimIdx = $hasIntroAnim ? count($segments) : null;
+    $introAnimAttached = false;
+    $introAnimFadeStart = null;
+
     // Fade each later segment in over its own short window, then latch it
     // permanently on top with a one-sided enable — the next segment's own
     // overlay (later in the chain) will cover it again when its turn
@@ -2024,9 +2057,21 @@ function forecast_generate_video($audioPath, array $segments, $outputPath, $dura
         $bgFilter .= "[{$i}:v]format=rgba,fade=t=in:st={$fadeStart}:d=" . FORECAST_SEGMENT_FADE . ":alpha=1[seg{$i}];";
         $bgFilter .= "[{$bgLabel}][seg{$i}]overlay=0:0:enable='gte(t\\,{$fadeStart})'[comp{$i}];";
         $bgLabel = "comp{$i}";
+
+        if ($introAnimIdx !== null && !$introAnimAttached && (float) $segments[$i]['start'] === (float) $introAnimation['start']) {
+            $introAnimAttached = true;
+            $introAnimFadeStart = $fadeStart;
+            $bgFilter .= "[{$introAnimIdx}:v]format=rgba,fade=t=in:st={$fadeStart}:d=" . FORECAST_SEGMENT_FADE . ":alpha=1[introanim];";
+            $bgFilter .= "[{$bgLabel}][introanim]overlay=0:0:eof_action=pass:enable='gte(t\\,{$fadeStart})'[compintroanim];";
+            $bgLabel = "compintroanim";
+        }
     }
 
-    $audioIdx = count($segments);
+    if ($introAnimAttached) {
+        $inputArgs .= '-itsoffset ' . escapeshellarg($introAnimFadeStart) . ' -i ' . escapeshellarg($introAnimation['path']) . ' ';
+    }
+
+    $audioIdx = $introAnimAttached ? $introAnimIdx + 1 : count($segments);
     $barIdx   = $audioIdx + 1;
 
     // The gap between the bottom band's own top edge and where the
