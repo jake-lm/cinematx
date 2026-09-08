@@ -17,8 +17,15 @@
 //  day's own day card correctly lists it too. Zips everything with
 //  zero-padded/slugged names so it sorts into the real main/sub-chapter
 //  order in any file browser or Premiere import, and records the zip
-//  on the episode row
-//  the same way bin/forecast-generate.php records generated_video.
+//  on the episode row the same way bin/forecast-generate.php records
+//  generated_video.
+//
+//  A film mentioned but not actually screening this week (forecast_get_
+//  extra_films() — added by TMDB id from the Timeline bank's own
+//  search, not scraped) gets a panel too, appended after every real
+//  day/film since it has no real day to file under. forecast_build_
+//  chapter_card() already renders it cleanly with no showtimes line —
+//  same as the real video's own chapter cards for the same film.
 // ═══════════════════════════════════════════════════════════════════════════
 if (PHP_SAPI !== 'cli') {
     http_response_code(404);
@@ -55,6 +62,7 @@ forecast_write_progress($episode_id, 'running', 0, null, 'package');
 $dir = dirname(__DIR__) . '/uploads/forecast';
 $byDay = forecast_all_week_films($conn, $episode['week_of']);
 $films = forecast_flat_week_films($byDay);
+$extraFilms = forecast_get_extra_films($episode);
 
 $stamp = time();
 $tmpDir = $dir . '/package-tmp-' . $episode_id . '-' . $stamp;
@@ -76,7 +84,7 @@ $entries[] = $introPath;
 // across the whole sequence, not per-film, so the zip's own sort order
 // mirrors the real main/sub-chapter hierarchy.
 $weekDays = forecast_week_days($episode['week_of']);
-$total = 7 + count($films);
+$total = 7 + count($films) + count($extraFilms);
 $done  = 0;
 $n     = 1;
 foreach ($weekDays as $ymd) {
@@ -98,6 +106,21 @@ foreach ($weekDays as $ymd) {
         $done++;
         forecast_write_progress($episode_id, 'running', min(90, (int) round($done / $total * 90)), null, 'package');
     }
+}
+
+// A film mentioned but not actually screening this week has no real day
+// to file under, so its panel just continues the same $n sequence after
+// every real day/film — sorts to the end of the zip rather than
+// squeezed in among the real schedule it isn't part of.
+foreach ($extraFilms as $film) {
+    $slug = ctx_slug($film['display_title'] ?? $film['title']);
+    $path = $tmpDir . '/' . sprintf('%02d', $n++) . '-' . $slug . '.png';
+    $cardImg = forecast_build_chapter_card($film, $episode);
+    imagepng($cardImg, $path);
+    imagedestroy($cardImg);
+    $entries[] = $path;
+    $done++;
+    forecast_write_progress($episode_id, 'running', min(90, (int) round($done / $total * 90)), null, 'package');
 }
 
 $zipName = $episode_id . '-package-' . $stamp . '.zip';
