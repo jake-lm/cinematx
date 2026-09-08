@@ -3398,7 +3398,6 @@ button, input, select, textarea {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  margin-bottom: var(--s-3);
 }
 
 .fc-zoom__label {

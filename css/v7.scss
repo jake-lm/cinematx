@@ -2294,12 +2294,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // best; zoomed in, the same drag distance covers far less time. Pan
 // left/right and Fit only ever show once actually zoomed in (see
 // initForecastTimeline()'s updateZoomUI()) — meaningless, and
-// confusing to leave clickable, at the default full view.
+// confusing to leave clickable, at the default full view. Lives in the
+// "Save chapters" row below the waveform, not directly above it —
+// directly above, a marker's own label tab (positioned above the
+// marker itself) could sit right on top of these buttons and block
+// them.
 .fc-zoom {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  margin-bottom: var(--s-3);
 }
 .fc-zoom__label {
   min-width: 28px;
