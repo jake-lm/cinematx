@@ -54,6 +54,21 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                 $film['director'] = $tmdb['director'];
                 $film['cast']     = $tmdb['cast'];
                 $film['wiki']     = $tmdb['wiki'];
+
+                // TMDB found genuinely nothing — not a wrong match to
+                // correct (that's TMDB_KNOWN_DIRECTOR_HINTS's job), a real
+                // miss, e.g. a local premiere or filmmaker Q&A no TMDB entry
+                // could ever match. Falls back to AFS's own screening page
+                // (see scraper_afs.php's afs_ fields, already fetched for
+                // every AFS film regardless) rather than showing a blank
+                // card. year/genres/cast/wiki have no AFS equivalent and
+                // stay absent, same as a curated shorts program below.
+                if (empty($film['poster']) && !empty($film['afs_poster'])) {
+                    $film['poster']   = $film['afs_poster'];
+                    $film['director'] = $film['director'] ?: $film['afs_director'];
+                    $film['runtime']  = $film['runtime']  ?: $film['afs_runtime'];
+                    $film['overview'] = $film['overview'] ?: $film['afs_overview'];
+                }
             } else {
                 // A curated shorts anthology (see afs_is_short_program()) —
                 // TMDB has no correct entry to borrow from, so only what the

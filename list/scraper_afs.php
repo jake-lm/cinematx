@@ -224,6 +224,18 @@ function fetch_afs_films_scrape() {
                     // because the short's TMDB popularity happened to be
                     // slightly higher.
                     'director_hint' => $detail['director'],
+                    // Same detail fetch's poster/runtime/overview, carried
+                    // through unconditionally this time (not just for a
+                    // shorts program) — a fallback for fetch_all_screenings()
+                    // to reach for only when TMDB comes back with genuinely
+                    // nothing, e.g. a local premiere or filmmaker Q&A no
+                    // TMDB entry could ever match. Kept in their own
+                    // afs_-prefixed fields rather than 'poster'/etc. so they
+                    // can never be mistaken for values TMDB already found.
+                    'afs_poster'    => $detail['poster'],
+                    'afs_director'  => $detail['director'],
+                    'afs_runtime'   => $detail['runtime'],
+                    'afs_overview'  => $detail['overview'],
                 ];
             }
         }
