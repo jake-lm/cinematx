@@ -91,6 +91,13 @@ function ctx_series($raw) {
         // A number-only or single-word-of-digits prefix is not a series.
         if ($series !== '' && !preg_match('/^\d+$/', $series)) return $series;
     }
+    // "Black Is Not a Genre presents SIGN O' THE TIMES" — same shape as the
+    // colon form above, a presenting series/collective's own naming
+    // convention using "presents" as the delimiter instead of ":".
+    if (preg_match('/^(.{3,40}?)\s+presents\s+(\S.*)$/iu', $raw, $m)) {
+        $series = trim($m[1]);
+        if ($series !== '') return $series;
+    }
     return null;
 }
 
@@ -117,6 +124,9 @@ function ctx_clean_title($raw) {
     $t = trim(preg_replace(CTX_LANGUAGE_TAG, '', $t));       // "Akira (Subtitled) in 4K" → "Akira in 4K"
     $t = trim(preg_replace(CTX_FORMAT_TAG, '', $t));         // "Akira in 4K" → "Akira"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
+    if (preg_match('/^(.{3,40}?)\s+presents\s+(\S.*)$/iu', $t, $m)) {
+        $t = trim($m[2]);                                    // "Black Is Not a Genre presents SIGN O' THE TIMES" → right
+    }
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
         $left = trim($m[1]);
         if (preg_match(CTX_EDITION_SUFFIX, trim($m[2])) || preg_match(CTX_EPISODE_SUFFIX, trim($m[2]))) {
