@@ -10,6 +10,7 @@
 //  "mark as used" state to track.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_guard.php';
+require dirname(__DIR__) . '/v7/_lib.php';
 require dirname(__DIR__) . '/list/scraper_news.php';
 
 $items = fetch_all_news();
