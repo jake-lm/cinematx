@@ -23,5 +23,7 @@
   <span class="ico"><i class="fa-solid fa-map-location-dot"></i></span><span class="txt">Screenings</span></a>
 <a class="rail__link<?php echo $on('forecast'); ?>" href="/_admin/forecast.php">
   <span class="ico"><i class="fa-solid fa-microphone"></i></span><span class="txt">Film Forecast</span></a>
+<a class="rail__link<?php echo $on('news'); ?>" href="/_admin/news.php">
+  <span class="ico"><i class="fa-solid fa-newspaper"></i></span><span class="txt">Film News</span></a>
 <a class="rail__link<?php echo $on('visitors'); ?>" href="/_admin/visitors.php">
   <span class="ico"><i class="fa-solid fa-chart-simple"></i></span><span class="txt">Visitors</span></a>
