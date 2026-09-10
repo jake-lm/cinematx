@@ -364,6 +364,29 @@
     window.addEventListener('resize', close);
   }
 
+  // ══ Film Forecast card ═══════════════════════════════════════════════════
+  // The front page's play button. src is only ever set on first play — the
+  // <audio> tag itself stays preload="none" so the front page never pulls an
+  // mp3 just for having the card on screen, the same reasoning startSync()
+  // already gives for the theatre video's own preload.
+  function initForecastCard() {
+    var btn = $('#forecast-play'), audio = $('#forecast-audio');
+    if (!btn || !audio) return;
+    var icon = $('i', btn);
+
+    btn.addEventListener('click', function () {
+      if (!audio.src) audio.src = btn.getAttribute('data-src');
+      // play() returns a promise that rejects on a genuine playback failure
+      // (a network blip, an unsupported source) — caught so that shows up
+      // as a quietly-reset icon, not an uncaught-rejection console error.
+      if (audio.paused) audio.play().catch(function () { icon.className = 'fa-solid fa-play'; });
+      else audio.pause();
+    });
+    audio.addEventListener('play',  function () { icon.className = 'fa-solid fa-pause'; });
+    audio.addEventListener('pause', function () { icon.className = 'fa-solid fa-play'; });
+    audio.addEventListener('ended', function () { icon.className = 'fa-solid fa-play'; });
+  }
+
   // ══ Stack options ════════════════════════════════════════════════════════
   // Whether Alamo/Fathom's chain screenings collapse into one card
   // (ctx_fold_venue() in v7/screenings.php) is decided server-side at render
@@ -2284,7 +2307,7 @@
   }
 
   function boot() {
-    initWelcome(); initTheme(); initThemeSwitcher(); initStackMenu(); initRail(); initList();
+    initWelcome(); initTheme(); initThemeSwitcher(); initStackMenu(); initForecastCard(); initRail(); initList();
     initOverlays(); initComposer(); initNotes(); initJoin();
     initCopyLink(); initDirectory(); initTheatre(); initScreening();
     initHovercard(); initImageCycle(); initCustomSelect();

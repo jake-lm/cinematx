@@ -965,18 +965,94 @@ button, input, select, textarea { font: inherit; color: inherit; }
 //  SIDE — ranks 2, 3 (4 The Directory is parked — see v7/index.php)
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Two rows now, not three: the Journal is the sole flexible row, so it
-// absorbs the space The Directory's own minmax(0, 1fr) used to claim. The
-// Theatre stays auto — sized to its own content, which is what puts it
-// last and small rather than sharing the remaining height.
+// Two rows: Film Forecast is compact, sized to its own content (auto) and
+// sits first; the Journal is the sole flexible row and absorbs whatever
+// height Forecast doesn't need, same role The Directory's own minmax(0, 1fr)
+// used to play before it was parked. Row order matches DOM order — Forecast
+// first, Journal second — since each section's own internal CSS assumes a
+// specific one of these two behaviors rather than "whichever row it lands in".
 .side {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--s-6);
   min-height: 0;
 }
 
-// ── 02 · The Journal — rank 2 ──────────────────────────────────────────────
+// ── 02 · Film Forecast — rank 2 ─────────────────────────────────────────────
+// Compact, dark, modeled closely on the old Theatre card's layout — a
+// square thumbnail, a kicker/title/meta stack, this time with a play button
+// on the end instead of a synced preview. Its own classes, not theatre-card
+// itself, so the two can't tangle if Theatre ever comes back.
+
+.forecast-card {
+  position: relative;
+  padding: var(--s-4);
+  background: var(--dark);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--dark-ink);
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(105% 80% at 22% 15%, rgba(242,238,229,0.09), transparent 62%);
+    pointer-events: none;
+  }
+}
+
+.forecast-card__in { position: relative; display: flex; align-items: center; gap: var(--s-4); }
+
+.forecast-card__art {
+  width: 58px; height: 58px; flex: none;
+  border-radius: 5px;
+  background-size: cover; background-position: center;
+  background-color: #000;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+}
+
+.forecast-card__meta { min-width: 0; flex: 1; }
+
+.forecast-card__kicker {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  @include label(var(--t-3xs), var(--dark-red));
+  margin-bottom: var(--s-2);
+}
+
+.forecast-card__title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--dark-ink);
+  // Sits beside a fixed-width play button, so it clips to one line rather
+  // than wrapping unpredictably against it.
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.forecast-card__sub { margin-top: var(--s-2); @include label(var(--t-3xs), var(--dark-2nd)); }
+
+.forecast-card__play {
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--dark-red);
+  color: var(--dark-ink);
+  border: none;
+  cursor: pointer;
+  font-size: var(--t-sm);
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+  &:hover { background: var(--red-hi); }
+  &:active { transform: scale(0.94); }
+  // A play triangle's own visual mass sits right of its bounding box —
+  // nudged back to actually look centered in the circle.
+  i.fa-play { margin-left: 2px; }
+}
+
+// ── 03 · The Journal — rank 3 ──────────────────────────────────────────────
 
 // A flex column filling .card__body's full (concrete, one-screen-locked)
 // height, so .lead__wrap below can claim exactly whatever the image/

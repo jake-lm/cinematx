@@ -1,11 +1,13 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — front page
-//  Weight order: 1 The List · 2 The Journal · 3 The Theatre
-//  (4 The Directory is parked — see "04 · The Directory" below)
+//  Weight order: 1 The List · 2 Film Forecast · 3 The Journal
+//  (The Theatre is parked — see "03 · The Theatre" below —
+//   and 4 The Directory is parked too — see "04 · The Directory")
 //  The only surface locked to a single screen.
 // ═══════════════════════════════════════════════════════════════════════════
 require __DIR__ . '/_lib.php';
+require dirname(__DIR__) . '/list/forecast.php';
 
 $now     = $CTX_NOW;
 $state   = ctx_state($conn);
@@ -68,6 +70,18 @@ $show_ts = $theatre['show_ts'];
 $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
+
+// The front page's Film Forecast card — always the latest posted episode;
+// there's no "nothing to show" state to design for, since one is always
+// live by the time this page is asked to render it.
+$forecast_episode    = forecast_latest_posted_episode($conn);
+$forecast_title      = 'Week of ' . date('M j, Y', strtotime($forecast_episode['week_of'])) . ' — with ' . $forecast_episode['guest_name'];
+$forecast_art_path   = forecast_ensure_podcast_art($forecast_episode, $conn);
+$forecast_art_url    = ig_public_url('/uploads/forecast/' . basename($forecast_art_path), $forecast_art_path);
+$forecast_audio_path = dirname(__DIR__) . '/uploads/forecast/' . $forecast_episode['audio_file'];
+$forecast_audio_url  = ig_public_url('/uploads/forecast/' . rawurlencode($forecast_episode['audio_file']), $forecast_audio_path);
+$forecast_published  = date('M j', $forecast_episode['posted_at']);
+$forecast_duration   = $forecast_episode['duration_seconds'] ? forecast_format_duration($forecast_episode['duration_seconds']) : null;
 
 // The Directory card is parked below (search "04 · The Directory") — no
 // point paying for this query while nothing renders it.
@@ -209,10 +223,28 @@ require __DIR__ . '/_chrome.php';
       <!-- ── SIDE — ranks 2, 3, 4 ────────────────────────────────────── -->
       <div class="side">
 
-        <!-- 02 · The Journal -->
+        <!-- 02 · Film Forecast -->
+        <section class="forecast-card">
+          <div class="forecast-card__in">
+            <div class="forecast-card__art" style="background-image:url('<?php echo $e($forecast_art_url); ?>')"></div>
+            <div class="forecast-card__meta">
+              <span class="forecast-card__kicker">02 &mdash; Film Forecast</span>
+              <h2 class="forecast-card__title"><?php echo $e($forecast_title); ?></h2>
+              <div class="forecast-card__sub">
+                Published <?php echo $e($forecast_published); ?><?php if ($forecast_duration): ?> &middot; <?php echo $e($forecast_duration); ?><?php endif; ?>
+              </div>
+            </div>
+            <button class="forecast-card__play" id="forecast-play" type="button" aria-label="Play episode" data-src="<?php echo $e($forecast_audio_url); ?>">
+              <i class="fa-solid fa-play"></i>
+            </button>
+          </div>
+          <audio id="forecast-audio" preload="none"></audio>
+        </section>
+
+        <!-- 03 · The Journal -->
         <section class="card">
           <div class="card__head">
-            <span class="card__n">02</span>
+            <span class="card__n">03</span>
             <span class="card__title">The Journal</span>
             <a class="card__more" href="/list">Archive &rarr;</a>
           </div>
@@ -270,6 +302,12 @@ require __DIR__ . '/_chrome.php';
           </div>
         </section>
 
+        <?php // 03 · The Theatre — parked, not removed. Flip to `if (true)` to
+              // bring it back. Everything downstream (ctx_theatre($conn, $now)
+              // above, motw/stream.php, the /th1//th2 pages themselves) is
+              // untouched and ready; this was always the one place deciding
+              // whether the card renders on the front page at all. ?>
+        <?php if (false): ?>
         <!-- 03 · The Theatre -->
         <section class="theatre-card<?php echo $is_live ? ' theatre-card--live' : ''; ?>" id="theatre-card">
           <div class="theatre-card__in">
@@ -303,6 +341,7 @@ require __DIR__ . '/_chrome.php';
           </p>
           <?php endif; ?>
         </section>
+        <?php endif; ?>
 
         <?php // 04 · The Directory — parked, not removed. Flip to `if (true)`
               // to bring it back; .side's grid-template-rows (css/v7.scss)

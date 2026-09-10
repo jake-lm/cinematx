@@ -59,6 +59,17 @@ function forecast_feed_episodes($conn) {
     )->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// The front page's own Film Forecast card — same posted_media_id gate as
+// the feed above, just the single newest one rather than the whole run.
+function forecast_latest_posted_episode($conn) {
+    return $conn->query(
+        "SELECT * FROM `forecast_episodes`
+         WHERE `posted_media_id` IS NOT NULL AND `audio_file` IS NOT NULL AND `audio_file` != ''
+         ORDER BY `posted_at` DESC, `id` DESC
+         LIMIT 1"
+    )->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
 // ── Uploads ──────────────────────────────────────────────────────────────
 //
 // Shared by _admin/forecast_save.php (the main create/edit form — photo,

@@ -1359,9 +1359,112 @@ button, input, select, textarea {
 
 .side {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--s-6);
   min-height: 0;
+}
+
+.forecast-card {
+  position: relative;
+  padding: var(--s-4);
+  background: var(--dark);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--dark-ink);
+  overflow: hidden;
+}
+.forecast-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(105% 80% at 22% 15%, rgba(242, 238, 229, 0.09), transparent 62%);
+  pointer-events: none;
+}
+
+.forecast-card__in {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.forecast-card__art {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  border-radius: 5px;
+  background-size: cover;
+  background-position: center;
+  background-color: #000;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.forecast-card__meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.forecast-card__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--dark-red);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--s-2);
+}
+
+.forecast-card__title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--dark-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.forecast-card__sub {
+  margin-top: var(--s-2);
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--dark-2nd);
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-card__play {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--dark-red);
+  color: var(--dark-ink);
+  border: none;
+  cursor: pointer;
+  font-size: var(--t-sm);
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.forecast-card__play:hover {
+  background: var(--red-hi);
+}
+.forecast-card__play:active {
+  transform: scale(0.94);
+}
+.forecast-card__play i.fa-play {
+  margin-left: 2px;
 }
 
 .lead {
