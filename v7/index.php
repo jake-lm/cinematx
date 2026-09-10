@@ -71,16 +71,19 @@ $journal = ctx_journal($conn, 4);
 $lead    = $journal['lead'];
 $items   = $journal['items'];
 
-// The front page's Film Forecast card — always the latest posted episode;
-// there's no "nothing to show" state to design for, since one is always
-// live by the time this page is asked to render it.
-$forecast_episode    = forecast_latest_posted_episode($conn);
-$forecast_title      = 'Week of ' . date('M j, Y', strtotime($forecast_episode['week_of'])) . ' — with ' . $forecast_episode['guest_name'];
-$forecast_art_path   = forecast_ensure_podcast_art($forecast_episode, $conn);
-$forecast_art_url    = ig_public_url('/uploads/forecast/' . basename($forecast_art_path), $forecast_art_path);
-$forecast_audio_path = dirname(__DIR__) . '/uploads/forecast/' . $forecast_episode['audio_file'];
-$forecast_audio_url  = ig_public_url('/uploads/forecast/' . rawurlencode($forecast_episode['audio_file']), $forecast_audio_path);
-$forecast_duration   = $forecast_episode['duration_seconds'] ? forecast_format_duration($forecast_episode['duration_seconds']) : null;
+// The front page's Film Forecast card — always the latest posted episode in
+// production, so there's no real "nothing to show" design here. Guarded
+// anyway: a genuinely empty forecast_episodes table (a fresh local dev DB,
+// say) must not fatal the entire front page over one missing card.
+$forecast_episode = forecast_latest_posted_episode($conn);
+if ($forecast_episode) {
+    $forecast_title      = 'Week of ' . date('M j, Y', strtotime($forecast_episode['week_of'])) . ' — with ' . $forecast_episode['guest_name'];
+    $forecast_art_path   = forecast_ensure_podcast_art($forecast_episode, $conn);
+    $forecast_art_url    = ig_public_url('/uploads/forecast/' . basename($forecast_art_path), $forecast_art_path);
+    $forecast_audio_path = dirname(__DIR__) . '/uploads/forecast/' . $forecast_episode['audio_file'];
+    $forecast_audio_url  = ig_public_url('/uploads/forecast/' . rawurlencode($forecast_episode['audio_file']), $forecast_audio_path);
+    $forecast_duration   = $forecast_episode['duration_seconds'] ? forecast_format_duration($forecast_episode['duration_seconds']) : null;
+}
 
 // The Directory card is parked below (search "04 · The Directory") — no
 // point paying for this query while nothing renders it.
@@ -222,6 +225,7 @@ require __DIR__ . '/_chrome.php';
       <!-- ── SIDE — ranks 2, 3, 4 ────────────────────────────────────── -->
       <div class="side">
 
+        <?php if ($forecast_episode): ?>
         <!-- 02 · Film Forecast -->
         <section class="forecast-card">
           <div class="forecast-card__in">
@@ -241,6 +245,7 @@ require __DIR__ . '/_chrome.php';
           </div>
           <audio id="forecast-audio" preload="none"></audio>
         </section>
+        <?php endif; ?>
 
         <!-- 03 · The Journal -->
         <section class="card">
