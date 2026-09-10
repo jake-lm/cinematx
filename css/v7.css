@@ -1442,6 +1442,20 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.forecast-card__elapsed {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  transition: max-width 0.35s var(--ease), opacity 0.35s var(--ease);
+}
+.forecast-card__elapsed.is-on {
+  max-width: 70px;
+  opacity: 1;
+}
+
 .forecast-card__play {
   flex: none;
   display: flex;

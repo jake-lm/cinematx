@@ -80,7 +80,6 @@ $forecast_art_path   = forecast_ensure_podcast_art($forecast_episode, $conn);
 $forecast_art_url    = ig_public_url('/uploads/forecast/' . basename($forecast_art_path), $forecast_art_path);
 $forecast_audio_path = dirname(__DIR__) . '/uploads/forecast/' . $forecast_episode['audio_file'];
 $forecast_audio_url  = ig_public_url('/uploads/forecast/' . rawurlencode($forecast_episode['audio_file']), $forecast_audio_path);
-$forecast_published  = date('M j', $forecast_episode['posted_at']);
 $forecast_duration   = $forecast_episode['duration_seconds'] ? forecast_format_duration($forecast_episode['duration_seconds']) : null;
 
 // The Directory card is parked below (search "04 · The Directory") — no
@@ -230,9 +229,11 @@ require __DIR__ . '/_chrome.php';
             <div class="forecast-card__meta">
               <span class="forecast-card__kicker">02 &mdash; Film Forecast</span>
               <h2 class="forecast-card__title"><?php echo $e($forecast_title); ?></h2>
+              <?php if ($forecast_duration): ?>
               <div class="forecast-card__sub">
-                Published <?php echo $e($forecast_published); ?><?php if ($forecast_duration): ?> &middot; <?php echo $e($forecast_duration); ?><?php endif; ?>
+                <span class="forecast-card__elapsed" id="forecast-elapsed">0:00 / </span><?php echo $e($forecast_duration); ?>
               </div>
+              <?php endif; ?>
             </div>
             <button class="forecast-card__play" id="forecast-play" type="button" aria-label="Play episode" data-src="<?php echo $e($forecast_audio_url); ?>">
               <i class="fa-solid fa-play"></i>

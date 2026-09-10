@@ -370,9 +370,15 @@
   // mp3 just for having the card on screen, the same reasoning startSync()
   // already gives for the theatre video's own preload.
   function initForecastCard() {
-    var btn = $('#forecast-play'), audio = $('#forecast-audio');
+    var btn = $('#forecast-play'), audio = $('#forecast-audio'), elapsed = $('#forecast-elapsed');
     if (!btn || !audio) return;
     var icon = $('i', btn);
+
+    function fmt(s) {
+      s = Math.max(0, Math.floor(s || 0));
+      var m = Math.floor(s / 60), sec = s % 60;
+      return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
 
     btn.addEventListener('click', function () {
       if (!audio.src) audio.src = btn.getAttribute('data-src');
@@ -382,9 +388,21 @@
       if (audio.paused) audio.play().catch(function () { icon.className = 'fa-solid fa-play'; });
       else audio.pause();
     });
-    audio.addEventListener('play',  function () { icon.className = 'fa-solid fa-pause'; });
+    audio.addEventListener('play', function () {
+      icon.className = 'fa-solid fa-pause';
+      // Slides open on first play, same class the whole rest of a listen —
+      // pausing partway through leaves the elapsed time showing where
+      // playback stopped rather than collapsing it shut again.
+      if (elapsed) elapsed.classList.add('is-on');
+    });
     audio.addEventListener('pause', function () { icon.className = 'fa-solid fa-play'; });
-    audio.addEventListener('ended', function () { icon.className = 'fa-solid fa-play'; });
+    audio.addEventListener('timeupdate', function () {
+      if (elapsed) elapsed.textContent = fmt(audio.currentTime) + ' / ';
+    });
+    audio.addEventListener('ended', function () {
+      icon.className = 'fa-solid fa-play';
+      if (elapsed) elapsed.textContent = '0:00 / ';
+    });
   }
 
   // ══ Stack options ════════════════════════════════════════════════════════

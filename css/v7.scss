@@ -1034,6 +1034,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .forecast-card__sub { margin-top: var(--s-2); @include label(var(--t-3xs), var(--dark-2nd)); }
 
+// Collapsed to nothing until playback starts, then grows open — the elapsed
+// time slides the total duration over to make room for it rather than the
+// two snapping into place together. max-width, not width: the target is
+// wider than "0:00 / " ever needs to be, since animating to an exact
+// content width isn't possible without knowing it up front.
+.forecast-card__elapsed {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: bottom;
+  transition: max-width 0.35s var(--ease), opacity 0.35s var(--ease);
+  &.is-on { max-width: 70px; opacity: 1; }
+}
+
 .forecast-card__play {
   flex: none;
   display: flex; align-items: center; justify-content: center;
