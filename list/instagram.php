@@ -667,6 +667,55 @@ function ig_paginate(array $films, $maxPerPage) {
     return $out;
 }
 
+// A list panel with 2 screenings on it shouldn't use the same tiny row a
+// panel with 10 needs — rows get larger as the list gets shorter and
+// smaller as it grows, on 4 steps. Deliberately the one exception to "no
+// shared abstraction" below: palette and decoration stay fully independent
+// per theme, but duplicating this table by hand in all 8 would be a real
+// maintenance hazard for zero benefit, since it's pure size math with
+// nothing theme-specific in it.
+//
+// Row height can't just track the thumbnail — the text block (title +
+// venue + time) has a legibility floor that shrinks slower than the
+// thumbnail does, so past Tier 2 the text block, not the thumbnail, is
+// actually the taller thing in the row (Tier 4's own $timeOffsetY sits
+// below its $thumbH on purpose). rowHeight is sized to whichever is
+// taller, plus a gap, not to the thumbnail alone.
+//
+// All four tiers fit within 876px — Terminal's own available height
+// before its footer zone, the tightest of the 8 themes — so every other
+// theme has a little extra room to spare rather than being the binding
+// constraint. First-draft pixel values, tuned against real rendered
+// output before this shipped (see the Film Forecast session that added
+// this — the same "render, look, adjust" discipline as everywhere else
+// in this codebase).
+function ig_list_row_geometry($count) {
+    static $tiers = [
+        // items => [thumbW, thumbH, rowHeight, titleSize, metaSize, titleOffsetY, metaOffsetY, timeOffsetY]
+        4  => [113, 170, 215, 36, 24, 41, 77, 111],
+        6  => [79,  118, 145, 30, 21, 35, 67, 96],
+        8  => [56,  84,  108, 24, 18, 28, 55, 80],
+        10 => [41,  62,  85,  20, 16, 23, 47, 69],
+    ];
+    $count = max(1, (int) $count);
+    $tier = 1;
+    foreach ($tiers as $maxItems => $t) {
+        if ($count <= $maxItems) break;
+        $tier++;
+    }
+    return [
+        'tier'         => $tier,
+        'thumbW'       => $t[0],
+        'thumbH'       => $t[1],
+        'rowHeight'    => $t[2],
+        'titleSize'    => $t[3],
+        'metaSize'     => $t[4],
+        'titleOffsetY' => $t[5],
+        'metaOffsetY'  => $t[6],
+        'timeOffsetY'  => $t[7],
+    ];
+}
+
 // ── Themes ───────────────────────────────────────────────────────────────
 //
 // Every theme draws its own complete list page and feature page — no shared
@@ -674,9 +723,9 @@ function ig_paginate(array $films, $maxPerPage) {
 // like different things, not the same skeleton recolored, and a self-
 // contained function per theme is easier to read and safer to touch than
 // unpicking a color parameter passed through several drawing calls. Row
-// geometry (thumbnail size, row height, the 6-per-page budget Auto mode
-// assumes) stays identical across themes for now, so composition modes and
-// pagination don't need to know which theme is active.
+// geometry no longer stays fixed across themes (see ig_list_row_geometry()
+// above) — each theme now computes it from that page's own row count — but
+// palette and decoration remain fully independent per theme.
 const IG_THEMES = [
     'paper'     => 'Paper',
     'marquee'   => 'Marquee',
@@ -775,6 +824,9 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     $muted   = ig_hex($im, '#6B6659');
     $divider = ig_hex($im, '#DED7C7');
     $placeholder = ig_hex($im, '#E4DECE');
+    // A few points darker than $paper — extremely subtle by design, same
+    // idea as Newsprint/Neon's own zebra fill, just tinted for this palette.
+    $stripe  = ig_hex($im, '#ECE7DD');
 
     imagefill($im, 0, 0, $paper);
 
@@ -800,21 +852,20 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 40;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    // Row size adapts to how many are actually on this page — see
+    // ig_list_row_geometry(). Capped at 10 outright (its own smallest
+    // tier is sized for exactly that many), so there's no longer a
+    // separate available-height division to get out of sync with it.
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    // Footer sits at a fixed baseline near the bottom, so rows must stop
-    // early enough to leave room for it (plus the "+N more" line above it) —
-    // otherwise a long list runs straight through the footer text.
-    $rowHeight     = $thumbH + 30;
-    $footerY       = $h - 60;
-    $rowsAreaEnd   = $footerY - 70;
-    $maxRows       = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -822,6 +873,12 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Extremely subtle zebra banding — every other row gets a barely
+        // darker strip behind it, same technique Newsprint/Neon already use.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -829,13 +886,14 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.1));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_HEADLINE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 32, $textMaxWidth);
-        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_HEADLINE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_HEADLINE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -846,11 +904,11 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -888,9 +946,8 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
 
 // A classic theatre marquee, at night: black background, a border of gold
 // bulbs, showtimes in the same gold rather than paper's red. Row geometry
-// (thumbnail size, row height, footer position) is identical to the paper
-// theme on purpose — only the palette and the bulb frame change, so this
-// stays a drop-in for the same pagination math.
+// comes from the shared ig_list_row_geometry() — only the palette and the
+// bulb frame change, so this stays a drop-in for the same pagination math.
 function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     $w = 1080;
     $h = 1350;
@@ -904,6 +961,10 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     $placeholder = ig_hex($im, '#2A2620');
     $gold        = ig_hex($im, '#F2C14E');
     $goldGlow    = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+    // A touch lighter than $bg, not darker — this palette is already near-
+    // black, so "subtle" here means barely lifting off it rather than
+    // deepening a shadow.
+    $stripe      = ig_hex($im, '#1C1912');
 
     imagefill($im, 0, 0, $bg);
     ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold);
@@ -919,18 +980,16 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 40;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -938,6 +997,10 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -945,13 +1008,14 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_MARQUEE_TITLE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.1));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_MARQUEE_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $gold, IG_FONT_MARQUEE_TITLE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $gold, IG_FONT_MARQUEE_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 32, $textMaxWidth);
-        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_MARQUEE_TITLE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_MARQUEE_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -962,11 +1026,11 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $gold, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $gold, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1012,6 +1076,7 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     $muted       = ig_hex($im, '#8A8578');
     $divider     = ig_hex($im, '#C9C2AF');
     $placeholder = ig_hex($im, '#E3DDD0');
+    $stripe      = ig_hex($im, '#E8E4D6');
 
     imagefill($im, 0, 0, $paper);
 
@@ -1037,18 +1102,16 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     ig_torn_line($im, $margin, $w - $margin, $y, $divider);
     $y += 40;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -1056,6 +1119,10 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -1063,13 +1130,14 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_ZINE_TITLE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.1));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_ZINE_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_ZINE_TITLE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_ZINE_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 32, $textMaxWidth);
-        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_ZINE_TITLE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_ZINE_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1080,11 +1148,11 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $pink, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1148,18 +1216,16 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 2, $ink);
     $y += 38;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -1180,13 +1246,14 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_NEWSPRINT_TITLE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.1));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_NEWSPRINT_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 32, $textMaxWidth);
-        imagettftext($im, 32, 0, $textX, $y + 40, $ink, IG_FONT_NEWSPRINT_TITLE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_NEWSPRINT_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1197,11 +1264,11 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $red, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1276,18 +1343,16 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $cyan);
     $y += 40;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -1310,9 +1375,10 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(26, 0, IG_FONT_NEON_TITLE, $initial);
+            $initSize = max(18, (int) round($geo['titleSize'] * 0.9));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_NEON_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 26, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_NEON_TITLE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_NEON_TITLE, $initial);
         }
 
         // Space for the "w/ Org" tag is reserved before the title is fit,
@@ -1321,19 +1387,20 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
         $presentedWith = ig_presented_with($film['billing'] ?? null);
         $tagText = null;
         $tagW = 0;
+        $tagSize = max(14, (int) round($geo['metaSize'] * 0.85));
         if ($presentedWith) {
-            $tagText = ig_fit_text($presentedWith, IG_FONT_BODY, 18, 200);
-            $tagBox  = imagettfbbox(18, 0, IG_FONT_BODY, $tagText);
+            $tagText = ig_fit_text($presentedWith, IG_FONT_BODY, $tagSize, 200);
+            $tagBox  = imagettfbbox($tagSize, 0, IG_FONT_BODY, $tagText);
             $tagW    = $tagBox[2] - $tagBox[0];
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 28, $textMaxWidth - ($tagText ? $tagW + 14 : 0));
-        ig_neon_text($im, 28, $textX, $y + 40, IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, $geo['titleSize'], $textMaxWidth - ($tagText ? $tagW + 14 : 0));
+        ig_neon_text($im, $geo['titleSize'], $textX, $y + $geo['titleOffsetY'], IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
 
         if ($tagText) {
-            $titleBox = imagettfbbox(28, 0, IG_FONT_NEON_TITLE, $title);
+            $titleBox = imagettfbbox($geo['titleSize'], 0, IG_FONT_NEON_TITLE, $title);
             $titleW   = $titleBox[2] - $titleBox[0];
-            imagettftext($im, 18, 0, $textX + $titleW + 14, $y + 40, $muted, IG_FONT_BODY, $tagText);
+            imagettftext($im, $tagSize, 0, $textX + $titleW + 14, $y + $geo['titleOffsetY'], $muted, IG_FONT_BODY, $tagText);
         }
 
         // Flick Clique names the monthly series, not a place — same reasoning
@@ -1345,11 +1412,11 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $pink, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
     }
@@ -1396,6 +1463,7 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     $divider     = ig_hex($im, '#26282C');
     $placeholder = ig_hex($im, '#1B1D20');
     $green       = ig_hex($im, '#5FD68C');
+    $stripe      = ig_hex($im, '#111316');
 
     imagefill($im, 0, 0, $bg);
     ig_led_border($im, 24, 24, $w - 24, $h - 24, 26, $dim);
@@ -1415,8 +1483,9 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     // Column x-positions — the header row and every data row share these,
     // so the whole page reads as one aligned table. TITLE's column carries
     // the poster thumbnail too; TIME/VENUE/STATUS stay text-only.
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo    = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
 
     $colTime   = $margin;
     $colPoster = $margin + 120;
@@ -1435,17 +1504,32 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
     imagesetthickness($im, 1);
     $y += 30;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 24, 0, $margin, $y + 40, $muted, IG_FONT_TERMINAL, 'NOTHING SCRAPED FOR TODAY — CHECK BACK LATER.');
     }
+
+    // Terminal's columns are fixed-width (a table, not a thumbnail+text
+    // block), much narrower than the text column every other theme gets —
+    // so it can't just borrow the shared tier's title/meta sizes, which are
+    // tuned for a nearly-full-width text block and would overrun these
+    // columns and truncate. Its own font scale, indexed off the same tier,
+    // stays modest enough to fit TIME (100px)/TITLE (270px)/VENUE (230px).
+    static $terminalFonts = [
+        1 => ['title' => 26, 'meta' => 18, 'venue' => 15],
+        2 => ['title' => 22, 'meta' => 16, 'venue' => 13],
+        3 => ['title' => 19, 'meta' => 15, 'venue' => 12],
+        4 => ['title' => 17, 'meta' => 13, 'venue' => 11],
+    ];
+    $tf = $terminalFonts[$geo['tier']];
+    $titleSize  = $tf['title'];
+    $timeSize   = $tf['meta'];
+    $venueSize  = $tf['venue'];
+    $statusSize = $tf['meta'];
 
     $timeMaxWidth   = $colPoster - $colTime - 20;
     $titleMaxWidth  = $colVenue - $colTitle - 20;
@@ -1454,10 +1538,16 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Zebra banding, same technique as every other theme — a strip a
+        // couple RGB points off the background, behind every other row.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $textY = $y + (int) round($thumbH / 2) + 8;
 
-        $time = ig_fit_text(implode('/', array_map(fn($t) => date('g:iA', $t), $film['timestamps'] ?? [$film['timestamp']])), IG_FONT_TERMINAL, 18, $timeMaxWidth);
-        imagettftext($im, 18, 0, $colTime, $textY, $ink, IG_FONT_TERMINAL, $time);
+        $time = ig_fit_text(implode('/', array_map(fn($t) => date('g:iA', $t), $film['timestamps'] ?? [$film['timestamp']])), IG_FONT_TERMINAL, $timeSize, $timeMaxWidth);
+        imagettftext($im, $timeSize, 0, $colTime, $textY, $ink, IG_FONT_TERMINAL, $time);
 
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
@@ -1467,17 +1557,18 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $colPoster, $y, $colPoster + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(24, 0, IG_FONT_TERMINAL, $initial);
+            $initSize = max(18, (int) round($titleSize * 0.85));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_TERMINAL, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 24, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 9, $muted, IG_FONT_TERMINAL, $initial);
+            imagettftext($im, $initSize, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_TERMINAL, $initial);
         }
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 22, $titleMaxWidth);
-        imagettftext($im, 22, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, $titleSize, $titleMaxWidth);
+        imagettftext($im, $titleSize, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
 
-        $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, 14, $venueMaxWidth);
-        imagettftext($im, 14, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
+        $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, $venueSize, $venueMaxWidth);
+        imagettftext($im, $venueSize, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
 
-        imagettftext($im, 18, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, 18, $statusMaxWidth));
+        imagettftext($im, $statusSize, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, $statusSize, $statusMaxWidth));
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1524,6 +1615,7 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     $rust        = ig_hex($im, '#B33B1E');
     $muted       = ig_hex($im, '#8A7D6E');
     $placeholder = ig_hex($im, '#241C15');
+    $stripe      = ig_hex($im, '#191209');
 
     imagefill($im, 0, 0, $bg);
     ig_sprocket_edge($im, 0, $h, 56, $strip, $bg);
@@ -1546,18 +1638,16 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     ig_dashed_line($im, $margin, $w - $margin, $y, $rust, 12, 8);
     $y += 40;
 
-    $thumbW = 82;
-    $thumbH = 123;
+    $geo   = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -1565,6 +1655,12 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Zebra banding, same technique as every other theme — a strip a
+        // couple RGB points off the background, behind every other row.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -1572,13 +1668,14 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_DARKROOM_TITLE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.2));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_DARKROOM_TITLE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_DARKROOM_TITLE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_DARKROOM_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 30, $textMaxWidth);
-        imagettftext($im, 30, 0, $textX, $y + 40, $amber, IG_FONT_DARKROOM_TITLE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $amber, IG_FONT_DARKROOM_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1589,11 +1686,11 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $rust, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $rust, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -1644,6 +1741,7 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     $terracotta  = ig_hex($im, '#C0562B');
     $divider     = ig_hex($im, '#E4D5BC');
     $placeholder = ig_hex($im, '#EDE1C8');
+    $stripe      = ig_hex($im, '#F3E9D4');
 
     imagefill($im, 0, 0, $cream);
 
@@ -1678,24 +1776,16 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 1, $divider);
     $y += 36;
 
-    // 78x117, not this theme's original 82x123 — still exactly a 2:3
-    // poster aspect, just small enough that six rows fit the available
-    // height instead of five. Thursday's request specifically; the row
-    // text sits at fixed offsets from each row's own $y, not scaled off
-    // thumbH, so this only changes the thumbnail and the gap between
-    // rows, never text legibility or position.
-    $thumbW = 78;
-    $thumbH = 117;
+    $geo    = ig_list_row_geometry(min(count($films), 10));
+    $thumbW = $geo['thumbW'];
+    $thumbH = $geo['thumbH'];
     $textX  = $margin + $thumbW + 28;
     $textMaxWidth = $w - $margin - $textX;
 
-    $rowHeight   = $thumbH + 30;
-    $footerY     = $h - 60;
-    $rowsAreaEnd = $footerY - 70;
-    $maxRows     = max(1, (int) floor(($rowsAreaEnd - $y) / $rowHeight));
-
-    $rows  = array_slice($films, 0, $maxRows);
-    $extra = count($films) - count($rows);
+    $rowHeight = $geo['rowHeight'];
+    $footerY   = $h - 60;
+    $rows      = array_slice($films, 0, 10);
+    $extra     = count($films) - count($rows);
 
     if (empty($films)) {
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
@@ -1703,6 +1793,12 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
 
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
+        // Zebra banding, same technique as every other theme — a strip a
+        // couple RGB points off the cream background, behind every other row.
+        if ($i % 2 === 1) {
+            imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
+        }
+
         $thumb = ig_fetch_thumb($film['poster'], $thumbW, $thumbH);
         if ($thumb) {
             imagecopy($im, $thumb, $margin, $y, 0, 0, $thumbW, $thumbH);
@@ -1710,13 +1806,14 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
         } else {
             imagefilledrectangle($im, $margin, $y, $margin + $thumbW, $y + $thumbH, $placeholder);
             $initial = mb_strtoupper(mb_substr($film['title'], 0, 1));
-            $ibox = imagettfbbox(36, 0, IG_FONT_HEADLINE, $initial);
+            $initSize = max(20, (int) round($geo['titleSize'] * 1.2));
+            $ibox = imagettfbbox($initSize, 0, IG_FONT_HEADLINE, $initial);
             $iw = $ibox[2] - $ibox[0];
-            imagettftext($im, 36, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + 12, $muted, IG_FONT_HEADLINE, $initial);
+            imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 30, $textMaxWidth);
-        imagettftext($im, 30, 0, $textX, $y + 40, $plum, IG_FONT_HEADLINE, $title);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $plum, IG_FONT_HEADLINE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1727,11 +1824,11 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
             ? $film['location']
             : ($film['location'] ? "{$film['venue']} — {$film['location']}" : $film['venue']);
         if ($film['director']) $venue .= '  ·  dir. ' . $film['director'];
-        $meta  = ig_fit_text($venue, IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 74, $muted, IG_FONT_BODY, $meta);
+        $meta  = ig_fit_text($venue, IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['metaOffsetY'], $muted, IG_FONT_BODY, $meta);
 
-        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, 22, $textMaxWidth);
-        imagettftext($im, 22, 0, $textX, $y + 104, $terracotta, IG_FONT_BODY, $time);
+        $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
+        imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $terracotta, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -2907,7 +3004,7 @@ const IG_COMPOSE_DEFAULT = ['mode' => 'auto', 'per_page' => null, 'features' => 
 // Screenings-per-page when Auto mode (or Manual with no count set) is
 // active — today's exact row height, so a single-page Auto day looks
 // identical to a Default one.
-const IG_AUTO_MAX_PER_PAGE = 6;
+const IG_AUTO_MAX_PER_PAGE = 10;
 
 function ig_compose_path($date) {
     return dirname(__DIR__) . '/uploads/social/compose-' . date('Y-m-d', $date) . '.json';
