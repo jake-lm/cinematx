@@ -69,6 +69,19 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                     $film['runtime']  = $film['runtime']  ?: $film['afs_runtime'];
                     $film['overview'] = $film['overview'] ?: $film['afs_overview'];
                 }
+
+                // Same idea for Hyperreal, but there's nothing to borrow a
+                // poster from — they never supply one at all, unlike AFS —
+                // so this falls back to the club's own logo instead (see
+                // HYPERREAL_LOGO) rather than leaving a blank card. The
+                // description usually IS on their own event page though,
+                // fetched lazily here since most Hyperreal screenings are
+                // real films that resolve on TMDB and never need it.
+                if (empty($film['poster']) && $film['venue'] === 'Hyperreal Film Club') {
+                    $detail = fetch_hyperreal_detail($film['url']);
+                    if (!empty($detail['overview'])) $film['overview'] = $detail['overview'];
+                    $film['poster'] = HYPERREAL_LOGO;
+                }
             } else {
                 // A curated shorts anthology (see afs_is_short_program()) —
                 // TMDB has no correct entry to borrow from, so only what the
