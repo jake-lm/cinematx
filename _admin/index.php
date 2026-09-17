@@ -11,6 +11,9 @@
 //  _guard.php before _lib.php and before any output: authentication is not
 //  something to do after loading the page's context.
 // ═══════════════════════════════════════════════════════════════════════════
+// Only this entry point doubles as a login screen when logged out — see
+// admin_login_page() in _guard.php.
+define('CTX_ADMIN_LOGIN', true);
 require __DIR__ . '/_guard.php';
 require dirname(__DIR__) . '/v7/_lib.php';
 require dirname(__DIR__) . '/list/instagram.php';

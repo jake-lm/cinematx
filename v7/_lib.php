@@ -11,7 +11,8 @@
 if (!defined('CTX_LIB')) {
 define('CTX_LIB', 1);
 
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once dirname(__DIR__) . '/session_boot.php';
+ctx_session_start();
 
 require_once dirname(__DIR__) . '/database.php';
 require_once dirname(__DIR__) . '/roles.php';

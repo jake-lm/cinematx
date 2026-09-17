@@ -1,5 +1,6 @@
 <?php
-session_start();
+require '../session_boot.php';
+ctx_session_start();
 require '../database.php';
 
 header('Content-Type: application/json');

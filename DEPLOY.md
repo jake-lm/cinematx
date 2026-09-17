@@ -27,6 +27,21 @@ post_max_size       = 512M
 max_execution_time  = 600
 ```
 
+`session.gc_maxlifetime` is the other one that bites, and it's set once per
+server rather than per-request, so it can't be fixed from application code.
+PHP's stock default is 1440 seconds (24 minutes), and most distros (Debian
+included) run a separate timer that deletes any session file untouched that
+long — `session_boot.php` issues a 24-hour cookie, but the underlying session
+file gets deleted out from under it after 24 idle minutes unless this is
+raised to match:
+
+```ini
+session.gc_maxlifetime = 90000
+```
+
+Raise it in the SAPI's own `php.ini` (e.g. `/etc/php/*/apache2/php.ini`, not
+the `cli` one) and reload the web server.
+
 ---
 
 ## 1. Files

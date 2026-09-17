@@ -1,5 +1,6 @@
 <?php
-session_start();
+require '../session_boot.php';
+ctx_session_start();
 date_default_timezone_set('America/Chicago');
 
 require '../database.php';
@@ -122,7 +123,18 @@ else if($action==='login') {
 	$user = trim((string)($_POST['email'] ?? ''));
 	$pass = (string)($_POST['pw'] ?? '');
 
-  if (auth_throttled($conn)) { header('Location: /dashboard/?error=109'); exit; }
+  // Only the disguised /_admin/ login form (see _admin/_guard.php) sends
+  // this — it wants both a failed attempt and a success to land back on
+  // /_admin/ rather than away from it. Anything else keeps the old
+  // hardcoded destinations below. Restricted to a same-site path so a
+  // crafted redirect can't send a login through to another host.
+  $redirect = $_POST['redirect'] ?? null;
+  if ($redirect !== null && (!is_string($redirect) || $redirect === '' || $redirect[0] !== '/' || ($redirect[1] ?? '') === '/')) {
+    $redirect = null;
+  }
+  if ($redirect !== null) $redirect = strtok($redirect, '?');
+
+  if (auth_throttled($conn)) { header('Location: ' . ($redirect ?? '/dashboard/') . '?error=109'); exit; }
 
   $sql1 = $conn->prepare("SELECT * FROM `users` WHERE `email` = :email LIMIT 1");
   $sql1->execute([':email' => $user]);
@@ -133,7 +145,7 @@ else if($action==='login') {
 
 	if($user === "" || $pass === "" || $pwv === false) {
     auth_fail($conn);
-    header('Location: /dashboard/?error=100');
+    header('Location: ' . ($redirect ?? '/dashboard/') . '?error=100');
     exit;
 	}
 	else {
@@ -150,7 +162,7 @@ else if($action==='login') {
     $stmt = $conn->prepare("UPDATE `users` SET `last_date` = :last_date WHERE `email` = :email");
     $stmt->execute([':last_date' => time(), ':email' => $user]);
 
-    header('Location: /');
+    header('Location: ' . ($redirect ?? '/'));
     exit;
 	}
 }

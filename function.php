@@ -12,7 +12,8 @@
 //  along with entries.php, the row template it rendered. Both remain in git
 //  history if ever needed.
 // ═══════════════════════════════════════════════════════════════════════════
-session_start();
+require __DIR__ . '/session_boot.php';
+ctx_session_start();
 require __DIR__ . '/database.php';
 header('Content-Type: application/json');
 
