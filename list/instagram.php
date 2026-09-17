@@ -294,23 +294,6 @@ function ig_fit_text($text, $font, $size, $maxWidth) {
     return $text;
 }
 
-// Every list-row title used to go straight to ig_fit_text() at a fixed
-// size — a long one (a Hyperreal showcase presented by some org, an
-// AFS retrospective subtitle) lost most of its words to an ellipsis
-// while the row still had a mostly-empty second half. Shrinking first
-// keeps the whole title readable; ig_fit_text() only becomes the last
-// resort once even $minSize doesn't fit. Returns the size actually used
-// alongside the text, since the caller's imagettftext() (and, for the
-// neon theme, the "w/ Org" tag positioned after it) needs to match.
-function ig_fit_title($text, $font, $size, $maxWidth, $minSize = null) {
-    $minSize = $minSize ?? max(14, (int) round($size * 0.65));
-    for ($try = $size; $try > $minSize; $try--) {
-        $bbox = imagettfbbox($try, 0, $font, $text);
-        if ($bbox[2] - $bbox[0] <= $maxWidth) return ['text' => $text, 'size' => $try];
-    }
-    return ['text' => ig_fit_text($text, $font, $minSize, $maxWidth), 'size' => $minSize];
-}
-
 // The compact "w/ Org" form of ctx_billing()'s "Presented with/by Org" —
 // for tight spaces (right next to a row title) where the full phrase
 // doesn't fit. Live-score billing has no compact form and returns null;
@@ -927,8 +910,8 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_HEADLINE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_HEADLINE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1049,8 +1032,8 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $gold, IG_FONT_MARQUEE_TITLE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_MARQUEE_TITLE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_MARQUEE_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1171,8 +1154,8 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_ZINE_TITLE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_ZINE_TITLE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_ZINE_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1287,8 +1270,8 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_NEWSPRINT_TITLE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_NEWSPRINT_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1429,11 +1412,11 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
             $tagW    = $tagBox[2] - $tagBox[0];
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, $geo['titleSize'], $textMaxWidth - ($tagText ? $tagW + 14 : 0));
-        ig_neon_text($im, $titleFit['size'], $textX, $y + $geo['titleOffsetY'], IG_FONT_NEON_TITLE, $titleFit['text'], $cyan, $cyanGlow);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, $geo['titleSize'], $textMaxWidth - ($tagText ? $tagW + 14 : 0));
+        ig_neon_text($im, $geo['titleSize'], $textX, $y + $geo['titleOffsetY'], IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
 
         if ($tagText) {
-            $titleBox = imagettfbbox($titleFit['size'], 0, IG_FONT_NEON_TITLE, $titleFit['text']);
+            $titleBox = imagettfbbox($geo['titleSize'], 0, IG_FONT_NEON_TITLE, $title);
             $titleW   = $titleBox[2] - $titleBox[0];
             imagettftext($im, $tagSize, 0, $textX + $titleW + 14, $y + $geo['titleOffsetY'], $muted, IG_FONT_BODY, $tagText);
         }
@@ -1597,8 +1580,8 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, $initSize, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_TERMINAL, $initial);
         }
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_TERMINAL, $titleSize, $titleMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, $titleSize, $titleMaxWidth);
+        imagettftext($im, $titleSize, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
 
         $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, $venueSize, $venueMaxWidth);
         imagettftext($im, $venueSize, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
@@ -1709,8 +1692,8 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_DARKROOM_TITLE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $amber, IG_FONT_DARKROOM_TITLE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $amber, IG_FONT_DARKROOM_TITLE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -1847,8 +1830,8 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $titleFit = ig_fit_title(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
-        imagettftext($im, $titleFit['size'], 0, $textX, $y + $geo['titleOffsetY'], $plum, IG_FONT_HEADLINE, $titleFit['text']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $plum, IG_FONT_HEADLINE, $title);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
