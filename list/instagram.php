@@ -1921,6 +1921,59 @@ function ig_wrap_lines($text, $font, $size, $maxWidth, $maxLines) {
     return $lines;
 }
 
+// Same wrapping pass as ig_wrap_lines(), but returns null the moment a
+// word would overflow $maxLines instead of dropping it — the caller uses
+// that to test whether $size is small enough for the whole title to
+// survive intact before ever accepting a truncated result.
+function ig_wrap_lines_exact($text, $font, $size, $maxWidth, $maxLines) {
+    $text = trim((string) $text);
+    if ($text === '') return [];
+
+    $words   = preg_split('/\s+/', $text);
+    $lines   = [];
+    $current = '';
+
+    foreach ($words as $word) {
+        $test = $current === '' ? $word : "$current $word";
+        $bbox = imagettfbbox($size, 0, $font, $test);
+        if ($current !== '' && $bbox[2] - $bbox[0] > $maxWidth) {
+            $lines[] = $current;
+            if (count($lines) >= $maxLines) return null;
+            $current = $word;
+        } else {
+            $current = $test;
+        }
+    }
+    if ($current !== '') $lines[] = $current;
+
+    return $lines;
+}
+
+/**
+ * The spotlight page's title used to wrap at a fixed size and lose
+ * whatever didn't fit on the second line to an ellipsis — the same
+ * problem the list rows had before shrinking replaced their own
+ * ig_fit_text() truncation. This shrinks the size first so the full
+ * title survives more often; ig_wrap_lines()'s truncation only kicks in
+ * once even $minSize doesn't fit within $maxLines. $lineHeight is the
+ * caller's leading at its default $size — scaled down with the font so a
+ * shrunk two-line title doesn't sit with its original, now-oversized gap.
+ */
+function ig_fit_title_wrapped($text, $font, $size, $maxWidth, $maxLines, $lineHeight, $minSize = null) {
+    $minSize = $minSize ?? max(30, (int) round($size * 0.65));
+    for ($try = $size; $try >= $minSize; $try--) {
+        $lines = ig_wrap_lines_exact($text, $font, $try, $maxWidth, $maxLines);
+        if ($lines !== null) {
+            return ['lines' => $lines, 'size' => $try, 'lineHeight' => (int) round($lineHeight * $try / $size)];
+        }
+    }
+    return [
+        'lines'      => ig_wrap_lines($text, $font, $minSize, $maxWidth, $maxLines),
+        'size'       => $minSize,
+        'lineHeight' => (int) round($lineHeight * $minSize / $size),
+    ];
+}
+
 /**
  * A single-film spotlight page, in the visual language of the homepage's
  * Journal panel (.lead) — hero, kicker, title, deck, faded overview —
@@ -2014,10 +2067,10 @@ function ig_build_feature_page_paper(array $film, $date) {
         $y += 68;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
-        $y += 72;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth, 2, 72);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2129,10 +2182,10 @@ function ig_build_feature_page_marquee(array $film, $date) {
         $y += 84;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_MARQUEE_TITLE, $line);
-        $y += 86;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth, 2, 86);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_MARQUEE_TITLE, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2237,10 +2290,10 @@ function ig_build_feature_page_zine(array $film, $date) {
         $y += 68;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 56, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_ZINE_TITLE, $line);
-        $y += 72;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 56, $textMaxWidth, 2, 72);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_ZINE_TITLE, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2344,10 +2397,10 @@ function ig_build_feature_page_newsprint(array $film, $date) {
         $y += 68;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 56, 0, $margin, $y, $ink, IG_FONT_NEWSPRINT_TITLE, $line);
-        $y += 76;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth, 2, 76);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_NEWSPRINT_TITLE, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2457,10 +2510,10 @@ function ig_build_feature_page_neon(array $film, $date) {
         $y += 60;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        ig_neon_text($im, 46, $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
-        $y += 60;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth, 2, 60);
+    foreach ($titleFit['lines'] as $line) {
+        ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
+        $y += $titleFit['lineHeight'];
     }
 
     // Live-score/presented-with-or-by billing (ctx_billing() in
@@ -2589,10 +2642,10 @@ function ig_build_feature_page_terminal(array $film, $date) {
         $y += 56;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 54, 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
-        $y += 66;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth, 2, 66);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2745,10 +2798,10 @@ function ig_build_feature_page_darkroom(array $film, $date) {
         $y += 66;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        ig_neon_text($im, 50, $margin, $y, IG_FONT_DARKROOM_TITLE, $line, $ink, $amberGlow);
-        $y += 62;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth, 2, 62);
+    foreach ($titleFit['lines'] as $line) {
+        ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_DARKROOM_TITLE, $line, $ink, $amberGlow);
+        $y += $titleFit['lineHeight'];
     }
 
     $deckParts = [];
@@ -2875,10 +2928,10 @@ function ig_build_feature_page_austin(array $film, $date) {
         $y += 66;
     }
 
-    $titleLines = ig_wrap_lines(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth, 2);
-    foreach ($titleLines as $line) {
-        imagettftext($im, 52, 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
-        $y += 58;
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth, 2, 58);
+    foreach ($titleFit['lines'] as $line) {
+        imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        $y += $titleFit['lineHeight'];
     }
 
     // Live-score/presented-with-or-by billing, same quiet treatment Neon's
