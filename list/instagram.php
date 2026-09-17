@@ -576,6 +576,13 @@ function ig_fetch_thumb($url, $w, $h, $vBias = 0.5) {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT        => 5,
                 CURLOPT_USERAGENT      => 'CinemaTX/1.0 (+https://cinematx.net)',
+                // TMDB's own poster URLs never redirect, so this never
+                // mattered until HYPERREAL_LOGO — Squarespace's static asset
+                // host 301s to its actual CDN URL, and without this the
+                // fetch silently returns an empty body and every Hyperreal
+                // fallback card fell through to the plain initial-letter
+                // placeholder.
+                CURLOPT_FOLLOWLOCATION => true,
             ]);
             $data = curl_exec($ch);
             curl_close($ch);
@@ -590,6 +597,17 @@ function ig_fetch_thumb($url, $w, $h, $vBias = 0.5) {
     $srcW = imagesx($src);
     $srcH = imagesy($src);
     $thumb = imagecreatetruecolor($w, $h);
+
+    // Every scraped/TMDB poster is an opaque JPEG, so this never mattered
+    // before — but a transparent-background PNG fallback (HYPERREAL_LOGO in
+    // scraper_hyperreal.php) needs its alpha preserved through the resize
+    // rather than pre-blended onto imagecreatetruecolor()'s default opaque
+    // black canvas. Every caller already paints $im with its own card
+    // background before pasting a thumb into it, and a truecolor image's
+    // alpha blending defaults to on — so a $thumb with real per-pixel alpha
+    // composites correctly wherever it lands with no change at any call site.
+    imagealphablending($thumb, false);
+    imagesavealpha($thumb, true);
 
     // Cover-crop to the target ratio rather than squashing the poster.
     if ($srcW / $srcH > $w / $h) {
