@@ -146,30 +146,53 @@ function ctx_year($raw) {
     return null;
 }
 
+// AFS's own recurring program name — "Artist Spotlight: Ari Aster in
+// Conversation with Richard Linklater" is a real, recurring AFS series, not
+// a film with a colon in its title, and (unlike a real film) will never
+// turn up on TMDB for ctx_series()'s own colon-prefix detection to catch —
+// that one only accepts a colon prefix once the cleaned title behind it
+// has already matched something real. A prefix, unlike every other billing
+// pattern below (which are suffixes).
+const CTX_ARTIST_SPOTLIGHT = '/^artist\s+spotlight\s*:\s*(?=\S)/i';
+
+// The org a screening is presented with/by — its own constant so
+// ctx_enrich() can strip exactly this from what it shows as the title,
+// not just extract it as billing. Kept separate from CTX_CONNECTIVES
+// (used only for the TMDB search string) since that one also silently
+// discards ft./featuring/in-person billing this deliberately leaves alone.
+const CTX_PRESENTED_SUFFIX = '/\s+presented\s+(with|by)\s+(.+)$/i';
+
 /**
  * The kinds of bolted-on billing worth surfacing rather than just
- * discarding: a marathon/round-the-clock format, a live-score accompanist,
- * or the org a screening is presented with/by. Each pattern is anchored to
- * the end of the raw title and checked independently — not tied to
+ * discarding: AFS's own "Artist Spotlight" program, a marathon/round-the-
+ * clock format, a live-score accompanist, or the org a screening is
+ * presented with/by. Each pattern is checked independently — not tied to
  * whichever connective ctx_clean_title() actually cut on — so "TENDER
  * MERCIES ft. "Welcome to Dollar Country" presented with End of an Ear"
  * still surfaces "Presented with End of an Ear" even though "ft." is the
  * earlier, unrelated match that strips the title down to "TENDER MERCIES".
  *
- * Marathon format is checked first and wins over a presenter credit if a
- * title has both ("IT ENDS Endless Screening presented by NEON") — the
- * format is the thing someone actually needs to know before showing up,
- * the distributor credit is much less essential. Captured verbatim from
+ * Marathon format is checked before a presenter credit and wins if a title
+ * has both ("IT ENDS Endless Screening presented by NEON") — the format is
+ * the thing someone actually needs to know before showing up, the
+ * distributor credit is much less essential. Captured verbatim from
  * whatever the venue actually printed (not hardcoded to "24-Hour") so a
  * differently-worded marathon elsewhere is represented accurately too.
  *
- * The other connectives (ft./featuring, in person, with director, w/)
- * stay silent strips — they're either a co-billed short (already folded
- * into the title text before this point) or a Q&A appearance too minor to
- * warrant its own line.
+ * Two of these (Artist Spotlight, presented with/by) are also stripped
+ * from the on-screen title by ctx_enrich(), using the same patterns —
+ * they're identifying the whole event, not extra billing alongside a
+ * real film title, so leaving them baked into the title too would just
+ * repeat what this line already says. The other connectives (ft./
+ * featuring, in person, with director, w/) stay silent strips — they're
+ * either a co-billed short (already folded into the title text before
+ * this point) or a Q&A appearance too minor to warrant its own line.
  */
 function ctx_billing($raw) {
     $raw = trim((string)$raw);
+    if (preg_match(CTX_ARTIST_SPOTLIGHT, $raw)) {
+        return 'Artist Spotlight';
+    }
     if (preg_match('/\b((?:\d{1,3}[\s-]?hours?|endless)\s+(?:screening|marathon))\b/i', $raw, $m)) {
         return ucwords(strtolower(trim($m[1])));
     }
@@ -179,7 +202,7 @@ function ctx_billing($raw) {
     if (preg_match('/\bwith\s+live\s+score\s*$/i', $raw)) {
         return 'Live score';
     }
-    if (preg_match('/\bpresented\s+(with|by)\s+(.+)$/i', $raw, $m)) {
+    if (preg_match(CTX_PRESENTED_SUFFIX, $raw, $m)) {
         return 'Presented ' . strtolower($m[1]) . ' ' . trim($m[2]);
     }
     return null;
@@ -199,8 +222,23 @@ function ctx_enrich(array $films) {
     foreach ($films as &$f) {
         $raw = (string)($f['title'] ?? '');
         $f['series']        = null;
-        $f['billing']       = ctx_billing($raw);
-        $f['display_title'] = $raw;
+        $f['billing'] = ctx_billing($raw);
+
+        // These two identify the whole event rather than describe a real
+        // film alongside it, so leaving them baked into the title as well
+        // would just repeat the billing line above. Checked against what
+        // ctx_billing() actually decided, not re-matched independently —
+        // "IT ENDS Endless Screening presented by NEON" bills as the
+        // marathon format (ctx_billing() checks that one first), and
+        // stripping "presented by NEON" here too, unconditionally, would
+        // delete NEON's credit from the title with nothing to replace it.
+        $displayTitle = $raw;
+        if ($f['billing'] === 'Artist Spotlight') {
+            $displayTitle = trim(preg_replace(CTX_ARTIST_SPOTLIGHT, '', $displayTitle));
+        } elseif (strpos((string)$f['billing'], 'Presented ') === 0) {
+            $displayTitle = trim(preg_replace(CTX_PRESENTED_SUFFIX, '', $displayTitle));
+        }
+        $f['display_title'] = $displayTitle;
         $f['year']          = $f['year']     ?? null;
         $f['runtime']       = $f['runtime']  ?? null;
         $f['overview']      = $f['overview'] ?? null;
