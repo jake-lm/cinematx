@@ -30,7 +30,7 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
           // link is never anonymous once the words are gone. ?>
     <a class="rail__mark" href="<?php echo CTX_HOME; ?>">
       <img class="rail__icon" src="/img/iconimg.png" alt="Cinema, TX" width="100" height="100" />
-      <span class="rail__word">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></span>
+      <span class="rail__word">Cinema<span class="c">,</span> TX</span>
     </a>
   </div>
 
@@ -88,7 +88,7 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
 
 <header class="bar">
   <button class="ibtn rail__toggle" id="rail-toggle" title="Collapse"><i class="fa-solid fa-bars"></i></button>
-  <a class="bar__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX<sup class="mark__beta">Beta</sup></a>
+  <a class="bar__mark" href="<?php echo CTX_HOME; ?>">Cinema<span class="c">,</span> TX</a>
   <?php // First name only — "Welcome to the Cinema, Jake Martinez" reads like
         // a form letter. Absent when signed out, and the rotator omits the
         // comma entirely rather than trailing one.
