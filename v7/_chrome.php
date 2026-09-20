@@ -42,8 +42,13 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-film"></i></span><span class="txt">Tonight</span></a>
     <a class="rail__link<?php echo $on('list'); ?>" href="/list">
       <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">The List</span></a>
+    <?php // Theatre — parked, not removed. Flip to `if (true)` to bring it
+          // back; the /th1//th2 pages themselves are untouched and ready,
+          // this was always the one place putting them in the nav. ?>
+    <?php if (false): ?>
     <a class="rail__link<?php echo $on('theatre'); ?>" href="/th1">
       <span class="ico"><i class="fa-solid fa-clapperboard"></i></span><span class="txt">Theatre</span></a>
+    <?php endif; ?>
     <?php // Guests still have no "You" menu to fall back to, so About only
           // joins the mobile collapse for members who actually have one. ?>
     <a class="rail__link<?php echo $full ? ' rail__link--full' : ''; ?><?php echo $on('about'); ?>" href="/about">
