@@ -43,9 +43,22 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
             $film['location'] = $film['location'] ?? null;
 
             if (empty($film['no_tmdb'])) {
-                // AFS-only for now (see scraper_afs.php) — absent for every
-                // other venue, so this is a no-op there.
-                $tmdb = fetch_tmdb($film['title'], null, $film['director_hint'] ?? tmdb_known_director_hint($film['title']));
+                // A year the venue itself supplied (the Paramount's ticket
+                // page states one for every film) or printed at the end of
+                // the title — "It (2017)", "The Omen (1976)" — is exactly
+                // what tells apart the many films sharing a name. It goes to
+                // TMDB as a year filter and comes off the search text, since
+                // a bare "Friday the 13th" picks the 2009 remake on
+                // popularity alone.
+                $lookup = $film['title'];
+                $year   = $film['year_hint'] ?? null;
+                if (preg_match('/^(.*\S)\s*\(((?:19|20)\d{2})\)\s*$/u', $lookup, $ym)) {
+                    $lookup = $ym[1];
+                    $year   = $year ?: (int)$ym[2];
+                }
+                // director_hint is AFS-only for now (see scraper_afs.php) —
+                // absent for every other venue, so this is a no-op there.
+                $tmdb = fetch_tmdb($lookup, $year, $film['director_hint'] ?? tmdb_known_director_hint($film['title']));
                 $film['poster']   = $tmdb['poster'];
                 $film['year']     = $tmdb['year'];
                 $film['runtime']  = $tmdb['runtime'];
@@ -68,6 +81,21 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                     $film['director'] = $film['director'] ?: $film['afs_director'];
                     $film['runtime']  = $film['runtime']  ?: $film['afs_runtime'];
                     $film['overview'] = $film['overview'] ?: $film['afs_overview'];
+                }
+
+                // The Paramount's feed always carries a real poster of its
+                // own, and its ticket page a year, runtime, director and
+                // synopsis (see scraper_paramount.php) — better than a blank
+                // card for a TMDB miss, e.g. a live conversation or a
+                // movie-riffing show billed under a film's name. Only when
+                // TMDB found none: what TMDB did find is what every other
+                // venue's listing uses.
+                if (empty($film['poster']) && !empty($film['paramount_poster'])) {
+                    $film['poster']   = $film['paramount_poster'];
+                    $film['year']     = $film['year']     ?: ($film['paramount_year']     ?? null);
+                    $film['runtime']  = $film['runtime']  ?: ($film['paramount_runtime']  ?? null);
+                    $film['director'] = $film['director'] ?: ($film['paramount_director'] ?? null);
+                    $film['overview'] = $film['overview'] ?: ($film['paramount_overview'] ?? null);
                 }
 
                 // Same idea for Hyperreal, but there's nothing to borrow a

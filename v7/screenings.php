@@ -222,7 +222,10 @@ function ctx_enrich(array $films) {
     foreach ($films as &$f) {
         $raw = (string)($f['title'] ?? '');
         $f['series']        = null;
-        $f['billing'] = ctx_billing($raw);
+        // A title's own billing wins; a scraper-supplied one (the Paramount's
+        // "Double feature" / "35mm" tags, which never appear in the title
+        // at all) is only the fallback.
+        $f['billing'] = ctx_billing($raw) ?? ($f['tag_billing'] ?? null);
 
         // These two identify the whole event rather than describe a real
         // film alongside it, so leaving them baked into the title as well
