@@ -1,4 +1,9 @@
 <?php
+// How far ahead The List looks. Read by the page itself, the cache warmer
+// and Hyperreal's month-spill check — three places that each used to carry
+// their own hardcoded 8 and would quietly disagree the moment one changed.
+const CTX_LOOKAHEAD_DAYS = 10;
+
 require_once __DIR__ . '/scraper_paramount.php';
 require_once __DIR__ . '/scraper_afs.php';
 require_once __DIR__ . '/scraper_hyperreal.php';

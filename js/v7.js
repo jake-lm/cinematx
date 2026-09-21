@@ -633,8 +633,8 @@
       // and only /list/ has a scope word to keep honest.
       var scope = $('#list-scope');
       if (scope) {
-        scope.textContent = { week: 'next eight days', today: 'today', tmrw: 'tomorrow' }[state.when]
-                          || 'next eight days';
+        var week = scope.getAttribute('data-week') || 'this week';
+        scope.textContent = { week: week, today: 'today', tmrw: 'tomorrow' }[state.when] || week;
       }
 
       ['#grid-empty', '#rows-empty', '#depth-empty', '#list-empty'].forEach(function (sel) {
