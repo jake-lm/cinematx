@@ -61,6 +61,11 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                     $lookup = $ym[1];
                     $year   = $year ?: (int)$ym[2];
                 }
+                // A hand-curated fallback for when neither of the above
+                // caught it — currently only the Paramount classics whose
+                // real year would otherwise come from a ticket page this
+                // server can't reach (see tmdb_known_year_hint()).
+                $year = $year ?: tmdb_known_year_hint($lookup);
                 // director_hint is AFS-only for now (see scraper_afs.php) —
                 // absent for every other venue, so this is a no-op there.
                 $tmdb = fetch_tmdb($lookup, $year, $film['director_hint'] ?? tmdb_known_director_hint($film['title']));

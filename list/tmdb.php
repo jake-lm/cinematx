@@ -87,6 +87,34 @@ function tmdb_known_director_hint($title) {
     return TMDB_KNOWN_DIRECTOR_HINTS[$key] ?? null;
 }
 
+// The same problem as above, but a year — not a director — is what actually
+// disambiguates these, since it narrows the TMDB search itself rather than
+// just re-ranking whatever comes back. All three are Paramount classic
+// re-releases: their own ticket page states each film's real year (see
+// scraper_paramount.php's year_hint), but that page has sat behind an
+// Incapsula bot wall this server can't get past since ~2026-09, so these
+// are hand-curated the same way a missing signal already is above. Add to
+// this list as they're found; check fetch_tmdb($title, null, ...) first
+// against what the venue actually says is playing, the same way the
+// director hints were found.
+const TMDB_KNOWN_YEAR_HINTS = [
+    // "Friday the 13th" (1980, Sean S. Cunningham) — the original slasher,
+    // Paramount's Oct. 2 Panic double feature. Popularity picks the 2009
+    // remake instead.
+    'friday the 13th' => 1980,
+    // "Dracula" (1931, Tod Browning) — the Bela Lugosi classic, Paramount's
+    // Oct. 14 double feature. Popularity picks the 2025 Luc Besson film.
+    'dracula' => 1931,
+    // "Frankenstein" (1931, James Whale) — the Boris Karloff classic, same
+    // Oct. 14 bill. Popularity picks the 2025 Guillermo del Toro film.
+    'frankenstein' => 1931,
+];
+
+function tmdb_known_year_hint($title) {
+    $key = trim(mb_strtolower((string) $title));
+    return TMDB_KNOWN_YEAR_HINTS[$key] ?? null;
+}
+
 /**
  * Pick the right film from a search response.
  *
