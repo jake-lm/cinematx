@@ -521,14 +521,21 @@ function forecast_wrapup_start(array $chapters, $duration) {
     return null;
 }
 
-// Every unique screening this week (a film playing three nights only
-// counts once), grouped by calendar day and chronologically ordered within
-// each — the one source both the automatic picker and the manual
-// checklist (forecast_all_week_films(), _admin/forecast_episode.php) read
-// from, so they can never disagree about what's actually playing.
+// Every unique screening in this episode's window (a film playing three
+// nights only counts once), grouped by calendar day and chronologically
+// ordered within each — the one source both the automatic picker and the
+// manual checklist (forecast_all_week_films(), _admin/forecast_episode.php)
+// read from, so they can never disagree about what's actually playing.
+//
+// The window is 10 days, not 7: week_of is still entered as that week's
+// Monday, but the episode airs the following Wednesday and talks about
+// what's playing through the Wednesday after that (the next episode's own
+// air day) — see forecast_week_days(). CTX_LOOKAHEAD_DAYS (10, in
+// list/fetch_screenings.php) was raised specifically so The List's data
+// reaches that far out.
 function forecast_week_by_day($conn, $weekOf) {
     $start = strtotime($weekOf);
-    $end   = strtotime('+7 day', $start) - 1;
+    $end   = strtotime('+10 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
     // IG_VENUES on its own is the *daily Instagram carousel's* venue
     // list — Alamo is deliberately excluded from it (it gets its own
@@ -612,13 +619,28 @@ function forecast_flat_week_films(array $byDay) {
     return $flat;
 }
 
-// The 7 calendar dates this episode's week actually spans, Monday..Sunday
-// of week_of — the fixed universe a day-timeline-entry validates against,
-// and what both the admin bank's day section and the day-panel loop
-// iterate over.
+// The 10 calendar dates this episode's window actually spans, starting on
+// week_of itself — still entered as that week's Monday — through the
+// following Wednesday, not just that Monday..Sunday: the show airs
+// Wednesday but is recorded a couple of days earlier and talks about
+// screenings through the next episode's own air day the Wednesday after,
+// so the window has to reach that far or those films would never be
+// eligible for a day/chapter. The fixed universe a day-timeline-entry
+// validates against, and what both the admin bank's day section and the
+// day-panel loop iterate over.
 function forecast_week_days($weekOf) {
     $start = strtotime($weekOf);
-    return array_map(fn($i) => date('Y-m-d', strtotime("+{$i} day", $start)), range(0, 6));
+    return array_map(fn($i) => date('Y-m-d', strtotime("+{$i} day", $start)), range(0, 9));
+}
+
+// The admin's default for a brand-new episode's "Week of" field: that
+// calendar week's Monday (today, if today already is one) — only ever a
+// starting point for a fresh form, editing an existing episode always
+// keeps its own stored date untouched.
+function forecast_default_week_of($now = null) {
+    $now = $now ?? strtotime('today');
+    $dow = (int) date('N', $now); // 1=Mon..7=Sun
+    return date('Y-m-d', strtotime('-' . ($dow - 1) . ' day', $now));
 }
 
 // Every film actually playing on $ymd, with its showtimes[] filtered down

@@ -65,9 +65,9 @@ require dirname(__DIR__) . '/v7/_chrome.php';
               <div class="field"><label class="field__label" for="fc-guest">Guest name</label>
                 <input class="field__input" id="fc-guest" name="guest_name" type="text" required
                        value="<?php echo $e($editing['guest_name'] ?? ''); ?>"></div>
-              <div class="field"><label class="field__label" for="fc-week">Week of</label>
+              <div class="field"><label class="field__label" for="fc-week">Week of <span class="admin-tz" id="fc-week-span"></span></label>
                 <input class="field__input" id="fc-week" name="week_of" type="date" required
-                       value="<?php echo $e($editing['week_of'] ?? ''); ?>"></div>
+                       value="<?php echo $e($editing['week_of'] ?? forecast_default_week_of()); ?>"></div>
               <div class="field"><label class="field__label" for="fc-blurb">Episode blurb <span class="admin-tz">optional</span></label>
                 <textarea class="field__input admin-textarea" id="fc-blurb" name="blurb" rows="4"><?php echo $e($editing['blurb'] ?? ''); ?></textarea></div>
               <div class="field"><label class="field__label" for="fc-photo">Guest photo <span class="admin-tz">optional</span></label>
@@ -167,5 +167,31 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       </div>
     </div>
   </main>
+
+  <script>
+    (function () {
+      var input = document.getElementById('fc-week');
+      var span  = document.getElementById('fc-week-span');
+      if (!input || !span) return;
+      var DAYS   = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      function render() {
+        if (!input.value) { span.textContent = ''; return; }
+        // Parsed and re-rendered in UTC — a plain "YYYY-MM-DD" string
+        // parses as UTC midnight, so reading it back with local
+        // getDay()/getDate() can land a day off west of Greenwich.
+        var start = new Date(input.value + 'T00:00:00Z');
+        if (isNaN(start)) { span.textContent = ''; return; }
+        // The window is 10 days, Monday through the following Wednesday —
+        // a bare "(Mon–Wed)" would look like just three days since
+        // both weekdays repeat every week, so this spells out the actual
+        // end date instead.
+        var end = new Date(start.getTime() + 9 * 86400000);
+        span.textContent = 'through ' + DAYS[end.getUTCDay()] + ', ' + MONTHS[end.getUTCMonth()] + ' ' + end.getUTCDate();
+      }
+      input.addEventListener('input', render);
+      render();
+    })();
+  </script>
 
 <?php require dirname(__DIR__) . '/v7/_foot.php'; ?>
