@@ -11,6 +11,7 @@ require_once __DIR__ . '/cache.php';
 // all, so the old parser dropped those silently.
 const PARAMOUNT_FEED     = 'https://www.austintheatre.org/wp-json/wp/v2/event';
 const PARAMOUNT_LISTING  = 'https://www.austintheatre.org/classic-film/';
+const PARAMOUNT_BULLOCK  = 'https://www.austintheatre.org/imax-screenings-at-the-bullock-theatre/';
 const PARAMOUNT_TICKETS  = 'https://tickets.austintheatre.org/';
 const PARAMOUNT_TYPE_FILM = 2;
 const PARAMOUNT_TYPE_PERFORMANCE = 4;
@@ -71,6 +72,32 @@ function paramount_listing_ids() {
     return $ids;
 }
 
+// The production-season ids of every film currently shown at the Bullock
+// Museum IMAX — a second curated page, same reasoning as
+// paramount_listing_ids(). This is what actually resolves the Bullock
+// location now: the feed's own "In IMAX" tag is applied inconsistently
+// (missing on every RyMAX title — La La Land, Blade Runner 2049, Barbie,
+// Project Hail Mary — while present on It and Sinners), and the ticket
+// page that would otherwise say so outright is unreachable from here (see
+// paramount_detail() below).
+function paramount_bullock_ids() {
+    $html = paramount_http(PARAMOUNT_BULLOCK);
+    if (!$html) return [];
+
+    $dom = new DOMDocument();
+    libxml_use_internal_errors(true);
+    $dom->loadHTML($html);
+    libxml_clear_errors();
+    $xpath = new DOMXPath($dom);
+
+    $ids = [];
+    $links = $xpath->query('//div[contains(concat(" ",normalize-space(@class)," ")," filmCard ")]//a[contains(@class,"links__overlay")]');
+    foreach ($links as $a) {
+        if (preg_match('#/(\d+)/?$#', $a->getAttribute('href'), $m)) $ids[$m[1]] = true;
+    }
+    return $ids;
+}
+
 // One event's own ticketing page — server-rendered, and the only place the
 // theatre says which room a show is in, and (per film, double features
 // included) the year, runtime, director and synopsis: "(1980, 95min/color,
@@ -80,6 +107,19 @@ function paramount_listing_ids() {
 // "Frankenstein" to 2025 films, when the theatre is showing the originals.
 // Cached per production season, refreshed every few days rather than
 // forever: unlike a finished AFS screening, a ticket page still gets edited.
+//
+// As of 2026-09, tickets.austintheatre.org sits behind Incapsula, and it
+// bot-walls this server's own IP outright — every request comes back a
+// ~1KB JS-challenge page, 100% of the time, confirmed against several
+// different screenings. A browser or a residential IP still gets the real
+// page (that's how this function was built and verified in the first
+// place); this box just can't reach it. So this stays in place rather
+// than being ripped out — it costs nothing to keep trying, and it starts
+// working again the moment that wall lifts, with no further changes — but
+// it currently contributes nothing on the live site. Venue now leans on
+// paramount_bullock_ids()/tags instead (see fetch_paramount_films_scrape());
+// there is no working substitute yet for the year/runtime/director/
+// synopsis this would otherwise supply.
 function paramount_detail($season) {
     if ($season === '') return [];
 
@@ -89,7 +129,12 @@ function paramount_detail($season) {
     if ($have && (time() - ($have['at'] ?? 0)) < 3 * 86400) return $have;
 
     $html = paramount_http(PARAMOUNT_TICKETS . $season);
-    if (!$html) return $have ?: [];   // stale beats empty; a transient miss isn't cached
+
+    // A block page is short and never contains the real page's wrapper —
+    // treated the same as a curl failure (not cached), since caching it
+    // would read as "confirmed no data" and make a real parse unreachable
+    // for the next 3 days even on a request that would have gone through.
+    if (!$html || strpos($html, 'tn-event-detail') === false) return $have ?: [];
 
     $detail = paramount_parse_detail($html) + ['at' => time()];
     $cache[$season] = $detail;
@@ -204,6 +249,8 @@ function fetch_paramount_films_scrape() {
         }
     }
 
+    $bullockIds = paramount_bullock_ids();
+
     $tz    = new DateTimeZone('America/Chicago');
     $films = [];
 
@@ -226,10 +273,14 @@ function fetch_paramount_films_scrape() {
         $tags = [];
         foreach (($acf['event_tags'] ?? []) as $t) $tags[$t['slug'] ?? ''] = true;
 
-        // Which room, per the ticket page itself — the feed's tags miss it
-        // (the RyMAX shows are at the Bullock IMAX but aren't tagged so).
-        // The tags are only the fallback for a page that couldn't be read.
+        // Which room. The ticket page itself would say outright, but is
+        // unreachable from here (see paramount_detail()); its answer is
+        // kept first in line for whenever that changes. The Bullock listing
+        // page is the reliable signal in the meantime — the feed's own
+        // "In IMAX" tag misses every RyMAX title (La La Land, Blade Runner
+        // 2049, Barbie, Project Hail Mary), so it's only the last resort.
         $location = $detail['venue'] ?? null;
+        if (!$location && isset($bullockIds[$season])) $location = 'Bullock IMAX';
         if (!$location) {
             if (isset($tags['in-imax']))                $location = 'Bullock IMAX';
             elseif (isset($tags['bass-concert-hall']))  $location = 'Bass Concert Hall';
