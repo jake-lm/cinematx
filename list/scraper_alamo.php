@@ -36,6 +36,49 @@ const ALAMO_EVENT_TYPES = ['special-event', 'movie-party', 'sing-along', 'live-q
 // Tagged, but describing how it is shown rather than what is shown.
 const ALAMO_NOT_PROGRAMMING = ['hdr-by-barco', 'advance-screening'];
 
+// Alamo's own copy for a screening, for when TMDB has nothing to say about it.
+// The schedule feed already carries a synopsis, tagline, runtime and poster
+// for every presentation — no second page to fetch, unlike Hyperreal's event
+// pages — and it is the only place a series like "Mystery Transmission" or
+// "Video Vortex" is described at all: TMDB has no entry for any of it. Only
+// used as a fallback (see fetch_screenings.php); a real TMDB match still wins.
+//
+// Long enough to read as a real synopsis, short enough that the handful of
+// multi-paragraph press-release entries (a live-score tour, a 4,000-character
+// essay) do not bloat every cached film row — cards clamp to a few lines
+// anyway.
+const ALAMO_OVERVIEW_MAX = 600;
+
+// The feed's HTML descriptions ("<p>…</p><p>…</p>", the odd link or <em>)
+// flattened to one line of plain text, cut at a word boundary if it runs long.
+function alamo_plain_text($html) {
+    $html = preg_replace('#</p>|<br\s*/?>#i', ' ', (string)$html);
+    $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = trim(preg_replace('/\s+/u', ' ', $text));
+    if (mb_strlen($text) > ALAMO_OVERVIEW_MAX) {
+        $cut = mb_substr($text, 0, ALAMO_OVERVIEW_MAX);
+        // Prefer ending on a whole sentence, so a cut synopsis still reads
+        // as finished rather than trailing off mid-thought — unless that
+        // would throw away more than half of it.
+        if (preg_match('/^(.{' . intdiv(ALAMO_OVERVIEW_MAX, 2) . ',}[.!?])(?:\s|$)/us', $cut, $m)) {
+            return $m[1];
+        }
+        $cut  = preg_replace('/\s+\S*$/u', '', $cut);
+        $text = rtrim($cut, " ,;:-\u{2014}") . '…';
+    }
+    return $text;
+}
+
+// The feed's poster URLs ask its image CDN for 1080×1620 — several times
+// larger than any card on this site shows, and every visitor would download
+// that full size. 600×900 keeps the 2:3 shape and stays sharp on a
+// high-density screen (TMDB's own posters here are 300 wide).
+function alamo_poster_url($uri) {
+    if (!$uri) return null;
+    $uri = preg_replace('/([?&])h=\d+/', '${1}h=900', $uri);
+    return preg_replace('/([?&])w=\d+/', '${1}w=600', $uri);
+}
+
 function fetch_alamo_films($force = false) {
     return ctx_cached_scrape('cache_alamo.json', 6 * 3600, 'fetch_alamo_films_scrape', $force);
 }
@@ -84,7 +127,23 @@ function fetch_alamo_films_scrape() {
 
         $title = trim((string)($p['show']['title'] ?? ''));
         if ($title === '') continue;
-        $keep[$p['slug']] = $title;
+
+        // The event's own copy (each installment of a monthly series has its
+        // own description and poster) beats the show-level one shared by all
+        // of them; the tagline stands in for a missing description.
+        $event = (array)($p['event'] ?? []);
+        $show  = (array)($p['show']  ?? []);
+        $overview = alamo_plain_text($event['description'] ?? '');
+        if ($overview === '') $overview = alamo_plain_text($event['headline'] ?? '');
+        if ($overview === '') $overview = alamo_plain_text($show['headline'] ?? '');
+        $poster = $event['posterImage']['uri'] ?? ($show['posterImages'][0]['uri'] ?? null);
+
+        $keep[$p['slug']] = [
+            'title'    => $title,
+            'poster'   => alamo_poster_url($poster),
+            'runtime'  => !empty($event['runtimeMinutes']) ? (int)$event['runtimeMinutes'] : null,
+            'overview' => $overview !== '' ? $overview : null,
+        ];
     }
     if (!$keep) return [];
 
@@ -107,11 +166,14 @@ function fetch_alamo_films_scrape() {
         }
 
         $films[] = [
-            'title'        => $keep[$slug],
+            'title'        => $keep[$slug]['title'],
             'url'          => 'https://drafthouse.com/austin/show/' . rawurlencode($slug),
             'timestamp'    => $ts,
             'display_date' => (new DateTime('@' . $ts))->setTimezone($tz)->format('D, M j · g:ia'),
             'location'     => $cinemas[$s['cinemaId'] ?? ''] ?? '',
+            'alamo_poster'   => $keep[$slug]['poster'],
+            'alamo_runtime'  => $keep[$slug]['runtime'],
+            'alamo_overview' => $keep[$slug]['overview'],
         ];
     }
 

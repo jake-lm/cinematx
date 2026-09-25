@@ -120,6 +120,32 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                     if (!empty($detail['overview'])) $film['overview'] = $detail['overview'];
                     $film['poster'] = HYPERREAL_LOGO;
                 }
+
+                // Alamo's schedule feed already carries a synopsis, runtime
+                // and poster for every presentation (see scraper_alamo.php),
+                // and for its own series — Video Vortex's "Mystery
+                // Transmission", a themed marathon, an interactive game show
+                // — it is the only description that exists; TMDB has no
+                // entry to find. Two separate checks: a whole-record miss
+                // (no poster) takes the poster and runtime, and a synopsis
+                // is borrowed whenever TMDB left it empty — including for a
+                // TMDB match that has a poster but no synopsis.
+                if ($film['venue'] === 'Alamo Drafthouse') {
+                    if (empty($film['poster']) && !empty($film['alamo_poster'])) {
+                        $film['poster']  = $film['alamo_poster'];
+                        $film['runtime'] = $film['runtime'] ?: ($film['alamo_runtime'] ?? null);
+                        // A TMDB record with a year but no poster is a stray
+                        // title match, not this screening ("Mystery Voyage"
+                        // came back as a 2006 film beside Alamo's own
+                        // "1960s children's film" description). A year
+                        // printed in the title itself is still picked up
+                        // later, by ctx_enrich().
+                        $film['year'] = null;
+                    }
+                    if (empty($film['overview']) && !empty($film['alamo_overview'])) {
+                        $film['overview'] = $film['alamo_overview'];
+                    }
+                }
             } else {
                 // A curated shorts anthology (see afs_is_short_program()) —
                 // TMDB has no correct entry to borrow from, so only what the
