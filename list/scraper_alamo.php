@@ -54,8 +54,8 @@ const ALAMO_OVERVIEW_MAX = 600;
 // placeholder for a feature kept secret until the lights go down, so there
 // is nothing for TMDB to look up, and whatever it does return for the name
 // is somebody else's movie ("Mystery Voyage" came back as a 2006 film).
-// Alamo's own blurb for the installment is the whole description that exists.
-// Limited to Alamo's own collection series so a normal booking of a real film
+// What Alamo's own page says about it (see alamo_site_overviews()) is the
+// whole description that exists. Limited to Alamo's own collection series so a normal booking of a real film
 // with "Mystery" in its name ("Mystery Train") still goes through TMDB.
 function alamo_is_mystery(array $presentation, $title) {
     return preg_match('/^mystery\b/i', $title) === 1
@@ -91,6 +91,74 @@ function alamo_poster_url($uri) {
     if (!$uri) return null;
     $uri = preg_replace('/([?&])h=\d+/', '${1}h=900', $uri);
     return preg_replace('/([?&])w=\d+/', '${1}w=600', $uri);
+}
+
+// The description Alamo's own page shows for a presentation. The market
+// schedule feed above only carries the *event's* copy, and that can disagree
+// with the page: the page renders the show-level headline and description,
+// which the feed leaves out entirely. Mystery Voyage's September installment
+// is the case that found it — the feed said "a 1960s children's film from
+// the depths of hell", the page (and the film actually playing) said "a 1990s
+// kung fu fantasia from Hong Kong" — and Jeopardy! Interactive has a full
+// description on the page but only a one-line tagline in the feed.
+//
+// It lives on a separate per-presentation endpoint, one request each, so this
+// is called from the scrape (cron) rather than per page view, and each answer
+// is kept for ALAMO_DETAIL_TTL in its own small cache file so the half-hourly
+// refresh only re-asks about what has gone stale. Returns [slug => text|null];
+// a slug missing from the result means "could not find out", and the caller
+// keeps the feed's own copy.
+const ALAMO_DETAIL_URL = 'https://drafthouse.com/s/mother/v2/schedule/presentation/austin/';
+const ALAMO_DETAIL_TTL = 6 * 3600;
+
+function alamo_site_overviews(array $slugs) {
+    $file  = __DIR__ . '/cache_alamo_detail.json';
+    $cache = file_exists($file) ? (json_decode(file_get_contents($file), true) ?: []) : [];
+    $out   = [];
+    $dirty = false;
+    $consecutive_failures = 0;
+
+    foreach ($slugs as $slug) {
+        $hit = $cache[$slug] ?? null;
+        if ($hit && (time() - ($hit['at'] ?? 0)) < ALAMO_DETAIL_TTL) {
+            $out[$slug] = $hit['overview'];
+            continue;
+        }
+        // Alamo unreachable: stop asking rather than waiting out a timeout per
+        // presentation, and fall back to whatever was fetched last time.
+        if ($consecutive_failures >= 3) {
+            if ($hit) $out[$slug] = $hit['overview'];
+            continue;
+        }
+
+        $ch = curl_init(ALAMO_DETAIL_URL . rawurlencode($slug));
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; CinemaTX/1.0; +https://cinematx.net)',
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,   // see fetch_alamo_films_scrape()
+        ]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+
+        $show = $body ? (json_decode($body, true)['data']['presentation']['show'] ?? null) : null;
+        if (!is_array($show)) {
+            $consecutive_failures++;
+            if ($hit) $out[$slug] = $hit['overview'];   // stale beats nothing
+            continue;
+        }
+        $consecutive_failures = 0;
+
+        $text = alamo_plain_text($show['description'] ?? '');
+        if ($text === '') $text = alamo_plain_text($show['headline'] ?? '');
+        $cache[$slug] = ['at' => time(), 'overview' => $text !== '' ? $text : null];
+        $out[$slug]   = $cache[$slug]['overview'];
+        $dirty = true;
+    }
+
+    if ($dirty) @file_put_contents($file, json_encode($cache));
+    return $out;
 }
 
 function fetch_alamo_films($force = false) {
@@ -161,6 +229,18 @@ function fetch_alamo_films_scrape() {
         ];
     }
     if (!$keep) return [];
+
+    // Only presentations that actually have something on sale are worth a
+    // lookup — the feed keeps presentations months out, and a page only ever
+    // shows what is playing soon.
+    $live = [];
+    foreach ($data['sessions'] as $s) {
+        $slug = $s['presentationSlug'] ?? null;
+        if ($slug && isset($keep[$slug]) && ($s['status'] ?? '') === 'ONSALE' && empty($s['isHidden'])) $live[$slug] = true;
+    }
+    foreach (alamo_site_overviews(array_keys($live)) as $slug => $text) {
+        if ($text) $keep[$slug]['overview'] = $text;
+    }
 
     $tz    = new DateTimeZone('America/Chicago');
     $films = [];
