@@ -12,6 +12,23 @@ require_once __DIR__ . '/scraper_fathom.php';
 require_once __DIR__ . '/scraper_flickclique.php';
 require_once __DIR__ . '/tmdb.php';
 
+// Hand-written descriptions, keyed by lowercased listing title, for screenings
+// where no source's own text fits: a scraped page describes one film out of a
+// program, or nothing exists at all. Applied last in fetch_all_screenings(),
+// so it beats whatever TMDB or a venue's own page supplied. Add to this list
+// as they turn up.
+const CTX_KNOWN_OVERVIEWS = [
+    // Hyperreal's page for this only describes the first film in the
+    // program (a documentary about a Florida college), not the screening
+    // as a whole.
+    'texas tribune festival' => 'A collection of documentary features and featurettes focused on the politics of the US and Texas.',
+];
+
+function ctx_known_overview($title) {
+    $key = trim(mb_strtolower((string) $title));
+    return CTX_KNOWN_OVERVIEWS[$key] ?? null;
+}
+
 function filter_screenings($films, $now, $end) {
     $out = array_values(array_filter($films, function($f) use ($now, $end) {
         return isset($f['timestamp']) && $f['timestamp'] >= $now && $f['timestamp'] <= $end;
@@ -157,6 +174,8 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                 $film['cast']   = null;
                 $film['wiki']   = null;
             }
+
+            if ($known = ctx_known_overview($film['title'])) $film['overview'] = $known;
 
             $all_films[] = $film;
         }
