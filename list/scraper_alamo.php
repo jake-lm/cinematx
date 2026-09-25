@@ -49,6 +49,20 @@ const ALAMO_NOT_PROGRAMMING = ['hdr-by-barco', 'advance-screening'];
 // anyway.
 const ALAMO_OVERVIEW_MAX = 600;
 
+// A mystery screening — "Mystery Transmission" (Video Vortex, monthly),
+// "Mystery Voyage" (AGFADROME, monthly) — is not a film: the title is a
+// placeholder for a feature kept secret until the lights go down, so there
+// is nothing for TMDB to look up, and whatever it does return for the name
+// is somebody else's movie ("Mystery Voyage" came back as a 2006 film).
+// Alamo's own blurb for the installment is the whole description that exists.
+// Limited to Alamo's own collection series so a normal booking of a real film
+// with "Mystery" in its name ("Mystery Train") still goes through TMDB.
+function alamo_is_mystery(array $presentation, $title) {
+    return preg_match('/^mystery\b/i', $title) === 1
+        && in_array('alamo-exclusive', (array)($presentation['presentationAttributeSlugs'] ?? []), true)
+        && (($presentation['superTitle']['type'] ?? null) === 'COLLECTION');
+}
+
 // The feed's HTML descriptions ("<p>…</p><p>…</p>", the odd link or <em>)
 // flattened to one line of plain text, cut at a word boundary if it runs long.
 function alamo_plain_text($html) {
@@ -143,6 +157,7 @@ function fetch_alamo_films_scrape() {
             'poster'   => alamo_poster_url($poster),
             'runtime'  => !empty($event['runtimeMinutes']) ? (int)$event['runtimeMinutes'] : null,
             'overview' => $overview !== '' ? $overview : null,
+            'mystery'  => alamo_is_mystery($p, $title),
         ];
     }
     if (!$keep) return [];
@@ -174,7 +189,16 @@ function fetch_alamo_films_scrape() {
             'alamo_poster'   => $keep[$slug]['poster'],
             'alamo_runtime'  => $keep[$slug]['runtime'],
             'alamo_overview' => $keep[$slug]['overview'],
-        ];
+        ] + (!$keep[$slug]['mystery'] ? [] : [
+            // Alamo's copy stands in for TMDB's outright, and 'no_tmdb' keeps
+            // any lookup from overwriting it (see alamo_is_mystery()) — the
+            // same contract AFS's shorts programs use in scraper_afs.php.
+            'no_tmdb'  => true,
+            'poster'   => $keep[$slug]['poster'],
+            'director' => null,
+            'runtime'  => $keep[$slug]['runtime'],
+            'overview' => $keep[$slug]['overview'],
+        ]);
     }
 
     return $films;
