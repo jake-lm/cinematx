@@ -929,6 +929,7 @@ function ctx_day_section($day, $now) {
        href="<?php echo $e($s['url'] ?: '/list'); ?>"<?php echo ($s['source'] ?? '') === 'user' ? '' : ' target="_blank" rel="noopener"'; ?>>
       <span class="shot__art<?php echo $stack ? ' fold__stack' : ''; ?>">
         <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
+        <?php if (!empty($s['format'])): ?><span class="shot__format"><?php echo $e($s['format']); ?></span><?php endif; ?>
         <?php if (!empty($s['poster'])): ?>
           <?php for ($i = min(count($times), 3); $i >= 1; $i--): ?>
           <img<?php echo $stack ? ' class="fold__face fold__face--' . $i . '"' : ''; ?> src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />

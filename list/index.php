@@ -104,6 +104,7 @@ function ctx_screening($s, $view) {
       <a class="shot<?php echo $member ? ' shot--member' : ''; ?>" <?php echo $attrs; ?> href="<?php echo $e($href); ?>"<?php echo $ext; ?>>
         <span class="shot__art">
           <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
+          <?php if (!empty($s['format'])): ?><span class="shot__format"><?php echo $e($s['format']); ?></span><?php endif; ?>
           <?php if (!empty($s['poster'])): ?>
           <img src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
           <?php else: ?>

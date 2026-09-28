@@ -791,6 +791,24 @@ button, input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.shot__format {
+  position: absolute;
+  top: var(--s-2);
+  right: var(--s-2);
+  z-index: 6;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--red);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
 .shot__title {
   margin-top: var(--s-2);
   font-family: var(--f-title);

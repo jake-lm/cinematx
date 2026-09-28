@@ -612,6 +612,22 @@ button, input, select, textarea { font: inherit; color: inherit; }
   @include label(var(--t-2xs), #fff);
 }
 
+// A real print — 35mm/70mm/16mm, AFS only for now (see fetch_afs_detail())
+// — called out the same way a showing's own time is, just pinned to the
+// opposite corner so the two chips never compete for the same space.
+// DCP (nearly every other screening) deliberately carries no badge at all;
+// the only reason this exists is to flag the exception.
+.shot__format {
+  position: absolute;
+  top: var(--s-2); right: var(--s-2);
+  z-index: 6; // above .shot__festival's 5, so the rare film-festival-plus-print case still shows both
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--red);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  @include label(var(--t-2xs), #fff);
+}
+
 .shot__title {
   margin-top: var(--s-2);
   font-family: var(--f-title);

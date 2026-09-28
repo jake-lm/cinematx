@@ -34,10 +34,10 @@ function fetch_afs_films($force = false) {
 //  screening is published.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AFS_SCREENING_CACHE_V = 4;
+const AFS_SCREENING_CACHE_V = 5;
 
 function fetch_afs_detail($url) {
-    $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null, 'overview' => null];
+    $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null, 'overview' => null, 'format' => null];
     if (!$url) return $empty;
 
     $cache_file = __DIR__ . '/cache_afs_series.json';
@@ -74,13 +74,24 @@ function fetch_afs_detail($url) {
     }
 
     // The format line — "1h 52min, DCP" for a program, "USA, 2025, 1h 38min,
-    // DCP" for a single film — shares .t-smaller with the series link, so
-    // this is matched by content (needs "min") rather than a class of its
-    // own; the hour group is optional for anything under an hour.
+    // DCP" for a single film, "USA, 1973, 1h 42min, 35mm" for a real print —
+    // shares .t-smaller with the series link, so this is matched by content
+    // (needs "min") rather than a class of its own; the hour group is
+    // optional for anything under an hour.
     $runtime = null;
+    $format  = null;
     foreach ($xpath->query('//p[contains(@class,"t-smaller")]') as $p) {
-        if (preg_match('/(?:(\d+)\s*h)?\s*(\d+)\s*min/i', trim($p->textContent), $m)) {
+        $text = trim($p->textContent);
+        if (preg_match('/(?:(\d+)\s*h)?\s*(\d+)\s*min/i', $text, $m)) {
             $runtime = ((int)($m[1] ?? 0)) * 60 + (int)$m[2];
+            // The line's own trailing beat — DCP (the ordinary digital
+            // case, true of almost every screening) is deliberately not
+            // captured here at all: the only reason to know this field
+            // exists is to call out a real print, so a value only ever
+            // lands in $format when there's actually something to say.
+            if (preg_match('/,\s*((?:16|35|70)\s?mm)\s*$/i', $text, $fm)) {
+                $format = strtolower(str_replace(' ', '', $fm[1]));
+            }
             break;
         }
     }
@@ -97,6 +108,7 @@ function fetch_afs_detail($url) {
         'poster'   => $poster_node ? $poster_node->getAttribute('src') : null,
         'runtime'  => $runtime,
         'overview' => $overview_node ? trim($overview_node->textContent) : null,
+        'format'   => $format,
     ];
 
     $cache[$url] = $out;
@@ -236,6 +248,13 @@ function fetch_afs_films_scrape() {
                     'afs_director'  => $detail['director'],
                     'afs_runtime'   => $detail['runtime'],
                     'afs_overview'  => $detail['overview'],
+                    // Not a TMDB-fallback field like the afs_-prefixed ones
+                    // above — a real print is true regardless of whether
+                    // TMDB found anything, so this is never overwritten or
+                    // gated by a match the way those are (see
+                    // fetch_all_screenings()). Already null for anything
+                    // but an actual 35/70/16mm print.
+                    'format'        => $detail['format'],
                 ];
             }
         }
