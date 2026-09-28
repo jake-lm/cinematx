@@ -21,7 +21,10 @@
 // CALIGARI with live score by David DiDonato" found TMDB nothing until this
 // one was added — a real, easily findable film with no poster because the
 // billing (not a re-release or a presenter credit) was still attached.
-const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented\s+by|in\s+person|with\s+director|with\s+live\s+score|w\/)\s+.*$/i';
+// "+" joins the same way at We Luv Video — "Scary Movie (1991) + Live
+// Q&A" — a bare delimiter rather than a word, so it's its own alternative
+// rather than tucked into the others.
+const CTX_CONNECTIVES = '/\s+(?:ft\.|feat\.|featuring|presented\s+with|presented\s+by|in\s+person|with\s+director|with\s+live\s+score|w\/|\+)\s+.*$/i';
 
 // Re-release billing: "… 55th Anniversary", "… 20th Anniversary - Studio
 // Ghibli Fest 2026". Distributors put the occasion in the title and TMDB then
@@ -83,6 +86,16 @@ const CTX_MARATHON_SCREENING = '/\s+(?:\d{1,3}[\s-]?hours?|endless)\s+(?:screeni
 /** The series/programme a screening belongs to, if the title carries one. */
 function ctx_series($raw) {
     $raw = trim((string)$raw);
+    // "Black Is Not a Genre presents SIGN O' THE TIMES", "Blood Shed Theater
+    // Presents: Blood Feast (1963)" — a presenting series/collective's own
+    // naming convention, with or without the colon We Luv Video's own titles
+    // always use. Checked before the generic colon-split below, which would
+    // otherwise match the colon form first and leave "Presents" stuck to the
+    // end of the series name instead of stripping it.
+    if (preg_match('/^(.{3,40}?)\s+presents:?\s+(\S.*)$/iu', $raw, $m)) {
+        $series = trim($m[1]);
+        if ($series !== '') return $series;
+    }
     // "Discovery Zone: MIRACLE MILE" — but not "Manhunter: The Final Cut"
     // style suffixes, so require the left side to be short and the right non-empty.
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $raw, $m)) {
@@ -90,13 +103,6 @@ function ctx_series($raw) {
         $series = trim($m[1]);
         // A number-only or single-word-of-digits prefix is not a series.
         if ($series !== '' && !preg_match('/^\d+$/', $series)) return $series;
-    }
-    // "Black Is Not a Genre presents SIGN O' THE TIMES" — same shape as the
-    // colon form above, a presenting series/collective's own naming
-    // convention using "presents" as the delimiter instead of ":".
-    if (preg_match('/^(.{3,40}?)\s+presents\s+(\S.*)$/iu', $raw, $m)) {
-        $series = trim($m[1]);
-        if ($series !== '') return $series;
     }
     return null;
 }
@@ -124,7 +130,7 @@ function ctx_clean_title($raw) {
     $t = trim(preg_replace(CTX_LANGUAGE_TAG, '', $t));       // "Akira (Subtitled) in 4K" → "Akira in 4K"
     $t = trim(preg_replace(CTX_FORMAT_TAG, '', $t));         // "Akira in 4K" → "Akira"
     $t = preg_replace('/\s*\([^)]*\)\s*$/u', '', $t);        // "… (20th Anniversary)"
-    if (preg_match('/^(.{3,40}?)\s+presents\s+(\S.*)$/iu', $t, $m)) {
+    if (preg_match('/^(.{3,40}?)\s+presents:?\s+(\S.*)$/iu', $t, $m)) {
         $t = trim($m[2]);                                    // "Black Is Not a Genre presents SIGN O' THE TIMES" → right
     }
     if (preg_match('/^(.{3,34}?):\s*(\S.*)$/u', $t, $m)) {   // "Series: Title" / "Title: Cut"
@@ -292,6 +298,18 @@ function ctx_enrich(array $films) {
             foreach (['year', 'runtime', 'overview', 'genres', 'director', 'cast', 'wiki'] as $k) {
                 if (!empty($tmdb[$k])) $f[$k] = $tmdb[$k];
             }
+        }
+
+        // We Luv Video's own flyer and synopsis (see scraper_weluvvideo.php)
+        // — checked last, after this cleaned-title attempt above, rather
+        // than eagerly in fetch_screenings.php: applying it there before
+        // this second chance ever ran would already have set $f['poster']
+        // and made the "raw matched — leave it alone" check near the top of
+        // this loop skip past a real TMDB match this cleanup step would
+        // otherwise have found.
+        if (empty($f['poster']) && !empty($f['weluvvideo_poster'])) {
+            $f['poster']   = $f['weluvvideo_poster'];
+            $f['overview'] = $f['overview'] ?: $f['weluvvideo_overview'];
         }
     }
     return $films;

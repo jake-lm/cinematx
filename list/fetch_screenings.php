@@ -10,6 +10,7 @@ require_once __DIR__ . '/scraper_hyperreal.php';
 require_once __DIR__ . '/scraper_alamo.php';
 require_once __DIR__ . '/scraper_fathom.php';
 require_once __DIR__ . '/scraper_flickclique.php';
+require_once __DIR__ . '/scraper_weluvvideo.php';
 require_once __DIR__ . '/tmdb.php';
 
 // Hand-written descriptions, keyed by lowercased listing title, for screenings
@@ -56,6 +57,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
         // point deciding whether Fathom's screenings exist at all.
         // ['films' => filter_screenings(fetch_fathom_films($force), $now, $end), 'venue' => 'Fathom Events'],
         ['films' => filter_screenings(fetch_flickclique_films($force), $now, $end), 'venue' => 'Flick Clique'],
+        ['films' => filter_screenings(fetch_weluvvideo_films($force), $now, $end), 'venue' => 'We Luv Video'],
     ];
     $all_films = [];
     foreach ($sources as $src) {
@@ -163,6 +165,18 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                         $film['overview'] = $film['alamo_overview'];
                     }
                 }
+
+                // We Luv Video's own flyer/synopsis is deliberately NOT
+                // merged in here, unlike every other venue's fallback above.
+                // Applying it this early, before a title's ever had a chance
+                // at ctx_enrich()'s cleaned-title second try, would set
+                // $film['poster'] and make that step's own "already matched"
+                // check skip right past it — costing a real TMDB poster for
+                // something like "We Luv Video Clerks Presents: Magic
+                // (1978)", whose raw title fails here only because of the
+                // still-attached "Clerks Presents:" prefix. See ctx_enrich()
+                // in v7/screenings.php, where this fallback is applied last
+                // instead, once that second chance has had its shot.
             } else {
                 // A curated shorts anthology (see afs_is_short_program()) —
                 // TMDB has no correct entry to borrow from, so only what the
