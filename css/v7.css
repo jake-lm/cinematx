@@ -770,6 +770,14 @@ button, input, select, textarea {
   left: var(--s-2);
   bottom: var(--s-2);
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+}
+
+.shot__t {
+  display: block;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--red);
@@ -781,14 +789,6 @@ button, input, select, textarea {
   text-transform: uppercase;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-
-.shot__t {
-  display: block;
 }
 
 .shot__title {

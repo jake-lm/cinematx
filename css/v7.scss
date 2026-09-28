@@ -584,30 +584,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text-3);
 }
 
-// A chip in the corner rather than a gradient wash across the bottom third —
-// reads as a sticker sitting on the art instead of fog over it, and leaves
-// the poster itself uncovered. Usually one short label (a time, a fold's
-// "12 films", a "3 ×" count); a film playing more than once today (see
-// ctx_day_films() — everything is folded per day now, so today is the only
-// day a card's times can ever be) stacks its extra lines taller rather than
-// the pill widening into a banner — a large fixed radius keeps it a true
-// pill at either height instead of just a rounded rectangle once it grows.
+// Positions whichever chips sit in it — the chip styling itself lives on
+// .shot__t below, one per showing, so a film playing more than once today
+// (ctx_day_films() folds everything per day now, so today is the only day a
+// card's times can ever be) reads as a short stack of separate pills rather
+// than two lines sharing one taller pill.
 .shot__time {
   position: absolute;
   left: var(--s-2); bottom: var(--s-2);
   z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+}
+
+// A chip in the corner rather than a gradient wash across the bottom third —
+// reads as a sticker sitting on the art instead of fog over it, and leaves
+// the poster itself uncovered. Always the same shape whether it's the only
+// one (a time, a fold's "12 films", a "3 ×" count) or one of a short stack.
+.shot__t {
+  display: block;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--red);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   @include label(var(--t-2xs), #fff);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
 }
-
-.shot__t { display: block; }
 
 .shot__title {
   margin-top: var(--s-2);

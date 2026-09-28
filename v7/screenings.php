@@ -576,7 +576,7 @@ function ctx_fold_card($s, $view) {
           <?php foreach (array_reverse($s['posters']) as $i => $p): ?>
           <img class="fold__face fold__face--<?php echo count($s['posters']) - $i; ?>" src="<?php echo $e($p); ?>" alt="" />
           <?php endforeach; ?>
-          <span class="shot__time"><?php echo $e($label); ?></span>
+          <span class="shot__time"><span class="shot__t"><?php echo $e($label); ?></span></span>
         </span>
         <span class="shot__title"><?php echo $e(ctx_venue_short($s['venue'])); ?><span class="shot__series"><?php echo $e($sub); ?></span></span>
         <span class="shot__venue"><?php echo date('D j M', $s['timestamp']); ?> &middot; tap for times</span>
@@ -627,7 +627,7 @@ function ctx_fold_children($s, $view) {
                 // one — "1 ×" is just noise on a poster that's already,
                 // visibly, one card. ?>
           <?php if (count($f['showings']) > 1): ?>
-          <span class="shot__time"><?php echo count($f['showings']); ?> &times;</span>
+          <span class="shot__time"><span class="shot__t"><?php echo count($f['showings']); ?> &times;</span></span>
           <?php endif; ?>
         </span>
         <span class="shot__title"><?php echo $e($f['display_title']); ?></span>
