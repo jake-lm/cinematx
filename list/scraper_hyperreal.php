@@ -7,7 +7,14 @@ require_once __DIR__ . '/cache.php';
 // end in "-movie-screening", but a live-scored classic and a touring shorts
 // festival used a different slug and were silently dropped by that filter
 // even though their titles carry the same suffix as every other screening.
-const HYPERREAL_SUFFIX = '/\s+at\s+hyperreal\s+film\s+club\s*$/i';
+//
+// A trailing "(Copy)" (sometimes more than one) shows up when their own
+// calendar tool duplicates a past DZ Roadshow event as the starting point
+// for a new one and it goes out unrenamed — "PATRON SAINT OF ROADKILL ~ DZ
+// Roadshow at HYPERREAL FILM CLUB (Copy)" is a real screening, not a draft,
+// but the anchored suffix used to require the title to end exactly at
+// "Hyperreal Film Club" and silently dropped it and every other one like it.
+const HYPERREAL_SUFFIX = '/\s+at\s+hyperreal\s+film\s+club\s*(?:\(copy\)\s*)*$/i';
 
 // Hyperreal never supplies a poster of its own the way AFS sometimes does —
 // there's no per-screening image on their event pages at all — so a TMDB
