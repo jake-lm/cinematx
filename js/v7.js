@@ -660,7 +660,7 @@
         if (n) n.textContent = count;
         // Hidden rather than removed — the front page renders every venue
         // chip up front (see index.php) so narrowing to one works even
-        // before "See more" has loaded a day with anything at it; a chip
+        // before "Load another day" has loaded a day with anything at it; a chip
         // just stays out of the way until its own count says otherwise.
         // /list/ has every day loaded from the start, so a chip there never
         // actually reaches zero in the first place — this only ever fires
@@ -704,7 +704,7 @@
       b.addEventListener('click', function () { state.when = b.getAttribute('data-when'); apply(); });
     });
 
-    // "See more" — the front page's own List module only ever renders today
+    // "Load another day" — the front page's own List module only ever renders today
     // itself; every day after that is one click, fetched from list/day.php
     // and appended as its own .day section (see ctx_day_section()) rather
     // than pre-rendered and hidden. Always present, per its own brief: not
@@ -736,7 +736,7 @@
             if (data.hasMore) {
               moreBtn.setAttribute('data-next-day', data.nextDay);
               moreBtn.disabled = false;
-              moreBtn.textContent = 'See more';
+              moreBtn.textContent = 'Load another day';
             } else {
               var end = document.createElement('p');
               end.className = 'empty';
@@ -746,7 +746,7 @@
           })
           .catch(function () {
             moreBtn.disabled = false;
-            moreBtn.textContent = 'See more';
+            moreBtn.textContent = 'Load another day';
           });
       });
     }
@@ -773,7 +773,7 @@
     }
 
     // Delegated rather than bound per-element: a folded card loaded later by
-    // "See more" (see initList()) carries the same data-open trigger and its
+    // "Load another day" (see initList()) carries the same data-open trigger and its
     // own sheet, appended to the DOM well after this ran, and a direct
     // per-element binding would never see either one.
     document.addEventListener('click', function (e) {

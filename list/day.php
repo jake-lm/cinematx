@@ -1,6 +1,6 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-//  The front page's own "See more" — one additional day, on request.
+//  The front page's own "Load another day" — one additional day, on request.
 //
 //  index.php renders today (offset 0) itself, server-side, on first paint.
 //  Every day after that is fetched here instead of being pre-rendered and

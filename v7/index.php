@@ -30,7 +30,7 @@ if ($state === 'onboard' || $state === 'gated') {
 }
 
 // Today only — see ctx_day_films(). Every day past this one is fetched by
-// list/day.php as its own "See more" click rather than pre-rendered here;
+// list/day.php as its own "Load another day" click rather than pre-rendered here;
 // the index page stays light, and most visits never ask for tomorrow at all.
 $today = ctx_day_films($conn, $now, 0);
 
@@ -38,7 +38,7 @@ $today = ctx_day_films($conn, $now, 0);
 // folded cards — see ctx_day_films()'s note on 'raw' vs 'films' for why —
 // and both start out reflecting today alone, matching what's actually on
 // screen on first paint. initList()'s apply() (v7.js) then keeps every one
-// of them live as "See more" pulls in further days, the same way it
+// of them live as "Load another day" pulls in further days, the same way it
 // already keeps the header's own total honest.
 $n_screenings = count($today['raw']);
 $counts       = ctx_venue_counts($today['raw']);
@@ -146,10 +146,10 @@ require __DIR__ . '/_chrome.php';
             <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
 
             <?php // Loads one more day per click, always — see ctx_day_films()'s
-                  // CTX_LOOKAHEAD_DAYS cap and initList()'s "See more" handler
-                  // in v7.js, which swaps this for a plain closing line once
-                  // list/day.php reports nothing further out. ?>
-            <button class="btn btn--quiet btn--block list-more" id="list-more" type="button" data-next-day="1">See more</button>
+                  // CTX_LOOKAHEAD_DAYS cap and initList()'s "Load another day"
+                  // handler in v7.js, which swaps this for a plain closing line
+                  // once list/day.php reports nothing further out. ?>
+            <button class="btn btn--quiet btn--block list-more" id="list-more" type="button" data-next-day="1">Load another day</button>
           </div>
         </div>
       </section>

@@ -541,7 +541,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &:hover { border-color: var(--line-2); color: var(--text); }
   &.is-on { background: var(--red); border-color: var(--red); color: #fff; }
   // A venue chip with nothing currently loaded for it (see initList()'s
-  // apply() in v7.js) — reappears on its own once "See more" brings that
+  // apply() in v7.js) — reappears on its own once "Load another day" brings that
   // venue in, the same live recount that already keeps its own number honest.
   &.is-hidden { display: none; }
 }

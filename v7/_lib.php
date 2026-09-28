@@ -132,7 +132,7 @@ function ctx_state($conn) {
 // ── 01 · The List ──────────────────────────────────────────────────────────
 // ctx_day_films() and ctx_day_section() (v7/screenings.php) are what the
 // front page's own List module runs on now — one calendar day at a time,
-// starting with today and loaded further by list/day.php's "See more".
+// starting with today and loaded further by list/day.php's "Load another day".
 // This used to be ctx_tonight(): a fixed 48-hour window merging today and
 // tomorrow into one flat list, before that. Retired along with it.
 
