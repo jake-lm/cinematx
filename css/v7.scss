@@ -3859,3 +3859,102 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: var(--t-xs); font-weight: 500; color: var(--text-2);
   input { accent-color: var(--red); }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CALENDAR — /calendar/
+//
+//  The same screenings as The List, gridded by weekday instead of fed one
+//  day at a time. Always a whole number of weeks (calendar/index.php pads
+//  both edges to that), so the grid never ends on a ragged row.
+// ═══════════════════════════════════════════════════════════════════════════
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.cal-wd {
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface-2);
+  @include label(var(--t-3xs), var(--text-3));
+  text-align: center;
+}
+
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-height: 96px;
+  padding: var(--s-2) var(--s-2);
+  background: var(--surface);
+  transition: background var(--t-fast) var(--ease);
+}
+
+.cal-day--pad { background: var(--bg); .cal-day__n { color: var(--text-4); } }
+
+.cal-day--today {
+  background: var(--red-wash);
+  box-shadow: inset 0 0 0 1px var(--red-hi);
+}
+
+.cal-day__n {
+  @include label(var(--t-2xs), var(--text-3));
+  .cal-day--today & { color: var(--red-hi); }
+}
+
+// Only meaningful once the header row disappears on mobile — see below.
+.cal-day__wd { display: none; }
+
+.cal-day__films { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.cal-event {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--t-2xs);
+  color: var(--text-2);
+  transition: color var(--t-fast) var(--ease);
+  &:hover { color: var(--red-hi); }
+}
+
+.cal-event__title { font-weight: 600; }
+.cal-event__dot   { margin: 0 3px; color: var(--text-4); }
+.cal-event__time  { color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+.cal-event--more {
+  color: var(--text-4);
+  font-size: var(--t-2xs);
+  cursor: default;
+  &:hover { color: var(--text-4); }
+}
+
+@media (max-width: 760px) {
+  .cal-wd { display: none; }
+  // Empty cells only exist to keep the grid's weekday columns aligned —
+  // once the grid collapses to one column there is nothing left for them
+  // to align with, so they'd just be blank rows in a scrolling list. Only
+  // days something is actually playing stay, the same way /list/ never
+  // renders a day with nothing on it either.
+  .cal-day--pad, .cal-day--empty { display: none; }
+  .cal-grid { grid-template-columns: 1fr; background: none; border: none; gap: var(--s-3); }
+  .cal-day {
+    min-height: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .cal-day--today { border-color: var(--red-hi); }
+  .cal-day__n { display: none; }
+  .cal-day__wd {
+    display: block;
+    @include label(var(--t-3xs), var(--text-3));
+    margin-bottom: var(--s-1);
+    .cal-day--today & { color: var(--red-hi); }
+  }
+  .cal-event { white-space: normal; font-size: var(--t-xs); }
+}

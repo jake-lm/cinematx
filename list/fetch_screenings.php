@@ -1,8 +1,9 @@
 <?php
-// How far ahead The List looks. Read by the page itself, the cache warmer
-// and Hyperreal's month-spill check — three places that each used to carry
-// their own hardcoded 8 and would quietly disagree the moment one changed.
-const CTX_LOOKAHEAD_DAYS = 10;
+// How far ahead The List (and the Calendar view) looks. Read by the pages
+// themselves, the cache warmer and Hyperreal's month-spill check — places
+// that each used to carry their own hardcoded 8 and would quietly disagree
+// the moment one changed.
+const CTX_LOOKAHEAD_DAYS = 28;
 
 require_once __DIR__ . '/scraper_paramount.php';
 require_once __DIR__ . '/scraper_afs.php';

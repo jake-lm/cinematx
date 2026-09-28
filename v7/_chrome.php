@@ -7,9 +7,9 @@
 //  you actually came to read.
 //
 //  Set before including:
-//    $ctx_active     string  one of: index list about dashboard directory profile
-//                            (or, when $ctx_admin_nav is set: dashboard films
-//                            showtimes instagram)
+//    $ctx_active     string  one of: index list calendar about dashboard
+//                            directory profile (or, when $ctx_admin_nav is
+//                            set: dashboard films showtimes instagram)
 //    $ctx_admin_nav  bool    swaps the rail's link list for _admin/_nav.php —
 //                            the wrapper, toggle and theme behaviour are the
 //                            same rail everywhere, only the links differ
@@ -42,6 +42,8 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-film"></i></span><span class="txt">Tonight</span></a>
     <a class="rail__link<?php echo $on('list'); ?>" href="/list">
       <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">The List</span></a>
+    <a class="rail__link<?php echo $on('calendar'); ?>" href="/calendar">
+      <span class="ico"><i class="fa-solid fa-table-cells"></i></span><span class="txt">Calendar</span></a>
     <?php // Theatre — parked, not removed. Flip to `if (true)` to bring it
           // back; the /th1//th2 pages themselves are untouched and ready,
           // this was always the one place putting them in the nav. ?>
