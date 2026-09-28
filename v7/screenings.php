@@ -709,15 +709,14 @@ function ctx_fold_repeats(array $entries, $per_day = false) {
         }
 
         // $per_day cards render as a single poster with one time shown — The
-        // List has no per-line time display the way the front page's own
-        // multi-day cards do via ctx_time_lines() — so the displayed time
-        // needs to be the one that's actually shown: the latest survivor
-        // above, matching what was asked for ("probably the latest in the
-        // day"). Left as the earliest showing for the front page's own
-        // un-per_day cards, deliberately unchanged — a film there still
-        // sorts by when it *starts* in that flat tonight/tomorrow list, and
-        // every showing gets its own line regardless of which one
-        // $timestamp happens to be.
+        // List has no per-line time display, unlike a card whose showings
+        // get their own line each via ctx_time_lines() — so the displayed
+        // time needs to be the one that's actually shown: the latest
+        // survivor above, matching what was asked for ("probably the
+        // latest in the day"). Left as the earliest showing when not
+        // per-day: every showing there gets its own line regardless of
+        // which one $timestamp happens to be, so it only has to sort
+        // correctly, not represent anything on its own.
         if ($per_day) $f['timestamp'] = end($f['showings'])['t'];
     }
     unset($f);
@@ -727,18 +726,20 @@ function ctx_fold_repeats(array $entries, $per_day = false) {
 }
 
 /**
- * The lines on a poster overlay: "4:30pm, Tue" per showing.
- * The weekday is always named on a stack — the whole point is that the
- * showings are on different days — and omitted for a lone showing today.
+ * The lines on a poster overlay: one "4:30pm" per showing.
+ *
+ * Used to also append the weekday ("4:30pm, Tue") whenever a card had more
+ * than one showing, or one that fell on a different day than $now — from
+ * when the front page merged today and tomorrow into a single flat list, so
+ * a stack's own showings could span two different days with nothing else on
+ * screen saying which was which. Both callers are day-scoped now (see
+ * ctx_day_films(), always folded per_day — every remaining ctx_fold_repeats()
+ * call is), so every showing a card ever has is already on the one day its
+ * own section header names; the weekday was left saying so a second time,
+ * always, on every showing of a film playing twice in one day.
  */
-function ctx_time_lines(array $showings, $now) {
-    $multi = count($showings) > 1;
-    $lines = [];
-    foreach ($showings as $s) {
-        $other = date('j M', $s['t']) !== date('j M', $now);
-        $lines[] = date('g:ia', $s['t']) . (($multi || $other) ? ', ' . date('D', $s['t']) : '');
-    }
-    return $lines;
+function ctx_time_lines(array $showings) {
+    return array_map(fn($s) => date('g:ia', $s['t']), $showings);
 }
 
 /**
@@ -755,7 +756,7 @@ function ctx_deep_card($s, $now) {
     $e      = 'ctx_e';
     $member = ($s['source'] ?? '') === 'user';
     $href   = !empty($s['url']) ? $s['url'] : '/list';
-    $times  = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']], $now);
+    $times  = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']]);
 
     $bits = [];
     if (!empty($s['year']))     $bits[] = (string)$s['year'];
@@ -921,7 +922,7 @@ function ctx_day_section($day, $now) {
     <?php foreach ($day['films'] as $s):
       if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); ctx_fold_children($s, 'grid'); continue; }
     ?>
-    <?php $times = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']], $now); $stack = count($times) > 1; ?>
+    <?php $times = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']]); $stack = count($times) > 1; ?>
     <a class="shot<?php echo ($s['source'] ?? '') === 'user' ? ' shot--member' : ''; ?><?php echo $stack ? ' shot--fold' : ''; ?>"
        data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo ($s['source'] ?? '') === 'user' ? 'user' : 'venue'; ?>"
        data-count="<?php echo count($times); ?>"<?php echo ctx_screening_hover($s); ?>
@@ -964,7 +965,7 @@ function ctx_day_section($day, $now) {
         <span class="line__sub">
           <?php if (($s['source'] ?? '') === 'user'): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
           <?php echo $e(implode(' · ', ctx_bits($s))); ?>
-          <?php if (!empty($s['showings']) && count($s['showings']) > 1): ?>&middot; <?php echo $e(implode(' · ', ctx_time_lines($s['showings'], $now))); ?><?php endif; ?>
+          <?php if (!empty($s['showings']) && count($s['showings']) > 1): ?>&middot; <?php echo $e(implode(' · ', ctx_time_lines($s['showings']))); ?><?php endif; ?>
         </span>
       </span>
       <span class="line__venue"><?php echo $day['is_today'] ? 'Today' : date('D', $s['timestamp']); ?></span>
