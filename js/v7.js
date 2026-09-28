@@ -655,8 +655,17 @@
         allCount.textContent = total;
       }
       $$('[data-narrow^="venue:"]').forEach(function (c) {
+        var count = venueTotals[c.getAttribute('data-narrow').slice(6)] || 0;
         var n = c.querySelector('.chip__n');
-        if (n) n.textContent = venueTotals[c.getAttribute('data-narrow').slice(6)] || 0;
+        if (n) n.textContent = count;
+        // Hidden rather than removed — the front page renders every venue
+        // chip up front (see index.php) so narrowing to one works even
+        // before "See more" has loaded a day with anything at it; a chip
+        // just stays out of the way until its own count says otherwise.
+        // /list/ has every day loaded from the start, so a chip there never
+        // actually reaches zero in the first place — this only ever fires
+        // on the front page in practice.
+        c.classList.toggle('is-hidden', count === 0);
       });
       $$('[data-when]').forEach(function (c) {
         c.classList.toggle('is-on', c.getAttribute('data-when') === state.when);

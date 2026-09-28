@@ -711,6 +711,9 @@ button, input, select, textarea {
   border-color: var(--red);
   color: #fff;
 }
+.chip.is-hidden {
+  display: none;
+}
 
 .chip__n {
   opacity: 0.6;
