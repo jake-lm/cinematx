@@ -763,11 +763,13 @@ button, input, select, textarea {
 
 .shot__time {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: var(--s-3) var(--s-2) var(--s-2);
-  background: linear-gradient(to top, rgba(10, 9, 7, 0.88), rgba(10, 9, 7, 0));
+  left: var(--s-2);
+  bottom: var(--s-2);
+  z-index: 2;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--red);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   font-family: var(--f-ui);
   font-size: var(--t-2xs);
   font-weight: 600;
@@ -775,10 +777,18 @@ button, input, select, textarea {
   text-transform: uppercase;
   color: #fff;
   font-variant-numeric: tabular-nums;
-  text-align: center;
+}
+
+.shot__time--stack {
+  left: var(--s-2);
+  right: var(--s-2);
+  bottom: var(--s-2);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1px;
+  padding: var(--s-2) var(--s-1);
 }
 
 .shot__t {
@@ -979,6 +989,10 @@ button, input, select, textarea {
   text-transform: uppercase;
   color: var(--text-4);
   font-variant-numeric: tabular-nums;
+}
+
+.list-more {
+  margin-top: var(--s-2);
 }
 
 .reading {
@@ -5620,6 +5634,19 @@ button, input, select, textarea {
   background: transparent;
   color: var(--red);
   border: 1px solid var(--red);
+}
+.post-status.status-selected {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+.post-status.status-drafted {
+  background: var(--surface-3);
+  color: var(--text-3);
+}
+.post-status.status-reviewed {
+  background: var(--red);
+  color: #fff;
 }
 
 .adm-prep-note {

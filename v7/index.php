@@ -29,37 +29,30 @@ if ($state === 'onboard' || $state === 'gated') {
     exit;
 }
 
-$tonight = ctx_tonight($conn, $now);
-$films   = $tonight['screenings'];
+// Today only — see ctx_day_films(). Every day past this one is fetched by
+// list/day.php as its own "See more" click rather than pre-rendered here;
+// the index page stays light, and most visits never ask for tomorrow at all.
+$today = ctx_day_films($conn, $now, 0);
 
-// Chips and the header count screenings, so all of this is computed before
-// folding — otherwise Alamo's chip reports the number of cards it collapsed
-// into (2) rather than what it is showing (23), and the chips stop summing to
-// the total beside them.
-$n_screenings = count($films);
-$venues       = ctx_venues($films);
-$counts       = ctx_venue_counts($films);
+// The header count and each chip's own number screen screenings, not
+// folded cards — see ctx_day_films()'s note on 'raw' vs 'films' for why —
+// and both start out reflecting today alone, matching what's actually on
+// screen on first paint. initList()'s apply() (v7.js) then keeps every one
+// of them live as "See more" pulls in further days, the same way it
+// already keeps the header's own total honest.
+$n_screenings = count($today['raw']);
+$counts       = ctx_venue_counts($today['raw']);
+$ctx_stack    = ctx_stack_pref();
 
-// A compact front-page module has even less room for a chain's schedule than
-// The List does, so the threshold is lower — but still opt-in via the same
-// stack-options popover and cookie The List uses (ctx_stack_pref()).
-$ctx_stack = ctx_stack_pref();
-if ($ctx_stack) {
-    $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
-    $films = ctx_fold_venue($films, 'Fathom Events', 2);
-}
+// The chip *list* itself can't wait for "See more," though — a venue with
+// nothing on today's page still needs its button there from the start, or
+// narrowing to it stays impossible even once a later day brings it in.
+// Venue is set by the scrapers themselves, before ctx_enrich() ever runs,
+// so asking this far ahead costs a handful of cache reads, not a single
+// TMDB lookup — nothing here touches ctx_enrich().
+$venues = ctx_venues(fetch_all_screenings($conn, $now, strtotime('+' . CTX_LOOKAHEAD_DAYS . ' days', $now)));
 
-// A festival's own threshold (3+ distinct films in a day) is fixed rather
-// than tuned per page — see ctx_fold_festival().
-$films = ctx_fold_festival($films);
-
-// Then a single film with more than one showing across the two days — an
-// alamo stack of its own, so two Spirited Aways read as one film on two
-// evenings rather than as a duplicate.
-$films = ctx_fold_repeats($films);
-$ctx_extra_sheets = '';
-foreach ($films as $s) if (!empty($s['is_group'])) $ctx_extra_sheets .= ctx_group_sheet($s);
-$label   = $tonight['label'];
+$ctx_extra_sheets = ctx_day_sheets($today);
 
 $theatre = ctx_theatre($conn, $now);
 $film    = $theatre['film'];
@@ -109,7 +102,7 @@ require __DIR__ . '/_chrome.php';
       <section class="card">
         <div class="card__head">
           <span class="card__n">01</span>
-          <span class="card__title"><?php echo $e($label); ?> in Austin</span>
+          <span class="card__title">Tonight in Austin</span>
           <a class="card__more" href="/list"><span id="list-count"><?php echo $n_screenings; ?></span>
                 <span id="list-noun"><?php echo $n_screenings === 1 ? 'screening' : 'screenings'; ?></span> &rarr;</a>
         </div>
@@ -143,82 +136,19 @@ require __DIR__ . '/_chrome.php';
         </div>
 
         <div class="card__body">
-          <?php if (!$films): ?>
-            <p class="empty">Nothing listed</p>
-          <?php else: ?>
-
-          <div class="grid-view" id="grid-view">
-            <?php foreach ($films as $s):
-              if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); ctx_fold_children($s, 'grid'); continue; }
-              $member = ($s['source'] ?? '') === 'user';
-              $href   = !empty($s['url']) ? $s['url'] : '/list';
-              $other  = date('j M', $s['timestamp']) !== date('j M', $now);
-            ?>
-            <?php $times = ctx_time_lines($s['showings'], $now); $stack = count($times) > 1; ?>
-            <a class="shot<?php echo $member ? ' shot--member' : ''; ?><?php echo $stack ? ' shot--fold' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
-               data-count="<?php echo count($times); ?>"<?php echo ctx_screening_hover($s); ?>
-               href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
-              <span class="shot__art<?php echo $stack ? ' fold__stack' : ''; ?>">
-                <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
-                <?php if (!empty($s['poster'])): ?>
-                  <?php // One face per showing, capped at three — the stack says
-                        // "more than one evening" without needing to be counted. ?>
-                  <?php for ($i = min(count($times), 3); $i >= 1; $i--): ?>
-                  <img<?php echo $stack ? ' class="fold__face fold__face--' . $i . '"' : ''; ?> src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
-                  <?php if (!$stack) break; ?>
-                  <?php endfor; ?>
-                <?php else: ?>
-                <span class="shot__blank"><?php echo $e($s['display_title']); ?></span>
-                <?php endif; ?>
-                <span class="shot__time"><?php foreach ($times as $l): ?><span class="shot__t"><?php echo $e($l); ?></span><?php endforeach; ?></span>
-              </span>
-              <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
-              <span class="shot__venue">
-                <?php // Abbreviated venue, so year and runtime fit beside it. ?>
-                <?php if ($member): ?><span class="shot__by">&#9679; By a member</span>
-                <?php else: ?><?php echo $e(implode(' · ', array_merge([ctx_venue_short($s['venue'])], ctx_bits($s, false)))); ?><?php endif; ?>
-              </span>
-            </a>
-            <?php endforeach; ?>
-            <p class="empty" id="grid-empty" style="display:none; grid-column:1/-1;">Nothing at that venue</p>
+          <div class="day-stream" id="day-stream">
+            <?php echo ctx_day_section($today, $now); ?>
           </div>
 
-          <div class="rows-view" id="rows-view">
-            <?php foreach ($films as $s):
-              if (!empty($s['is_group'])) { ctx_fold_card($s, 'rows'); ctx_fold_children($s, 'rows'); continue; }
-              $member = ($s['source'] ?? '') === 'user';
-              $href   = !empty($s['url']) ? $s['url'] : '/list';
-              $other  = date('j M', $s['timestamp']) !== date('j M', $now);
-            ?>
-            <a class="line<?php echo $member ? ' line--member' : ''; ?>"
-               data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo $member ? 'user' : 'venue'; ?>"
-               data-count="<?php echo count($s['showings'] ?? [1]); ?>"<?php echo ctx_screening_hover($s); ?>
-               href="<?php echo $e($href); ?>"<?php echo $member ? '' : ' target="_blank" rel="noopener"'; ?>>
-              <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
-              <span>
-                <span class="line__title"><?php echo $e($s['display_title']); ?>
-                  <?php if (!empty($s['festival'])): ?><span class="line__festival"><?php echo $e($s['festival']); ?></span>
-                  <?php elseif (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?>
-                </span>
-                <span class="line__sub">
-                  <?php if ($member): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
-                  <?php echo $e(implode(' · ', ctx_bits($s))); ?>
-                  &middot; <?php echo $e(implode(' · ', ctx_time_lines($s['showings'], $now))); ?>
-                </span>
-              </span>
-              <span class="line__venue"><?php echo $other ? date('D', $s['timestamp']) : 'Today'; ?></span>
-            </a>
-            <?php endforeach; ?>
-            <p class="empty" id="rows-empty" style="display:none;">Nothing at that venue</p>
-          </div>
+          <p class="empty" id="grid-empty" style="display:none;">Nothing at that venue</p>
+          <p class="empty" id="rows-empty" style="display:none;">Nothing at that venue</p>
+          <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
 
-          <div class="depth-view" id="depth-view">
-            <?php foreach ($films as $s) ctx_deep_card($s, $now); ?>
-            <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
-          </div>
-
-          <?php endif; ?>
+          <?php // Loads one more day per click, always — see ctx_day_films()'s
+                // CTX_LOOKAHEAD_DAYS cap and initList()'s "See more" handler
+                // in v7.js, which swaps this for a plain closing line once
+                // list/day.php reports nothing further out. ?>
+          <button class="btn btn--quiet btn--block list-more" id="list-more" type="button" data-next-day="1">See more</button>
         </div>
       </section>
 

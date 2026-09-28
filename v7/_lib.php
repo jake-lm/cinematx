@@ -130,37 +130,11 @@ function ctx_state($conn) {
 // own. roles.php is already required above, so they're in scope regardless.
 
 // ── 01 · The List ──────────────────────────────────────────────────────────
-
-/**
- * Tonight's screenings, widened into tomorrow when the evening is nearly
- * over so the page never shows a near-empty list late at night.
- * Returns ['screenings' => [...], 'label' => 'Tonight'|'Tonight & tomorrow'].
- */
-/**
- * Tonight and tomorrow.
- *
- * This used to fetch today only and widen to tomorrow when today had fewer
- * than five screenings. The intent was sound — do not pad a one-screen module
- * with tomorrow when tonight is already full — but it tied the front page's
- * time horizon to the number of sources we had integrated, which are unrelated
- * things. Adding Alamo took today from 5 to 18, the widening stopped firing,
- * and tomorrow silently disappeared along with half the heading. Every further
- * venue would have made it less likely to ever come back.
- *
- * The window is fixed now and the label describes what came back rather than
- * what was asked for: "Tonight" only when tomorrow genuinely has nothing.
- * Folding is what makes the fixed window affordable — 33 screenings render as
- * about ten tiles.
- */
-function ctx_tonight($conn, $now) {
-    $end_of_today = strtotime('tomorrow', $now) - 1;
-    $films = ctx_enrich(fetch_all_screenings($conn, $now, $now + 172800));
-
-    $tomorrow = 0;
-    foreach ($films as $f) if ($f['timestamp'] > $end_of_today) $tomorrow++;
-
-    return ['screenings' => $films, 'label' => $tomorrow ? 'Tonight & tomorrow' : 'Tonight'];
-}
+// ctx_day_films() and ctx_day_section() (v7/screenings.php) are what the
+// front page's own List module runs on now — one calendar day at a time,
+// starting with today and loaded further by list/day.php's "See more".
+// This used to be ctx_tonight(): a fixed 48-hour window merging today and
+// tomorrow into one flat list, before that. Retired along with it.
 
 /** Screening counts keyed by venue slug, for the filter chips. */
 function ctx_venue_counts(array $films) {

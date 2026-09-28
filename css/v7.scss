@@ -577,20 +577,36 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text-3);
 }
 
-// Time sits on the artwork so the caption below stays a single clean line.
+// A chip in the corner rather than a gradient wash across the bottom third —
+// reads as a sticker sitting on the art instead of fog over it, and leaves
+// the poster itself uncovered. Always a single short label in practice (a
+// time, a fold's "12 films", a "3 ×" count) — never more than one line.
 .shot__time {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  padding: var(--s-3) var(--s-2) var(--s-2);
-  background: linear-gradient(to top, rgba(10,9,7,0.88), rgba(10,9,7,0));
+  left: var(--s-2); bottom: var(--s-2);
+  z-index: 2;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--red);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   @include label(var(--t-2xs), #fff);
-  text-align: center;
+}
 
-  // One line per showing. The gradient already darkens upward, so extra lines
-  // land on ground dark enough to read without a box of their own.
+// The one case with more than one time to show: a film playing tonight and
+// tomorrow (v7/index.php's own fold, distinct from ctx_fold_card()'s venue
+// summary — the poster stack behind it already says "more than once," this
+// just needs to stay legible). A small corner sticker can't hold three or
+// four lines, so this widens into an inset banner instead — still off the
+// card's edges, unlike the old edge-to-edge gradient.
+.shot__time--stack {
+  left: var(--s-2); right: var(--s-2);
+  bottom: var(--s-2);
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 1px;
+  padding: var(--s-2) var(--s-1);
 }
 
 .shot__t { display: block; }
@@ -715,6 +731,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .line--member { background: var(--red-wash); box-shadow: inset 2px 0 0 0 var(--red); }
 
 .empty { padding: var(--s-7) var(--s-4); text-align: center; @include label(var(--t-3xs), var(--text-4)); }
+
+// The front page's own "load one more day" — always present under its List
+// module (see ctx_day_section()), not just once today runs dry.
+.list-more { margin-top: var(--s-2); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  READING SURFACES  (/posts/, /about/)
@@ -3617,6 +3637,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
   &.status-live  { background: var(--red); color: #fff; }
   &.status-draft { background: var(--surface-3); color: var(--text-3); }
   &.status-prep  { background: transparent; color: var(--red); border: 1px solid var(--red); }
+  // A news item's own draft workflow (_admin/news.php) — picked, but the
+  // quote-picking routine hasn't read it yet; quotes/images ready and
+  // waiting on a review pick; and fully reviewed, respectively.
+  &.status-selected { background: transparent; color: var(--red); border: 1px solid var(--red); }
+  &.status-drafted  { background: var(--surface-3); color: var(--text-3); }
+  &.status-reviewed { background: var(--red); color: #fff; }
 }
 
 .adm-prep-note {

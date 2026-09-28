@@ -581,8 +581,28 @@
       return true;
     }
 
+    // Per-venue totals for the chips themselves — separate from `shown`,
+    // which is what the *active* filter leaves visible. A chip's own count
+    // means "how many at this venue, full stop," so it tracks `inDay`
+    // (Today/Tomorrow/Week) but ignores state.narrow — Alamo's number
+    // shouldn't change depending on which chip happens to be selected
+    // right now. Only matters on the front page: /list/ has every day in
+    // the DOM from the start, so its chip counts were already exactly
+    // right and this just recomputes the same numbers.
+    function tally(totals, el, inScope) {
+      if (!inScope || !el.classList.contains('shot')) return;
+      // A folded venue card's own count is already covered by the films it
+      // stands for (data-unfold), rendered alongside it — counting both
+      // would double the chip, the same reason matches() hides one or the
+      // other rather than showing both.
+      if (el.getAttribute('data-fold')) return;
+      var v = el.getAttribute('data-venue');
+      totals[v] = (totals[v] || 0) + weight(el);
+    }
+
     function apply() {
       var shown = 0;
+      var venueTotals = {};
       var days  = $$('.day');
 
       if (days.length) {
@@ -592,16 +612,23 @@
                    || (state.when === 'today' && key === todayKey)
                    || (state.when === 'tmrw'  && key === tmrwKey);
           var visible = 0;
-          // .deep only exists on the front page, which has no .day wrappers,
-          // so this branch never actually sees one — listed for symmetry with
-          // the flat branch below.
-          $$('.shot, .line, .deep', day).forEach(function (el) {
+          // .deep now also reaches this branch — the front page's own List
+          // module gained .day wrappers of its own (one per loaded day, see
+          // ctx_day_section()) rather than staying the flat list this
+          // comment used to describe.
+          var candidates = $$('.shot, .line, .deep', day);
+          candidates.forEach(function (el) {
             var ok = inDay && matches(el);
             el.classList.toggle('is-hidden', !ok);
             if (ok && el.classList.contains('shot')) visible += weight(el);
+            tally(venueTotals, el, inDay);
           });
-          // A day whose screenings are all filtered out loses its heading too.
-          day.classList.toggle('is-hidden', visible === 0);
+          // A day whose screenings are all filtered out loses its heading
+          // too — but a day with none to begin with (today, genuinely
+          // empty) isn't "filtered out," it's ctx_day_section()'s own "No
+          // more screenings today" line, which has no .shot to count and
+          // must not be swept away by the same rule.
+          day.classList.toggle('is-hidden', candidates.length > 0 && visible === 0);
           shown += visible;
         });
       } else {
@@ -613,11 +640,23 @@
           var ok = matches(el);
           el.classList.toggle('is-hidden', !ok);
           if (ok && el.classList.contains('shot')) shown += weight(el);
+          tally(venueTotals, el, true);
         });
       }
 
       $$('[data-narrow]').forEach(function (c) {
         c.classList.toggle('is-on', c.getAttribute('data-narrow') === state.narrow);
+      });
+
+      var allCount = $('[data-narrow="all"] .chip__n');
+      if (allCount) {
+        var total = 0;
+        Object.keys(venueTotals).forEach(function (v) { total += venueTotals[v]; });
+        allCount.textContent = total;
+      }
+      $$('[data-narrow^="venue:"]').forEach(function (c) {
+        var n = c.querySelector('.chip__n');
+        if (n) n.textContent = venueTotals[c.getAttribute('data-narrow').slice(6)] || 0;
       });
       $$('[data-when]').forEach(function (c) {
         c.classList.toggle('is-on', c.getAttribute('data-when') === state.when);
@@ -655,6 +694,53 @@
     $$('[data-when]').forEach(function (b) {
       b.addEventListener('click', function () { state.when = b.getAttribute('data-when'); apply(); });
     });
+
+    // "See more" — the front page's own List module only ever renders today
+    // itself; every day after that is one click, fetched from list/day.php
+    // and appended as its own .day section (see ctx_day_section()) rather
+    // than pre-rendered and hidden. Always present, per its own brief: not
+    // conditioned on today being empty, just on there being a further day
+    // list/day.php still has something for.
+    var moreBtn = $('#list-more');
+    var stream  = $('#day-stream');
+    if (moreBtn && stream) {
+      moreBtn.addEventListener('click', function () {
+        var day = parseInt(moreBtn.getAttribute('data-next-day'), 10);
+        moreBtn.disabled = true;
+        moreBtn.textContent = 'Loading…';
+
+        fetch('/list/day.php?day=' + day, { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) throw new Error(data.error);
+
+            stream.insertAdjacentHTML('beforeend', data.html);
+            // Sheets are position:fixed and, like the account panel's own,
+            // belong just inside <body> — not nested in the scrolling card
+            // body a transform somewhere up that chain could one day turn
+            // into their containing block instead of the viewport.
+            if (data.sheets) document.body.insertAdjacentHTML('beforeend', data.sheets);
+
+            applyView();
+            apply();
+
+            if (data.hasMore) {
+              moreBtn.setAttribute('data-next-day', data.nextDay);
+              moreBtn.disabled = false;
+              moreBtn.textContent = 'See more';
+            } else {
+              var end = document.createElement('p');
+              end.className = 'empty';
+              end.textContent = 'That’s everything on The List right now.';
+              moreBtn.replaceWith(end);
+            }
+          })
+          .catch(function () {
+            moreBtn.disabled = false;
+            moreBtn.textContent = 'See more';
+          });
+      });
+    }
   }
 
   // ══ Overlays ═════════════════════════════════════════════════════════════
@@ -677,10 +763,15 @@
       open = el;
     }
 
-    $$('[data-open]').forEach(function (b) {
-      b.addEventListener('click', function (e) { e.preventDefault(); show(b.getAttribute('data-open')); });
+    // Delegated rather than bound per-element: a folded card loaded later by
+    // "See more" (see initList()) carries the same data-open trigger and its
+    // own sheet, appended to the DOM well after this ran, and a direct
+    // per-element binding would never see either one.
+    document.addEventListener('click', function (e) {
+      var opener = e.target.closest('[data-open]');
+      if (opener) { e.preventDefault(); show(opener.getAttribute('data-open')); return; }
+      if (e.target.closest('[data-close]')) close();
     });
-    $$('[data-close]').forEach(function (b) { b.addEventListener('click', close); });
     if (scrim) scrim.addEventListener('click', close);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) close(); });
     if (location.hash === '#join') show('account');

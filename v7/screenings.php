@@ -844,6 +844,163 @@ function ctx_deep_fold(array $s) {
     <?php return ob_get_clean();
 }
 
+/**
+ * One calendar day's screenings, enriched and folded exactly like a single
+ * day of /list/ — $offset 0 is today, 1 is tomorrow, and so on. Built for
+ * the front page's own List module, which used to fetch a fixed 48-hour
+ * window and merge today and tomorrow into one flat list; it now shows one
+ * day at a time, loaded on request (see list/day.php), so each call here
+ * needs to stand on its own the way /list/'s per-day sections already do.
+ *
+ * Folding is $per_day-true (ctx_fold_repeats' own term for it) — a film
+ * showing three times today is one card with its latest time, not three,
+ * the same rule /list/ already applies per day. Capped at CTX_LOOKAHEAD_DAYS:
+ * past that, nothing has been scraped for this day yet, and the caller
+ * (list/day.php) uses the returned 'has_more' to know when to stop offering
+ * to load another one.
+ */
+function ctx_day_films($conn, $now, $offset) {
+    $tz    = new DateTimeZone('America/Chicago');
+    $start = strtotime($offset . ' day', strtotime('today', $now));
+    $end   = strtotime('+1 day', $start) - 1;
+
+    $raw = ctx_enrich(fetch_all_screenings($conn, $start, $end));
+
+    $films = $raw;
+    if (ctx_stack_pref()) {
+        $films = ctx_fold_venue($films, 'Alamo Drafthouse', 2);
+        $films = ctx_fold_venue($films, 'Fathom Events', 2);
+    }
+    $films = ctx_fold_festival($films);
+    $films = ctx_fold_repeats($films, true);
+
+    return [
+        'offset'    => $offset,
+        'key'       => date('Ymd', $start),
+        'label'     => $offset === 0 ? 'Today' : ($offset === 1 ? 'Tomorrow' : (new DateTime('@' . $start))->setTimezone($tz)->format('l, j F')),
+        // Raw is what the venue chips and the header count are built from —
+        // a folded card stands for several screenings, and counting cards
+        // instead of screenings is how a chip and the total beside it stop
+        // agreeing (see index.php).
+        'raw'       => $raw,
+        'films'     => $films,
+        'is_today'  => $offset === 0,
+        'has_more'  => $offset < CTX_LOOKAHEAD_DAYS - 1,
+    ];
+}
+
+/**
+ * One day's worth of the front page's List module — the label, all three
+ * view renderings (grid/rows/depth), and, for a folded venue-day card, the
+ * sheet it opens. Shared by index.php's own initial "today" render and
+ * list/day.php's "see more" fragment so the two can never drift: a film
+ * that folds one way on first paint folds exactly the same way once loaded
+ * later by the button.
+ *
+ * A day with nothing on it still renders its label — "No more screenings
+ * today" reads as the deliberate end of the list, not a blank spot that
+ * looks like something failed to load; a later, empty day gets a quieter
+ * version of the same idea, since "no more" would be wrong once there's a
+ * button underneath offering to check the day after it.
+ */
+function ctx_day_section($day, $now) {
+    $e = 'ctx_e';
+    ob_start(); ?>
+<section class="day" data-day="<?php echo $e($day['key']); ?>">
+  <div class="day__label">
+    <span class="day__name"><?php echo $e($day['label']); ?></span>
+    <span class="day__rule"></span>
+    <span class="day__count"><?php echo count($day['films']); ?></span>
+  </div>
+
+  <?php if (!$day['films']): ?>
+  <p class="empty"><?php echo $day['is_today'] ? 'No more screenings today.' : 'Nothing listed yet.'; ?></p>
+  <?php else: ?>
+
+  <div class="grid-view">
+    <?php foreach ($day['films'] as $s):
+      if (!empty($s['is_group'])) { ctx_fold_card($s, 'grid'); ctx_fold_children($s, 'grid'); continue; }
+    ?>
+    <?php $times = ctx_time_lines($s['showings'] ?? [['t' => $s['timestamp'], 'loc' => $s['location'] ?? '']], $now); $stack = count($times) > 1; ?>
+    <a class="shot<?php echo ($s['source'] ?? '') === 'user' ? ' shot--member' : ''; ?><?php echo $stack ? ' shot--fold' : ''; ?>"
+       data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo ($s['source'] ?? '') === 'user' ? 'user' : 'venue'; ?>"
+       data-count="<?php echo count($times); ?>"<?php echo ctx_screening_hover($s); ?>
+       href="<?php echo $e($s['url'] ?: '/list'); ?>"<?php echo ($s['source'] ?? '') === 'user' ? '' : ' target="_blank" rel="noopener"'; ?>>
+      <span class="shot__art<?php echo $stack ? ' fold__stack' : ''; ?>">
+        <?php if (!empty($s['festival'])): ?><span class="shot__festival"><?php echo $e($s['festival']); ?></span><?php endif; ?>
+        <?php if (!empty($s['poster'])): ?>
+          <?php for ($i = min(count($times), 3); $i >= 1; $i--): ?>
+          <img<?php echo $stack ? ' class="fold__face fold__face--' . $i . '"' : ''; ?> src="<?php echo $e($s['poster']); ?>" alt="<?php echo $e($s['display_title']); ?>" loading="lazy" />
+          <?php if (!$stack) break; ?>
+          <?php endfor; ?>
+        <?php else: ?>
+        <span class="shot__blank"><?php echo $e($s['display_title']); ?></span>
+        <?php endif; ?>
+        <span class="shot__time<?php echo $stack ? ' shot__time--stack' : ''; ?>"><?php foreach ($times as $l): ?><span class="shot__t"><?php echo $e($l); ?></span><?php endforeach; ?></span>
+      </span>
+      <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
+      <span class="shot__venue">
+        <?php if (($s['source'] ?? '') === 'user'): ?><span class="shot__by">&#9679; By a member</span>
+        <?php else: ?><?php echo $e(implode(' · ', array_merge([ctx_venue_short($s['venue'])], ctx_bits($s, false)))); ?><?php endif; ?>
+      </span>
+    </a>
+    <?php endforeach; ?>
+  </div>
+
+  <div class="rows-view">
+    <?php foreach ($day['films'] as $s):
+      if (!empty($s['is_group'])) { ctx_fold_card($s, 'rows'); ctx_fold_children($s, 'rows'); continue; }
+    ?>
+    <a class="line<?php echo ($s['source'] ?? '') === 'user' ? ' line--member' : ''; ?>"
+       data-venue="<?php echo $e(ctx_slug($s['venue'])); ?>" data-source="<?php echo ($s['source'] ?? '') === 'user' ? 'user' : 'venue'; ?>"
+       data-count="<?php echo count($s['showings'] ?? [1]); ?>"<?php echo ctx_screening_hover($s); ?>
+       href="<?php echo $e($s['url'] ?: '/list'); ?>"<?php echo ($s['source'] ?? '') === 'user' ? '' : ' target="_blank" rel="noopener"'; ?>>
+      <span class="line__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
+      <span>
+        <span class="line__title"><?php echo $e($s['display_title']); ?>
+          <?php if (!empty($s['festival'])): ?><span class="line__festival"><?php echo $e($s['festival']); ?></span>
+          <?php elseif (!empty($s['series'])): ?><span class="line__series"><?php echo $e($s['series']); ?></span><?php endif; ?>
+        </span>
+        <span class="line__sub">
+          <?php if (($s['source'] ?? '') === 'user'): ?><span class="shot__by">&#9679; By a member</span> &middot; <?php endif; ?>
+          <?php echo $e(implode(' · ', ctx_bits($s))); ?>
+          <?php if (!empty($s['showings']) && count($s['showings']) > 1): ?>&middot; <?php echo $e(implode(' · ', ctx_time_lines($s['showings'], $now))); ?><?php endif; ?>
+        </span>
+      </span>
+      <span class="line__venue"><?php echo $day['is_today'] ? 'Today' : date('D', $s['timestamp']); ?></span>
+    </a>
+    <?php endforeach; ?>
+  </div>
+
+  <div class="depth-view">
+    <?php foreach ($day['films'] as $s) {
+      if (!empty($s['is_group'])) { ctx_deep_fold($s); continue; }
+      ctx_deep_card($s, $now);
+    } ?>
+  </div>
+
+  <?php endif; ?>
+</section>
+<?php return ob_get_clean();
+}
+
+/**
+ * The sheets a day's folded venue cards open, kept apart from
+ * ctx_day_section() itself rather than embedded in it — .sheet is
+ * position:fixed and every existing use of it (the account panel,
+ * ctx_group_sheet() on /list/) is hoisted to just inside <body>, outside
+ * anything that could ever gain its own transform/filter and quietly
+ * become the containing block instead of the viewport. A day loaded later
+ * by list/day.php keeps that guarantee by being inserted at the same place
+ * (see initListMore() in v7.js), rather than wherever in .card__body its
+ * triggering button happens to sit.
+ */
+function ctx_day_sheets($day) {
+    $html = '';
+    foreach ($day['films'] as $s) if (!empty($s['is_group'])) $html .= ctx_group_sheet($s);
+    return $html;
+}
+
 /** Distinct venues present, for the filter chips. */
 function ctx_venues(array $films) {
     $v = [];
