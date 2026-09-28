@@ -3866,6 +3866,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 //  The same screenings as The List, gridded by weekday instead of fed one
 //  day at a time. Always a whole number of weeks (calendar/index.php pads
 //  both edges to that), so the grid never ends on a ragged row.
+//
+//  Every screening on a day renders, uncapped — this view exists for people
+//  who want to see the whole shape of a busy day at a glance, so a packed
+//  Friday running the page tall and needing a scroll is the right trade,
+//  not something to hide behind a "+N more".
 // ═══════════════════════════════════════════════════════════════════════════
 
 .cal-grid {
@@ -3889,8 +3894,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
-  min-height: 96px;
-  padding: var(--s-2) var(--s-2);
+  min-height: 130px;
+  padding: var(--s-3) var(--s-2);
   background: var(--surface);
   transition: background var(--t-fast) var(--ease);
 }
@@ -3910,14 +3915,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // Only meaningful once the header row disappears on mobile — see below.
 .cal-day__wd { display: none; }
 
-.cal-day__films { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cal-day__films { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
 .cal-event {
   display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: var(--t-2xs);
+  font-size: var(--t-xs);
   color: var(--text-2);
   transition: color var(--t-fast) var(--ease);
   &:hover { color: var(--red-hi); }
@@ -3926,13 +3931,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .cal-event__title { font-weight: 600; }
 .cal-event__dot   { margin: 0 3px; color: var(--text-4); }
 .cal-event__time  { color: var(--text-3); font-variant-numeric: tabular-nums; }
-
-.cal-event--more {
-  color: var(--text-4);
-  font-size: var(--t-2xs);
-  cursor: default;
-  &:hover { color: var(--text-4); }
-}
 
 @media (max-width: 760px) {
   .cal-wd { display: none; }

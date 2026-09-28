@@ -6022,8 +6022,8 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
-  min-height: 96px;
-  padding: var(--s-2) var(--s-2);
+  min-height: 130px;
+  padding: var(--s-3) var(--s-2);
   background: var(--surface);
   transition: background var(--t-fast) var(--ease);
 }
@@ -6060,7 +6060,7 @@ button, input, select, textarea {
 .cal-day__films {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -6069,7 +6069,7 @@ button, input, select, textarea {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: var(--t-2xs);
+  font-size: var(--t-xs);
   color: var(--text-2);
   transition: color var(--t-fast) var(--ease);
 }
@@ -6089,15 +6089,6 @@ button, input, select, textarea {
 .cal-event__time {
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
-}
-
-.cal-event--more {
-  color: var(--text-4);
-  font-size: var(--t-2xs);
-  cursor: default;
-}
-.cal-event--more:hover {
-  color: var(--text-4);
 }
 
 @media (max-width: 760px) {

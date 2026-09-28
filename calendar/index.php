@@ -83,23 +83,17 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             $in_range  = $key >= $today_key && $key <= $cutoff_key;
             $is_today  = $key === $today_key;
             $day_films = $in_range ? ($by_day[$key] ?? []) : [];
-            // A crowded day (a Friday with five Alamo screens booked, say)
-            // gets capped rather than blowing out the row height every
-            // other week has to match — "+N more" instead of growing.
-            $shown = array_slice($day_films, 0, 4);
-            $extra = count($day_films) - count($shown);
         ?>
-        <div class="cal-day<?php echo $in_range ? '' : ' cal-day--pad'; ?><?php echo $is_today ? ' cal-day--today' : ''; ?><?php echo $shown ? '' : ' cal-day--empty'; ?>">
+        <div class="cal-day<?php echo $in_range ? '' : ' cal-day--pad'; ?><?php echo $is_today ? ' cal-day--today' : ''; ?><?php echo $day_films ? '' : ' cal-day--empty'; ?>">
           <span class="cal-day__n"><?php echo (int)$cursor->format('j'); ?></span>
-          <?php if ($shown): ?>
+          <?php if ($day_films): ?>
           <span class="cal-day__wd"><?php echo $cursor->format('D j'); ?></span>
           <div class="cal-day__films">
-            <?php foreach ($shown as $s): $href = !empty($s['url']) ? $s['url'] : '#'; ?>
+            <?php foreach ($day_films as $s): $href = !empty($s['url']) ? $s['url'] : '#'; ?>
             <a class="cal-event" href="<?php echo $e($href); ?>" target="_blank" rel="noopener">
               <span class="cal-event__title"><?php echo $e($s['display_title']); ?></span><span class="cal-event__dot">&middot;</span><span class="cal-event__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
             </a>
             <?php endforeach; ?>
-            <?php if ($extra > 0): ?><span class="cal-event cal-event--more">+<?php echo $extra; ?> more</span><?php endif; ?>
           </div>
           <?php endif; ?>
         </div>
