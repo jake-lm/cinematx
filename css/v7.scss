@@ -488,6 +488,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .card__body { flex: 1; min-height: 0; @include scroller; }
 
+// The front page's own List module sits inside a card, unlike /list/'s
+// .day sections, which carry their own edges because they sit directly on
+// the page ground (see the comment on .day .grid-view) — .card__body itself
+// stays bare so a full-bleed lead image (the Journal card) can still reach
+// the card's own edge, so this is scoped to the one card that needs it.
+.list-panel { padding: var(--s-4); }
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  01 · THE LIST — rank 1
 // ═══════════════════════════════════════════════════════════════════════════

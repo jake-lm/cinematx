@@ -635,6 +635,10 @@ button, input, select, textarea {
   background: transparent;
 }
 
+.list-panel {
+  padding: var(--s-4);
+}
+
 .controls {
   flex: none;
   display: flex;

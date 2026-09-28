@@ -136,19 +136,21 @@ require __DIR__ . '/_chrome.php';
         </div>
 
         <div class="card__body">
-          <div class="day-stream" id="day-stream">
-            <?php echo ctx_day_section($today, $now); ?>
+          <div class="list-panel">
+            <div class="day-stream" id="day-stream">
+              <?php echo ctx_day_section($today, $now); ?>
+            </div>
+
+            <p class="empty" id="grid-empty" style="display:none;">Nothing at that venue</p>
+            <p class="empty" id="rows-empty" style="display:none;">Nothing at that venue</p>
+            <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
+
+            <?php // Loads one more day per click, always — see ctx_day_films()'s
+                  // CTX_LOOKAHEAD_DAYS cap and initList()'s "See more" handler
+                  // in v7.js, which swaps this for a plain closing line once
+                  // list/day.php reports nothing further out. ?>
+            <button class="btn btn--quiet btn--block list-more" id="list-more" type="button" data-next-day="1">See more</button>
           </div>
-
-          <p class="empty" id="grid-empty" style="display:none;">Nothing at that venue</p>
-          <p class="empty" id="rows-empty" style="display:none;">Nothing at that venue</p>
-          <p class="empty" id="depth-empty" style="display:none;">Nothing at that venue</p>
-
-          <?php // Loads one more day per click, always — see ctx_day_films()'s
-                // CTX_LOOKAHEAD_DAYS cap and initList()'s "See more" handler
-                // in v7.js, which swaps this for a plain closing line once
-                // list/day.php reports nothing further out. ?>
-          <button class="btn btn--quiet btn--block list-more" id="list-more" type="button" data-next-day="1">See more</button>
         </div>
       </section>
 
