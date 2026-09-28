@@ -3890,11 +3890,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   text-align: center;
 }
 
+// Fixed rather than min — a busy day scrolls within its own cell (see
+// .cal-day__films) instead of stretching the whole row to match it, so nine
+// quiet days never end up as tall as the one packed Friday beside them.
 .cal-day {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
-  min-height: 130px;
+  height: 168px;
   padding: var(--s-3) var(--s-2);
   background: var(--surface);
   transition: background var(--t-fast) var(--ease);
@@ -3915,10 +3918,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // Only meaningful once the header row disappears on mobile — see below.
 .cal-day__wd { display: none; }
 
-.cal-day__films { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cal-day__films {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  flex: 1;
+  min-height: 0;
+  @include scroller;
+}
 
 .cal-event {
   display: block;
+  // A flex child (.cal-day__films is `flex; column`) with overflow:hidden
+  // gets an auto min-height of 0 by default, so without this a packed day
+  // shrinks every line to fit instead of overflowing into the scrollbar
+  // that's the whole point of that container.
+  flex-shrink: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -3941,8 +3954,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   // renders a day with nothing on it either.
   .cal-day--pad, .cal-day--empty { display: none; }
   .cal-grid { grid-template-columns: 1fr; background: none; border: none; gap: var(--s-3); }
+  // Each day is already its own independent card here, not a shared grid
+  // row, so a busy one running long doesn't drag its neighbors down with
+  // it — free to just grow, same as the page around it.
   .cal-day {
-    min-height: 0;
+    height: auto;
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
@@ -3954,5 +3970,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
     margin-bottom: var(--s-1);
     .cal-day--today & { color: var(--red-hi); }
   }
+  .cal-day__films { overflow: visible; }
   .cal-event { white-space: normal; font-size: var(--t-xs); }
 }

@@ -6022,7 +6022,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   gap: var(--s-1);
-  min-height: 130px;
+  height: 168px;
   padding: var(--s-3) var(--s-2);
   background: var(--surface);
   transition: background var(--t-fast) var(--ease);
@@ -6062,10 +6062,26 @@ button, input, select, textarea {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+.cal-day__films::-webkit-scrollbar {
+  width: 5px;
+}
+.cal-day__films::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 4px;
+}
+.cal-day__films::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .cal-event {
   display: block;
+  flex-shrink: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -6105,7 +6121,7 @@ button, input, select, textarea {
     gap: var(--s-3);
   }
   .cal-day {
-    min-height: 0;
+    height: auto;
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
@@ -6128,6 +6144,9 @@ button, input, select, textarea {
   }
   .cal-day--today .cal-day__wd {
     color: var(--red-hi);
+  }
+  .cal-day__films {
+    overflow: visible;
   }
   .cal-event {
     white-space: normal;
