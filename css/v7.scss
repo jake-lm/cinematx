@@ -586,34 +586,25 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 // A chip in the corner rather than a gradient wash across the bottom third —
 // reads as a sticker sitting on the art instead of fog over it, and leaves
-// the poster itself uncovered. Always a single short label in practice (a
-// time, a fold's "12 films", a "3 ×" count) — never more than one line.
+// the poster itself uncovered. Usually one short label (a time, a fold's
+// "12 films", a "3 ×" count); a film playing more than once today (see
+// ctx_day_films() — everything is folded per day now, so today is the only
+// day a card's times can ever be) stacks its extra lines taller rather than
+// the pill widening into a banner — a large fixed radius keeps it a true
+// pill at either height instead of just a rounded rectangle once it grows.
 .shot__time {
   position: absolute;
   left: var(--s-2); bottom: var(--s-2);
   z-index: 2;
   padding: 3px 9px;
-  border-radius: 20px;
+  border-radius: 999px;
   background: var(--red);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   @include label(var(--t-2xs), #fff);
-}
-
-// The one case with more than one time to show: a film playing tonight and
-// tomorrow (v7/index.php's own fold, distinct from ctx_fold_card()'s venue
-// summary — the poster stack behind it already says "more than once," this
-// just needs to stay legible). A small corner sticker can't hold three or
-// four lines, so this widens into an inset banner instead — still off the
-// card's edges, unlike the old edge-to-edge gradient.
-.shot__time--stack {
-  left: var(--s-2); right: var(--s-2);
-  bottom: var(--s-2);
-  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding: var(--s-2) var(--s-1);
 }
 
 .shot__t { display: block; }

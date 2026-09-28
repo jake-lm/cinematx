@@ -937,7 +937,7 @@ function ctx_day_section($day, $now) {
         <?php else: ?>
         <span class="shot__blank"><?php echo $e($s['display_title']); ?></span>
         <?php endif; ?>
-        <span class="shot__time<?php echo $stack ? ' shot__time--stack' : ''; ?>"><?php foreach ($times as $l): ?><span class="shot__t"><?php echo $e($l); ?></span><?php endforeach; ?></span>
+        <span class="shot__time"><?php foreach ($times as $l): ?><span class="shot__t"><?php echo $e($l); ?></span><?php endforeach; ?></span>
       </span>
       <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
       <span class="shot__venue">
