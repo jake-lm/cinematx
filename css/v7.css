@@ -4534,7 +4534,7 @@ button, input, select, textarea {
 .hovercard__side {
   flex: none;
   width: 62px;
-  align-self: flex-start;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4554,6 +4554,7 @@ button, input, select, textarea {
 }
 
 .hovercard__scores {
+  margin-top: auto;
   display: grid;
   grid-template-columns: max-content max-content;
   justify-content: center;
