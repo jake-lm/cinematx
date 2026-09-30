@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 7;
+const TMDB_CACHE_V = 8;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -36,6 +36,10 @@ const TMDB_EMPTY = [
     'director' => null,
     'cast'     => null,
     'wiki'     => null,
+    // Kept alongside the article link so list/rt.php can find the film's
+    // Rotten Tomatoes page without a second, independent title search.
+    // Movies only — a TV fallback match stays null, so it never gets a score.
+    'wikidata' => null,
 ];
 
 // Exhibition format is how a venue is showing a film, never part of its title,
@@ -277,7 +281,8 @@ function fetch_tmdb($title, $year = null, $director_hint = null) {
                 $out['cast'] = implode(', ', array_slice($names, 0, 3)) ?: null;
             }
 
-            $out['wiki'] = wikidata_article($detail['external_ids']['wikidata_id'] ?? null);
+            $out['wikidata'] = $detail['external_ids']['wikidata_id'] ?? null;
+            $out['wiki']     = wikidata_article($out['wikidata']);
         }
     }
 

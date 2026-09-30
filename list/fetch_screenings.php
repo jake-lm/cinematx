@@ -13,6 +13,7 @@ require_once __DIR__ . '/scraper_fathom.php';
 require_once __DIR__ . '/scraper_flickclique.php';
 require_once __DIR__ . '/scraper_weluvvideo.php';
 require_once __DIR__ . '/tmdb.php';
+require_once __DIR__ . '/rt.php';
 
 // Hand-written descriptions, keyed by lowercased listing title, for screenings
 // where no source's own text fits: a scraped page describes one film out of a
@@ -97,6 +98,11 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                 $film['director'] = $tmdb['director'];
                 $film['cast']     = $tmdb['cast'];
                 $film['wiki']     = $tmdb['wiki'];
+                // Only trusted when TMDB also had a poster for the match —
+                // a poster-less hit is the shape a stray title match takes
+                // (see the Alamo block below), and a wrong film's score is
+                // worse than none.
+                $film['wikidata'] = !empty($tmdb['poster']) ? $tmdb['wikidata'] : null;
 
                 // TMDB found genuinely nothing — not a wrong match to
                 // correct (that's TMDB_KNOWN_DIRECTOR_HINTS's job), a real

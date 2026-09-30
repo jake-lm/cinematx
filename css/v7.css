@@ -4531,18 +4531,44 @@ button, input, select, textarea {
     transform: none;
   }
 }
-.hovercard__art {
+.hovercard__side {
   flex: none;
   width: 62px;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.hovercard__art {
+  width: 100%;
   border-radius: 4px;
   overflow: hidden;
   background: var(--surface-3);
-  align-self: flex-start;
 }
 .hovercard__art img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.hovercard__rt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--f-ui);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.hovercard__rt svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .hovercard__in {

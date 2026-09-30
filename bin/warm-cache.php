@@ -22,6 +22,9 @@ if (PHP_SAPI !== 'cli') {
 }
 
 $root = dirname(__DIR__);
+// The only place Rotten Tomatoes is ever fetched live — see list/rt.php.
+// Defined before the includes so nothing that reads it can see it unset.
+define('CTX_RT_LIVE', true);
 require $root . '/config.php';
 require $root . '/database.php';
 require $root . '/list/fetch_screenings.php';
@@ -44,7 +47,7 @@ $now     = time();
 $films = ctx_enrich(fetch_all_screenings($conn, $now, $now + CTX_LOOKAHEAD_DAYS * 86400, true));
 
 $total = count($films);
-$have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0];
+$have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0, 'rt' => 0];
 foreach ($films as $f) {
     foreach ($have as $k => $_) if (!empty($f[$k])) $have[$k]++;
 }
@@ -55,6 +58,7 @@ foreach ($films as $f) $venues[$f['venue'] ?? '?'] = ($venues[$f['venue'] ?? '?'
 printf("%s warm: %d screenings in %.1fs\n", date('c'), $total, microtime(true) - $started);
 foreach ($venues as $v => $n) printf("           %-24s %d\n", $v, $n);
 foreach ($have as $k => $n)   printf("           %-24s %d/%d\n", $k, $n, $total);
+echo "           (rt = Rotten Tomatoes critics score; gaps are normal, mostly indie/local screenings)\n";
 
 // A venue that scrapes to nothing is usually a changed page structure, and it
 // fails quietly — The List simply stops mentioning them. Worth a loud line in

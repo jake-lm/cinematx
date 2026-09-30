@@ -1464,6 +1464,10 @@
   // hover cannot be reached without a pointer, and on touch the same gesture
   // is a tap, which should follow the link.
 
+  var TOMATO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#E5412E" d="M8 3.4c-3.6-.2-6.6 2.2-6.6 5.6 0 3.2 2.9 5.6 6.6 5.6s6.6-2.4 6.6-5.6c0-3.4-3-5.8-6.6-5.6z"/>'
+                 + '<path fill="#4F8A2B" d="M8 1.2 6.9 3 4.8 2.3l1.3 1.8L3.9 5l2.6-.1L8 6.2l1.5-1.3 2.6.1-2.2-.9 1.3-1.8L9.1 3z"/></svg>';
+  var SPLAT_SVG  = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#7C9A3C" d="M8 1.5c1.2 0 1.5 1.6 2.4 2.1 1 .5 2.6-.3 3.2.7.6 1-.7 2-.7 3.1 0 1.2 1.5 2 1 3.1-.5 1.1-2.2.6-3 1.4-.8.8-.4 2.5-1.6 2.7-1.1.2-1.6-1.3-2.6-1.7-1-.4-2.6.4-3.1-.6-.5-1 .8-2 .8-3.1 0-1.1-1.4-1.9-.9-3 .5-1 2.2-.5 3-1.3C6.3 4.1 6.8 1.5 8 1.5z"/></svg>';
+
   var HOVER_IN  = 420;   // dwell before showing — a glance passing over is not a request
   var HOVER_OUT = 160;   // grace on the way out, so the gap to the card is crossable
 
@@ -1484,7 +1488,17 @@
 
     function paint(d) {
       var h = '';
-      if (d.img) h += '<span class="hovercard__art"><img src="' + esc(d.img) + '" alt="" /></span>';
+      // Poster on top, Rotten Tomatoes critics score under it — the left
+      // column is otherwise empty below the artwork. Fresh is the usual 60%
+      // line; anything under it gets RT's own splat instead of a tomato.
+      var side = '';
+      if (d.img) side += '<span class="hovercard__art"><img src="' + esc(d.img) + '" alt="" /></span>';
+      var rt = parseInt(d.rt, 10);
+      if (rt >= 0 && rt <= 100) {
+        side += '<span class="hovercard__rt" title="Rotten Tomatoes critics score">'
+              + (rt >= 60 ? TOMATO_SVG : SPLAT_SVG) + '<span>' + rt + '%</span></span>';
+      }
+      if (side) h += '<span class="hovercard__side">' + side + '</span>';
       h += '<span class="hovercard__in">';
       if (d.title) h += '<span class="hovercard__title">' + esc(d.title) + '</span>';
       if (d.meta)  h += '<span class="hovercard__meta">'  + esc(d.meta)  + '</span>';
