@@ -42,8 +42,13 @@ $on         = fn($k) => $ctx_active === $k ? ' is-on' : '';
       <span class="ico"><i class="fa-solid fa-film"></i></span><span class="txt">Tonight</span></a>
     <a class="rail__link<?php echo $on('list'); ?>" href="/list">
       <span class="ico"><i class="fa-solid fa-calendar-days"></i></span><span class="txt">The List</span></a>
+    <?php // Calendar — parked, not removed. Flip to `if (true)` to bring it
+          // back; /calendar/ itself is untouched and still reachable by URL,
+          // this is the one place putting it in the nav. ?>
+    <?php if (false): ?>
     <a class="rail__link<?php echo $on('calendar'); ?>" href="/calendar">
       <span class="ico"><i class="fa-solid fa-table-cells"></i></span><span class="txt">Calendar</span></a>
+    <?php endif; ?>
     <?php // Theatre — parked, not removed. Flip to `if (true)` to bring it
           // back; the /th1//th2 pages themselves are untouched and ready,
           // this was always the one place putting them in the nav. ?>
