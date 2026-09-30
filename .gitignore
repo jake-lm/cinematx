@@ -28,6 +28,9 @@ data/
 # means every deploy collides with the cron. warm-cache.php rebuilds them.
 list/cache_*.json
 
+# IMDb's bulk ratings file (~9 MB) — downloaded by bin/refresh-imdb.php
+list/imdb_ratings.tsv.gz*
+
 # Generated daily Instagram cards — regenerated on each cron run
 uploads/social/*.png
 

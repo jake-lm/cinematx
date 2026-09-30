@@ -26,6 +26,7 @@ RedirectMatch 404 (?i)/\.git(/|$)
 
 # Scrape caches. Harmless but no reason to serve them.
 RedirectMatch 404 (?i)^/list/cache_.*\.json$
+RedirectMatch 404 (?i)^/list/imdb_ratings\.tsv\.gz
 
 # CLI only. warm-cache.php refuses a web SAPI on its own; this means it is
 # never reached at all.

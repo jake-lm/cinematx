@@ -14,6 +14,7 @@ require_once __DIR__ . '/scraper_flickclique.php';
 require_once __DIR__ . '/scraper_weluvvideo.php';
 require_once __DIR__ . '/tmdb.php';
 require_once __DIR__ . '/rt.php';
+require_once __DIR__ . '/imdb.php';
 
 // Hand-written descriptions, keyed by lowercased listing title, for screenings
 // where no source's own text fits: a scraped page describes one film out of a
@@ -103,6 +104,7 @@ function fetch_all_screenings($conn, $now, $end, $force = false) {
                 // (see the Alamo block below), and a wrong film's score is
                 // worse than none.
                 $film['wikidata'] = !empty($tmdb['poster']) ? $tmdb['wikidata'] : null;
+                $film['imdb']     = !empty($tmdb['poster']) ? $tmdb['imdb']     : null;
 
                 // TMDB found genuinely nothing — not a wrong match to
                 // correct (that's TMDB_KNOWN_DIRECTOR_HINTS's job), a real

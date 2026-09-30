@@ -295,7 +295,7 @@ function ctx_enrich(array $films) {
             }
             // The cleaned lookup is the one that matched, so its metadata is
             // the metadata for this film.
-            foreach (['year', 'runtime', 'overview', 'genres', 'director', 'cast', 'wiki', 'wikidata'] as $k) {
+            foreach (['year', 'runtime', 'overview', 'genres', 'director', 'cast', 'wiki', 'wikidata', 'imdb'] as $k) {
                 if (!empty($tmdb[$k])) $f[$k] = $tmdb[$k];
             }
         }
@@ -318,7 +318,8 @@ function ctx_enrich(array $films) {
     // first, and the loop's early `continue`s would skip a score attached
     // inside it. See list/rt.php — null for most indie screenings, by design.
     foreach ($films as &$f) {
-        $f['rt'] = !empty($f['wikidata']) ? fetch_rt($f['wikidata']) : null;
+        $f['rt']         = !empty($f['wikidata']) ? fetch_rt($f['wikidata']) : null;
+        $f['imdb_score'] = !empty($f['imdb'])     ? fetch_imdb($f['imdb'])   : null;
     }
     unset($f);
     return $films;
@@ -1069,6 +1070,7 @@ function ctx_venue_short($v) {
  *   body the paragraph          foot   the bottom rule line
  *   link {href, label} — sits opposite foot on that same rule
  *   rt   a 0–100 critics score, under the artwork; omitted when there isn't one
+ *   imdb a 0–10 rating, beside it on the same rule
  */
 function ctx_hover(array $slots) {
     $slots = array_filter($slots, fn($v) => $v !== null && $v !== '' && $v !== []);
@@ -1094,6 +1096,7 @@ function ctx_screening_hover($s) {
         'sub'   => implode(' · ', $sub),
         'body'  => $s['overview'] ?? null,
         'rt'    => $s['rt'] ?? null,
+        'imdb'  => $s['imdb_score'] ?? null,
         'foot'  => trim(($s['venue'] ?? '')
                       . (empty($s['location']) ? '' : ', ' . $s['location'])
                       . (empty($s['timestamp']) ? '' : ' · ' . date('D j M, g:ia', $s['timestamp'])), ' ·'),

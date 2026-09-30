@@ -23,7 +23,7 @@
 //  the next read refetches rather than serving a row that predates it.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const TMDB_CACHE_V = 8;
+const TMDB_CACHE_V = 9;
 
 const TMDB_EMPTY = [
     'v'        => TMDB_CACHE_V,
@@ -40,6 +40,9 @@ const TMDB_EMPTY = [
     // Rotten Tomatoes page without a second, independent title search.
     // Movies only — a TV fallback match stays null, so it never gets a score.
     'wikidata' => null,
+    // The film's IMDb id ("tt0103064"), for list/imdb.php. Movies only,
+    // same as wikidata above.
+    'imdb'     => null,
 ];
 
 // Exhibition format is how a venue is showing a film, never part of its title,
@@ -282,6 +285,7 @@ function fetch_tmdb($title, $year = null, $director_hint = null) {
             }
 
             $out['wikidata'] = $detail['external_ids']['wikidata_id'] ?? null;
+            $out['imdb']     = $detail['external_ids']['imdb_id'] ?? null;
             $out['wiki']     = wikidata_article($out['wikidata']);
         }
     }

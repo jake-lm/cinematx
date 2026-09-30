@@ -1493,11 +1493,17 @@
       // line; anything under it gets RT's own splat instead of a tomato.
       var side = '';
       if (d.img) side += '<span class="hovercard__art"><img src="' + esc(d.img) + '" alt="" /></span>';
+      var scores = '';
       var rt = parseInt(d.rt, 10);
       if (rt >= 0 && rt <= 100) {
-        side += '<span class="hovercard__rt" title="Rotten Tomatoes critics score">'
-              + (rt >= 60 ? TOMATO_SVG : SPLAT_SVG) + '<span>' + rt + '%</span></span>';
+        scores += '<span class="hovercard__rt" title="Rotten Tomatoes critics score">'
+                + (rt >= 60 ? TOMATO_SVG : SPLAT_SVG) + '<span>' + rt + '%</span></span>';
       }
+      var imdb = parseFloat(d.imdb);
+      if (imdb >= 0 && imdb <= 10) {
+        scores += '<span class="hovercard__imdb" title="IMDb rating"><b>IMDb</b><span>' + imdb.toFixed(1) + '</span></span>';
+      }
+      if (scores) side += '<span class="hovercard__scores">' + scores + '</span>';
       if (side) h += '<span class="hovercard__side">' + side + '</span>';
       h += '<span class="hovercard__in">';
       if (d.title) h += '<span class="hovercard__title">' + esc(d.title) + '</span>';

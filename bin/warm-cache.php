@@ -50,8 +50,15 @@ $now     = time();
 // started before this run would go without one for the rest of the day.
 $films = ctx_enrich(fetch_all_screenings($conn, strtotime('today', $now), $now + CTX_LOOKAHEAD_DAYS * 86400, true));
 
+// Pulls this schedule's IMDb ids out of the downloaded ratings file (see
+// list/imdb.php). The scores were read during enrichment above, before the
+// file had been scanned for any new ids, so they're re-read here.
+$imdb_ready = imdb_index(array_column($films, 'imdb')) !== false;
+foreach ($films as &$f) $f['imdb_score'] = !empty($f['imdb']) ? fetch_imdb($f['imdb']) : null;
+unset($f);
+
 $total = count($films);
-$have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0, 'rt' => 0];
+$have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0, 'rt' => 0, 'imdb_score' => 0];
 foreach ($films as $f) {
     foreach ($have as $k => $_) if (!empty($f[$k])) $have[$k]++;
 }
@@ -62,7 +69,8 @@ foreach ($films as $f) $venues[$f['venue'] ?? '?'] = ($venues[$f['venue'] ?? '?'
 printf("%s warm: %d screenings in %.1fs\n", date('c'), $total, microtime(true) - $started);
 foreach ($venues as $v => $n) printf("           %-24s %d\n", $v, $n);
 foreach ($have as $k => $n)   printf("           %-24s %d/%d\n", $k, $n, $total);
-echo "           (rt = Rotten Tomatoes critics score; gaps are normal, mostly indie/local screenings)\n";
+echo "           (rt = Rotten Tomatoes critics score, imdb_score = IMDb rating; gaps are normal, mostly indie/local screenings)\n";
+if (!$imdb_ready) fwrite(STDERR, date('c') . " warm: no IMDb ratings file yet — run: php bin/refresh-imdb.php\n");
 
 // A venue that scrapes to nothing is usually a changed page structure, and it
 // fails quietly — The List simply stops mentioning them. Worth a loud line in
