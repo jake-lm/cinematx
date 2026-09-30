@@ -110,7 +110,7 @@ function ctx_screening($s, $view) {
           <?php else: ?>
           <span class="shot__blank"><?php echo $e($s['display_title']); ?></span>
           <?php endif; ?>
-          <span class="shot__time"><?php echo date('g:ia', $s['timestamp']); ?></span>
+          <span class="shot__time"><span class="shot__t"><?php echo date('g:ia', $s['timestamp']); ?></span></span>
         </span>
         <span class="shot__title"><?php echo $e($s['display_title']); ?><?php if (!empty($s['series'])): ?><span class="shot__series"><?php echo $e($s['series']); ?></span><?php endif; ?></span>
         <span class="shot__venue">

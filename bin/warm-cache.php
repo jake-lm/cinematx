@@ -44,7 +44,11 @@ $now     = time();
 // Enriching is what populates the TMDB cache — poster, year, runtime, plot and
 // the Wikipedia link — so this warms both layers in one pass, by doing exactly
 // what a page request does.
-$films = ctx_enrich(fetch_all_screenings($conn, $now, $now + CTX_LOOKAHEAD_DAYS * 86400, true));
+// From midnight rather than from now: the front page lists all of today,
+// showings already under way included, and page requests never fetch a
+// Rotten Tomatoes score themselves (see list/rt.php) — so anything that
+// started before this run would go without one for the rest of the day.
+$films = ctx_enrich(fetch_all_screenings($conn, strtotime('today', $now), $now + CTX_LOOKAHEAD_DAYS * 86400, true));
 
 $total = count($films);
 $have  = ['poster' => 0, 'year' => 0, 'runtime' => 0, 'overview' => 0, 'wiki' => 0, 'rt' => 0];
