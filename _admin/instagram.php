@@ -32,7 +32,7 @@ $films = ig_today_films($conn, $now);
 $saved = ig_compose_read($now);
 
 $alamo_films    = ig_alamo_films($conn, $now);
-$alamo_selected = ig_alamo_read($now);
+$alamo_selected = ig_alamo_selected_keys($now, $alamo_films);
 foreach ($alamo_films as &$af) { $af['checked'] = in_array(ig_alamo_key($af), $alamo_selected, true); }
 unset($af);
 

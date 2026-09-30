@@ -139,14 +139,18 @@ function ig_today_films($conn, $date = null) {
 
     // Alamo is left out of IG_VENUES above (a chain, not the arthouse lineup
     // this post is meant to promote) but can be opted into per day through
-    // the admin checklist — fold in whichever ones were checked. Only
-    // touches ig_alamo_films() (a second scrape-cache read, see
-    // list/cache.php — cheap, not a live re-scrape) when there's actually a
-    // selection to honor, so a day nobody checks anything on costs nothing.
-    $alamoSelected = ig_alamo_read($start);
+    // the admin checklist — fold in whichever ones were checked, or, on a
+    // day nobody's touched that checklist, the last couple Alamo screenings
+    // of the night by default (see ig_alamo_selected_keys()). Fetches
+    // ig_alamo_films() (a second scrape-cache read, see list/cache.php —
+    // cheap, not a live re-scrape) every day now rather than only when a
+    // selection exists, since even the default needs to know what's
+    // actually playing tonight to pick the last two.
+    $alamoFilms    = ig_alamo_films($conn, $start);
+    $alamoSelected = ig_alamo_selected_keys($start, $alamoFilms);
     if ($alamoSelected) {
         $alamo = array_values(array_filter(
-            ig_alamo_films($conn, $start),
+            $alamoFilms,
             fn($f) => in_array(ig_alamo_key($f), $alamoSelected, true)
         ));
         $films = array_merge($films, $alamo);
@@ -3159,16 +3163,44 @@ function ig_carousel_selection(array $films, array $compose, $date) {
 // Which Alamo films today's admin opted into the card — same read/write
 // shape as the carousel list, but keyed by ig_alamo_key() (title only)
 // rather than ig_film_key(), since the checklist itself is one row per
-// title, and absent here does mean empty (Alamo is opt-in, not defaulted).
+// title. Returns null when nobody's ever saved this date's checklist
+// (distinct from an empty array, an explicit save of zero) — same
+// null-means-untouched contract as ig_carousel_read(), so
+// ig_alamo_selected_keys() below can tell "never touched" from "chose
+// none" the same way ig_carousel_selection() already does for the
+// carousel.
 function ig_alamo_path($date) {
     return dirname(__DIR__) . '/uploads/social/alamo-' . date('Y-m-d', $date) . '.json';
 }
 
 function ig_alamo_read($date) {
     $file = ig_alamo_path($date);
-    if (!file_exists($file)) return [];
+    if (!file_exists($file)) return null;
     $data = json_decode(file_get_contents($file), true);
-    return is_array($data) ? $data : [];
+    return is_array($data) ? $data : null;
+}
+
+// The two Alamo screenings playing latest tonight, ranked by each film's
+// own last showtime — one row per film (ig_alamo_films() already folds a
+// title's repeat showings into one row), not per individual showtime, so a
+// single film with two late showtimes only ever fills one of the two slots.
+const IG_ALAMO_DEFAULT_COUNT = 2;
+
+function ig_alamo_default_keys(array $films) {
+    usort($films, fn($a, $b) => max($b['timestamps']) <=> max($a['timestamps']));
+    return array_map('ig_alamo_key', array_slice($films, 0, IG_ALAMO_DEFAULT_COUNT));
+}
+
+// Whichever Alamo keys are actually in play for $date: the admin's own
+// saved checklist once one exists (even an explicit save of zero honors
+// that), otherwise ig_alamo_default_keys()'s pick. The one thing both
+// ig_today_films() and the admin checklist page (whose checkboxes read
+// straight off this) go through, so what shows checked always matches
+// what would actually post — no separate "defaulted" state to track or
+// display, it just reads as already checked.
+function ig_alamo_selected_keys($date, array $films) {
+    $saved = ig_alamo_read($date);
+    return $saved !== null ? $saved : ig_alamo_default_keys($films);
 }
 
 function ig_alamo_write($date, array $keys) {
