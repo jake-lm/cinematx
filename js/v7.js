@@ -1464,9 +1464,12 @@
   // hover cannot be reached without a pointer, and on touch the same gesture
   // is a tap, which should follow the link.
 
-  var TOMATO_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#E5412E" d="M8 3.4c-3.6-.2-6.6 2.2-6.6 5.6 0 3.2 2.9 5.6 6.6 5.6s6.6-2.4 6.6-5.6c0-3.4-3-5.8-6.6-5.6z"/>'
-                 + '<path fill="#4F8A2B" d="M8 1.2 6.9 3 4.8 2.3l1.3 1.8L3.9 5l2.6-.1L8 6.2l1.5-1.3 2.6.1-2.2-.9 1.3-1.8L9.1 3z"/></svg>';
-  var SPLAT_SVG  = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="#7C9A3C" d="M8 1.5c1.2 0 1.5 1.6 2.4 2.1 1 .5 2.6-.3 3.2.7.6 1-.7 2-.7 3.1 0 1.2 1.5 2 1 3.1-.5 1.1-2.2.6-3 1.4-.8.8-.4 2.5-1.6 2.7-1.1.2-1.6-1.3-2.6-1.7-1-.4-2.6.4-3.1-.6-.5-1 .8-2 .8-3.1 0-1.1-1.4-1.9-.9-3 .5-1 2.2-.5 3-1.3C6.3 4.1 6.8 1.5 8 1.5z"/></svg>';
+  // One bucket at every score — RT's own tipped-over "spilled" variant for
+  // low audience scores is deliberately left out.
+  var POPCORN_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true">'
+                  + '<g fill="#FBE29A"><circle cx="4.6" cy="4.8" r="2.3"/><circle cx="8" cy="3.5" r="2.7"/><circle cx="11.4" cy="4.8" r="2.3"/></g>'
+                  + '<path fill="#E5412E" d="M3 6.5h10l-1.3 8.5H4.3z"/>'
+                  + '<path fill="none" stroke="#fff" stroke-width="1.2" d="M6.33 6.7 6.77 14.8M9.67 6.7 9.23 14.8"/></svg>';
 
   var HOVER_IN  = 420;   // dwell before showing — a glance passing over is not a request
   var HOVER_OUT = 160;   // grace on the way out, so the gap to the card is crossable
@@ -1488,20 +1491,21 @@
 
     function paint(d) {
       var h = '';
-      // Poster on top, Rotten Tomatoes critics score under it — the left
-      // column is otherwise empty below the artwork. Fresh is the usual 60%
-      // line; anything under it gets RT's own splat instead of a tomato.
+      // Poster on top, the ratings under it in two columns — icon, then
+      // value — so rows line up however wide each icon is. The left column is
+      // as wide as the widest icon (the IMDb chip); the bucket centres in it.
       var side = '';
       if (d.img) side += '<span class="hovercard__art"><img src="' + esc(d.img) + '" alt="" /></span>';
       var scores = '';
       var rt = parseInt(d.rt, 10);
       if (rt >= 0 && rt <= 100) {
-        scores += '<span class="hovercard__rt" title="Rotten Tomatoes critics score">'
-                + (rt >= 60 ? TOMATO_SVG : SPLAT_SVG) + '<span>' + rt + '%</span></span>';
+        scores += '<span class="hovercard__ico" title="Rotten Tomatoes audience score">' + POPCORN_SVG + '</span>'
+                + '<span class="hovercard__val" title="Rotten Tomatoes audience score">' + rt + '%</span>';
       }
       var imdb = parseFloat(d.imdb);
       if (imdb >= 0 && imdb <= 10) {
-        scores += '<span class="hovercard__imdb" title="IMDb rating"><b>IMDb</b><span>' + imdb.toFixed(1) + '</span></span>';
+        scores += '<span class="hovercard__ico" title="IMDb rating"><b class="hovercard__mark">IMDb</b></span>'
+                + '<span class="hovercard__val" title="IMDb rating">' + imdb.toFixed(1) + '</span>';
       }
       if (scores) side += '<span class="hovercard__scores">' + scores + '</span>';
       if (side) h += '<span class="hovercard__side">' + side + '</span>';

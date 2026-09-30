@@ -4554,34 +4554,26 @@ button, input, select, textarea {
 }
 
 .hovercard__scores {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: max-content max-content;
+  justify-content: center;
   align-items: center;
-  gap: var(--s-1);
+  column-gap: var(--s-2);
+  row-gap: var(--s-1);
 }
 
-.hovercard__rt {
-  display: inline-flex;
+.hovercard__ico {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  font-family: var(--f-ui);
-  font-size: var(--t-2xs);
-  font-weight: 600;
-  letter-spacing: var(--track);
-  text-transform: uppercase;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
+  justify-content: center;
 }
-.hovercard__rt svg {
+.hovercard__ico svg {
   width: 16px;
   height: 16px;
   flex: none;
 }
 
-.hovercard__imdb {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.hovercard__val {
   font-family: var(--f-ui);
   font-size: var(--t-2xs);
   font-weight: 600;
@@ -4590,7 +4582,8 @@ button, input, select, textarea {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
-.hovercard__imdb b {
+
+.hovercard__mark {
   padding: 1px 3px;
   border-radius: 3px;
   background: #F5C518;

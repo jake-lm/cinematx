@@ -1069,7 +1069,7 @@ function ctx_venue_short($v) {
  *   meta one quiet line         sub    a second quiet line
  *   body the paragraph          foot   the bottom rule line
  *   link {href, label} — sits opposite foot on that same rule
- *   rt   a 0–100 critics score, under the artwork; omitted when there isn't one
+ *   rt   a 0–100 Rotten Tomatoes audience score, under the artwork; omitted when there isn't one
  *   imdb a 0–10 rating, beside it on the same rule
  */
 function ctx_hover(array $slots) {

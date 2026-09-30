@@ -69,7 +69,7 @@ foreach ($films as $f) $venues[$f['venue'] ?? '?'] = ($venues[$f['venue'] ?? '?'
 printf("%s warm: %d screenings in %.1fs\n", date('c'), $total, microtime(true) - $started);
 foreach ($venues as $v => $n) printf("           %-24s %d\n", $v, $n);
 foreach ($have as $k => $n)   printf("           %-24s %d/%d\n", $k, $n, $total);
-echo "           (rt = Rotten Tomatoes critics score, imdb_score = IMDb rating; gaps are normal, mostly indie/local screenings)\n";
+echo "           (rt = Rotten Tomatoes audience score, imdb_score = IMDb rating; gaps are normal, mostly indie/local screenings)\n";
 if (!$imdb_ready) fwrite(STDERR, date('c') . " warm: no IMDb ratings file yet — run: php bin/refresh-imdb.php\n");
 
 // A venue that scrapes to nothing is usually a changed page structure, and it
