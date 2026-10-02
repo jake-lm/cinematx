@@ -813,13 +813,24 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
 // glow behind a bright core — GD has no light-bleed primitive, so the glow
 // is just a larger, low-alpha circle drawn first. The marquee theme's
 // signature: every page gets framed by it, list and feature alike.
-function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb) {
+function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haunted = false) {
     $top   = $x2 - $x1;
     $side  = $y2 - $y1;
     $perim = 2 * $top + 2 * $side;
     $n     = max(4, (int) round($perim / $spacing));
 
+    // Haunted: a fixed, index-keyed handful of bulbs are burnt out and a
+    // few more flicker at half strength. Keyed on the bulb's own position
+    // rather than rand(), so the same card always renders identically — a
+    // regenerated preview must match what posts.
+    if ($haunted) {
+        $rgb      = imagecolorsforindex($im, $glow);
+        $dimGlow  = imagecolorallocatealpha($im, $rgb['red'], $rgb['green'], $rgb['blue'], 122);
+        $deadBulb = imagecolorallocate($im, 0x3A, 0x36, 0x2E);
+    }
+
     for ($i = 0; $i < $n; $i++) {
+        $state = $haunted ? crc32('bulb' . $i) % 7 : 99;
         $d = ($i / $n) * $perim;
         if ($d < $top) {
             $x = $x1 + $d; $y = $y1;
@@ -830,9 +841,145 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb) {
         } else {
             $x = $x1; $y = $y2 - ($d - 2 * $top - $side);
         }
-        imagefilledellipse($im, (int) $x, (int) $y, 16, 16, $glow);
-        imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $bulb);
+        if ($state === 0) {
+            imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $deadBulb);
+        } elseif ($state === 1) {
+            imagefilledellipse($im, (int) $x, (int) $y, 16, 16, $dimGlow);
+            imagefilledellipse($im, (int) $x, (int) $y, 6, 6, $bulb);
+        } else {
+            imagefilledellipse($im, (int) $x, (int) $y, 16, 16, $glow);
+            imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $bulb);
+        }
     }
+}
+
+// October's seasonal accents (fall + Halloween as one look, since the
+// theatres around town run horror all month). Keyed on the post's own date,
+// not today's, so tomorrow's preview and a regenerated card agree with what
+// will actually post, and every accent drops out on its own on Nov 1.
+function ig_halloween_season($date) {
+    return (int) date('n', $date) === 10;
+}
+
+// A corner cobweb: spokes fanning from ($cx,$cy) across a quarter turn,
+// joined by sagging rings. $sx/$sy (+1/-1) pick which corner it hangs in.
+function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1) {
+    $angles = [0, 22.5, 45, 67.5, 90];
+    $pt = function ($deg, $r) use ($cx, $cy, $sx, $sy) {
+        $rad = deg2rad($deg);
+        return [$cx + $sx * $r * cos($rad), $cy + $sy * $r * sin($rad)];
+    };
+    foreach ($angles as $a) {
+        [$x, $y] = $pt($a, $len);
+        imageline($im, (int) $cx, (int) $cy, (int) $x, (int) $y, $color);
+    }
+    foreach ([0.26, 0.46, 0.68, 0.92] as $f) {
+        for ($k = 0; $k < count($angles) - 1; $k++) {
+            [$x1, $y1] = $pt($angles[$k], $len * $f);
+            [$x2, $y2] = $pt($angles[$k + 1], $len * $f);
+            // Each strand is a short polyline bowed toward the corner — a
+            // chord with a sine-shaped dip, so it hangs in a smooth curve
+            // instead of kinking at a single pulled-in midpoint.
+            $sag = 0.09 * $len * $f;
+            $px = $x1; $py = $y1;
+            for ($s = 1; $s <= 6; $s++) {
+                $t  = $s / 6;
+                $bx = $x1 + ($x2 - $x1) * $t;
+                $by = $y1 + ($y2 - $y1) * $t;
+                $dx = $cx - $bx; $dy = $cy - $by;
+                $d  = max(1.0, sqrt($dx * $dx + $dy * $dy));
+                $dip = $sag * sin(M_PI * $t);
+                $qx = $bx + $dx / $d * $dip;
+                $qy = $by + $dy / $d * $dip;
+                imageline($im, (int) round($px), (int) round($py), (int) round($qx), (int) round($qy), $color);
+                $px = $qx; $py = $qy;
+            }
+        }
+    }
+}
+
+// A plain pumpkin sitting on $baseY, $r px from its centre to either side
+// (so 2*$r wide, about 1.75*$r tall): overlapping lobes for the ribs, a
+// darker outline on each, and a short stem. Drawn bottom-anchored so two
+// different sizes line up on the same ground without hand-tuning each cy.
+function ig_pumpkin($im, $cx, $baseY, $r, $face = false) {
+    $shade = imagecolorallocate($im, 0xB0, 0x4A, 0x0E);
+    $mid   = imagecolorallocate($im, 0xD9, 0x6A, 0x18);
+    $base  = imagecolorallocate($im, 0xEC, 0x7E, 0x22);
+    $light = imagecolorallocate($im, 0xF5, 0x95, 0x38);
+    $stem  = imagecolorallocate($im, 0x5E, 0x6B, 0x2A);
+
+    $hMax = (int) round(1.75 * $r);
+    $cy   = (int) round($baseY - $hMax / 2);
+
+    // [dx, width, height, fill] — outermost lobes first so the centre rib
+    // lands on top.
+    $lobes = [
+        [-0.64, 0.96, 1.52, $mid],  [0.64, 0.96, 1.52, $mid],
+        [-0.34, 1.20, 1.68, $base], [0.34, 1.20, 1.68, $base],
+        [0.0,   1.10, 1.75, $light],
+    ];
+    foreach ($lobes as [$dx, $wf, $hf, $fill]) {
+        $x = (int) round($cx + $dx * $r);
+        $h = (int) round($hf * $r);
+        imagefilledellipse($im, $x, $cy, (int) round($wf * $r), $h, $fill);
+        imageellipse($im, $x, $cy, (int) round($wf * $r), $h, $shade);
+    }
+
+    // The face is cut out as solid black shapes: they sit against the
+    // orange rind, so they read as holes even on the near-black card. (A
+    // glowing face was tried first; every amber shade either washed into
+    // the rind or needed a halo.) $glow keeps its name from that version.
+    if ($face) {
+        $glow = imagecolorallocate($im, 0x0B, 0x0A, 0x08);
+        $poly = function (array $rel, $color) use ($im, $cx, $cy, $r) {
+            $pts = [];
+            foreach ($rel as [$px, $py]) {
+                $pts[] = (int) round($cx + $px * $r);
+                $pts[] = (int) round($cy + $py * $r);
+            }
+            imagefilledpolygon($im, $pts, $color);
+        };
+        $poly([[-0.66, -0.02], [-0.20, -0.02], [-0.43, -0.46]], $glow);     // left eye
+        $poly([[ 0.20, -0.02], [ 0.66, -0.02], [ 0.43, -0.46]], $glow);     // right eye
+        $poly([[-0.10,  0.20], [ 0.10,  0.20], [ 0.00,  0.03]], $glow);     // nose
+        $poly([                                                             // grin
+            [-0.66, 0.30], [-0.42, 0.44], [-0.26, 0.30], [-0.10, 0.46], [0.06, 0.30],
+            [ 0.22, 0.46], [ 0.40, 0.30], [ 0.66, 0.28], [0.50, 0.60], [0.20, 0.70],
+            [-0.20, 0.70], [-0.50, 0.60],
+        ], $glow);
+    }
+
+    $stemW = max(4, (int) round(0.30 * $r));
+    $stemH = max(6, (int) round(0.40 * $r));
+    $top   = $cy - (int) round($hMax / 2);
+    imagefilledpolygon($im, [
+        $cx - (int) round($stemW / 2) - 1, $top + 2,
+        $cx - (int) round($stemW / 2) + 2, $top - $stemH,
+        $cx + (int) round($stemW / 2) + 3, $top - $stemH + 2,
+        $cx + (int) round($stemW / 2),     $top + 2,
+    ], $stem);
+}
+
+// A filled bat silhouette, wings spread, ~$size px across half-span. Drawn
+// as polygons rather than ig_bat_mark()'s two arcs — those read as distant
+// birds, this reads as a bat at close range.
+function ig_bat_silhouette($im, $x, $y, $size, $color) {
+    $wing = [[0.12, -0.10], [0.55, -0.42], [1.0, -0.30], [0.86, 0.0], [0.76, 0.26], [0.55, 0.06], [0.35, 0.30], [0.15, 0.12]];
+    foreach ([1, -1] as $m) {
+        $pts = [];
+        foreach ($wing as [$wx, $wy]) {
+            $pts[] = (int) round($x + $m * $wx * $size);
+            $pts[] = (int) round($y + $wy * $size);
+        }
+        imagefilledpolygon($im, $pts, $color);
+        imagefilledpolygon($im, [
+            (int) round($x + $m * 0.10 * $size), (int) round($y - 0.12 * $size),
+            (int) round($x + $m * 0.09 * $size), (int) round($y - 0.34 * $size),
+            (int) round($x),                     (int) round($y - 0.14 * $size),
+        ], $color);
+    }
+    imagefilledellipse($im, (int) $x, (int) $y, (int) round(0.26 * $size), (int) round(0.46 * $size), $color);
 }
 
 function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
@@ -976,20 +1123,48 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     $im = imagecreatetruecolor($w, $h);
     imagealphablending($im, true);
 
+    // In October the marquee's gold bulbs and accents turn pumpkin orange
+    // (the fall half of the seasonal look); the Halloween half is drawn
+    // after the bulbs below. The variable keeps its $gold name — it is
+    // "the accent", whichever hue the season makes it.
+    $season      = ig_halloween_season($date);
+    [$ar, $ag, $ab] = $season ? [0xF2, 0x8A, 0x2E] : [0xF2, 0xC1, 0x4E];
+
     $bg          = ig_hex($im, '#14120F');
     $ink         = ig_hex($im, '#F2EEE5');
     $muted       = ig_hex($im, '#B5AFA0');
     $divider     = ig_hex($im, '#3A362E');
     $placeholder = ig_hex($im, '#2A2620');
-    $gold        = ig_hex($im, '#F2C14E');
-    $goldGlow    = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+    $gold        = imagecolorallocate($im, $ar, $ag, $ab);
+    $goldGlow    = imagecolorallocatealpha($im, $ar, $ag, $ab, 100);
     // A touch lighter than $bg, not darker — this palette is already near-
     // black, so "subtle" here means barely lifting off it rather than
     // deepening a shadow.
-    $stripe      = ig_hex($im, '#1C1912');
+    $stripe      = ig_hex($im, $season ? '#211810' : '#1C1912');
 
     imagefill($im, 0, 0, $bg);
-    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold);
+    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold, $season);
+
+    if ($season) {
+        // A pale moon in the empty band right of the kicker (the date
+        // headline sits below it), bats crossing it, and cobwebs in the two
+        // right-hand corners — the left ones would sit under the kicker and
+        // the footer text.
+        $mx = 770; $my = 98; $mr = 46;
+        foreach ([34, 24, 14] as $grow) {
+            imagefilledellipse($im, $mx, $my, ($mr + $grow) * 2, ($mr + $grow) * 2, imagecolorallocatealpha($im, $ar, $ag, $ab, 120));
+        }
+        imagefilledellipse($im, $mx, $my, $mr * 2, $mr * 2, ig_hex($im, '#EADFC2'));
+        $batDark = ig_hex($im, '#0B0A08');
+        ig_bat_silhouette($im, $mx - 8, $my + 6, 30, $batDark);
+        ig_bat_silhouette($im, $mx + 30, $my - 20, 17, $batDark);
+        $batDim = ig_hex($im, '#6A3A16');
+        ig_bat_silhouette($im, $mx + 92, $my + 14, 20, $batDim);
+        ig_bat_silhouette($im, $mx - 96, $my - 8, 15, $batDim);
+        $web = imagecolorallocatealpha($im, 0xB5, 0xAF, 0xA0, 78);
+        ig_cobweb($im, $w - 46, 46, 118, $web, -1, 1);
+        ig_cobweb($im, $w - 46, $h - 46, 118, $web, -1, -1);
+    }
 
     $margin = 80;
 
@@ -2122,8 +2297,12 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $muted       = ig_hex($im, '#B5AFA0');
     $divider     = ig_hex($im, '#3A362E');
     $placeholder = ig_hex($im, '#2A2620');
-    $gold        = ig_hex($im, '#F2C14E');
-    $goldGlow    = imagecolorallocatealpha($im, 0xF2, 0xC1, 0x4E, 100);
+    // Same October swap as the list page (see ig_halloween_season()): the
+    // gold accent turns pumpkin orange.
+    $season      = ig_halloween_season($date);
+    [$ar, $ag, $ab] = $season ? [0xF2, 0x8A, 0x2E] : [0xF2, 0xC1, 0x4E];
+    $gold        = imagecolorallocate($im, $ar, $ag, $ab);
+    $goldGlow    = imagecolorallocatealpha($im, $ar, $ag, $ab, 100);
 
     imagefill($im, 0, 0, $bg);
 
@@ -2153,6 +2332,16 @@ function ig_build_feature_page_marquee(array $film, $date) {
     }
 
     ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold);
+
+    // A spotlight page's Halloween pieces: a cobweb in the bottom-right
+    // corner with two pumpkins (a big one and a smaller one) sitting on the
+    // same ground just left of it, all clear of the left-aligned footer and
+    // director lines. The top corners belong to the hero image and its pills.
+    if ($season) {
+        ig_cobweb($im, $w - 46, $h - 46, 118, imagecolorallocatealpha($im, 0xB5, 0xAF, 0xA0, 78), -1, -1);
+        ig_pumpkin($im, $w - 218, $h - 50, 44, true);
+        ig_pumpkin($im, $w - 296, $h - 50, 28);
+    }
 
     $pillFont = 30;
     $pillPadX = 30;
