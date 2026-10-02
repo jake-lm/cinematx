@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/fetch_screenings.php';
 require_once dirname(__DIR__) . '/v7/screenings.php';
+require_once __DIR__ . '/instagram_animation.php';
 
 define('IG_GRAPH_VERSION', 'v21.0');
 define('IG_FONT_HEADLINE', dirname(__DIR__) . '/assets/fonts/Fraunces-Bold.ttf');
@@ -783,9 +784,11 @@ function ig_theme_for_date($date) {
 // page's own row-capacity overflow, which each renderer still tracks
 // internally. Only Auto/Manual multi-page days ever pass a nonzero value;
 // it's what turns the quiet "+N more" line into a "keep swiping" one.
-function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 0) {
+function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 0, $anim = null) {
     switch ($theme) {
-        case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount);
+        // $anim (one frame of a looping version) is only honoured by themes
+        // that animate — see ig_theme_animates(); the rest ignore it.
+        case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount, $anim);
         case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
@@ -3429,7 +3432,9 @@ function ig_save_images(array $gdImages, $date) {
         $out[] = [$path, '/uploads/social/' . $name];
     }
 
-    foreach (glob($dir . '/ig-*.png') as $old) {
+    // Stills and the animation files that sit beside them (ig-<date>-<n>.mp4
+    // plus its .key, .lock and any leftover .part.mp4) age out together.
+    foreach (glob($dir . '/ig-*.{png,mp4,mp4.key,mp4.lock}', GLOB_BRACE) as $old) {
         if (filemtime($old) < time() - 7 * 86400) unlink($old);
     }
 
@@ -3674,22 +3679,40 @@ function ig_excluded_write($date, array $keys) {
  * when that selection or the cap runs out.
  */
 function ig_build_images(array $films, $date, array $compose) {
+    $images = [];
+    foreach (ig_plan_pages($films, $date, $compose) as $p) {
+        $images[] = $p['type'] === 'list'
+            ? ig_build_list_page($p['films'], $date, $p['theme'], $p['moreCount'])
+            : ig_build_feature_page($p['film'], $date, $p['theme']);
+    }
+    return $images;
+}
+
+/**
+ * Which pages a composition produces, as descriptors rather than images —
+ * [['type' => 'list', 'films' => [...], 'moreCount' => n, 'theme' => t] or
+ * ['type' => 'feature', 'film' => [...], 'theme' => t], …] in carousel
+ * order. ig_build_images() renders exactly this, and the animation code
+ * reads it too, so the two can never disagree about how a day is paginated
+ * or which slides are list pages.
+ */
+function ig_plan_pages(array $films, $date, array $compose) {
     $theme = in_array($compose['theme'] ?? 'paper', array_keys(IG_THEMES), true) ? $compose['theme'] : 'paper';
 
     if ($compose['mode'] === 'default' || empty($films)) {
-        return [ig_build_list_page($films, $date, $theme)];
+        return [['type' => 'list', 'films' => $films, 'moreCount' => 0, 'theme' => $theme]];
     }
 
     $maxPerPage = ($compose['mode'] === 'manual' && !empty($compose['per_page']))
         ? max(1, (int) $compose['per_page'])
         : IG_AUTO_MAX_PER_PAGE;
 
-    $images   = [];
+    $plan     = [];
     $consumed = 0;
     foreach (ig_paginate($films, $maxPerPage) as $page) {
         $consumed += count($page);
         $moreCount = count($films) - $consumed; // 0 on the last list page
-        $images[]  = ig_build_list_page($page, $date, $theme, $moreCount);
+        $plan[]    = ['type' => 'list', 'films' => $page, 'moreCount' => $moreCount, 'theme' => $theme];
     }
 
     if (!empty($compose['features'])) {
@@ -3700,20 +3723,27 @@ function ig_build_images(array $films, $date, array $compose) {
         $selected = ig_carousel_selection($films, $compose, $date);
         $chosen   = array_values(array_filter($films, fn($f) => in_array(ig_film_key($f), $selected, true)));
 
-        $slotsLeft = 10 - count($images);
+        $slotsLeft = 10 - count($plan);
         foreach ($chosen as $film) {
             if ($slotsLeft <= 0) break;
-            $images[] = ig_build_feature_page($film, $date, $theme);
+            $plan[] = ['type' => 'feature', 'film' => $film, 'theme' => $theme];
             $slotsLeft--;
         }
     }
 
-    return $images;
+    return $plan;
 }
 
 // ── Graph API ────────────────────────────────────────────────────────────
 
 function ig_graph_call($url, array $fields, $method = 'GET') {
+    // A test seam, never set in production: a callable in
+    // $GLOBALS['IG_GRAPH_STUB'] stands in for Meta so the publish logic —
+    // and above all its video fallbacks, which can't be rehearsed against
+    // the live API without risking a real post — can be exercised locally.
+    if (!empty($GLOBALS['IG_GRAPH_STUB'])) {
+        return ($GLOBALS['IG_GRAPH_STUB'])($url, $fields, $method);
+    }
     $ch = curl_init();
     if ($method === 'GET') {
         curl_setopt($ch, CURLOPT_URL, $url . '?' . http_build_query($fields));
@@ -3768,6 +3798,66 @@ function ig_create_container($base, $ig, array $fields, $maxAttempts = 10, $slee
 }
 
 /**
+ * The CAROUSEL parent container for $pages, children first. With $useVideo, a
+ * page carrying a 'video' gets a video child — and if that one child fails it
+ * is replaced by the page's still, so one bad video costs an animation, not a
+ * slide. Without it (or on a page with no video) every child is an image,
+ * exactly the requests the carousel has always made.
+ */
+function ig_carousel_container($base, $ig, array $pages, $caption, $useVideo) {
+    $children   = [];
+    $anyVideo   = false;
+    foreach ($pages as $i => $page) {
+        $video = $useVideo ? ($page['video'] ?? null) : null;
+        if ($video) {
+            try {
+                [$videoPath, $videoUrl] = $video;
+                $video_url = ig_public_url($videoUrl, $videoPath);
+                if ($video_url === '') {
+                    throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the video from.');
+                }
+                $children[] = ig_create_container($base, $ig, [
+                    'media_type'       => 'VIDEO',
+                    'video_url'        => $video_url,
+                    'is_carousel_item' => 'true',
+                ], IG_VIDEO_POLL_ATTEMPTS, IG_VIDEO_POLL_SLEEP);
+                $anyVideo = true;
+                continue;
+            } catch (Throwable $e) {
+                error_log('ig: video for slide ' . ($i + 1) . ' failed (' . $e->getMessage() . '), using the still');
+            }
+        }
+
+        [$path, $url] = $page;
+        $image_url = ig_public_url($url, $path);
+        if ($image_url === '') {
+            throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the card from.');
+        }
+        try {
+            $children[] = ig_create_container($base, $ig, [
+                'image_url'        => $image_url,
+                'is_carousel_item' => 'true',
+            ]);
+        } catch (RuntimeException $e) {
+            throw new RuntimeException('Carousel image ' . ($i + 1) . ' of ' . count($pages) . ' failed: ' . $e->getMessage());
+        }
+    }
+
+    // With a video among the children the parent can take longer to settle.
+    return $anyVideo
+        ? ig_create_container($base, $ig, [
+            'media_type' => 'CAROUSEL',
+            'children'   => implode(',', $children),
+            'caption'    => $caption,
+        ], IG_VIDEO_POLL_ATTEMPTS, IG_VIDEO_POLL_SLEEP)
+        : ig_create_container($base, $ig, [
+            'media_type' => 'CAROUSEL',
+            'children'   => implode(',', $children),
+            'caption'    => $caption,
+        ]);
+}
+
+/**
  * Container(s) → poll → publish. Returns the published media id, or throws
  * with whatever Meta's error payload said.
  *
@@ -3798,26 +3888,24 @@ function ig_publish(array $pages, $caption) {
             'caption'   => $caption,
         ]);
     } else {
-        $children = [];
-        foreach ($pages as $i => [$path, $url]) {
-            $image_url = ig_public_url($url, $path);
-            if ($image_url === '') {
-                throw new RuntimeException('CTX_SITE_URL is not set, so Meta has no address to fetch the card from.');
-            }
-            try {
-                $children[] = ig_create_container($base, $ig, [
-                    'image_url'        => $image_url,
-                    'is_carousel_item' => 'true',
-                ]);
-            } catch (RuntimeException $e) {
-                throw new RuntimeException('Carousel image ' . ($i + 1) . ' of ' . count($pages) . ' failed: ' . $e->getMessage());
-            }
+        // A page may carry a 'video' => [path, url] beside its still (see
+        // ig_attach_animations()). The animation is an upgrade, never a
+        // requirement: if building the carousel with videos fails for any
+        // reason, it is rebuilt from the stills alone. This retry covers
+        // only container *creation*, which publishes nothing; the one
+        // media_publish call below is never repeated, so a fallback can't
+        // double-post.
+        $hasVideo = false;
+        foreach ($pages as $page) {
+            if (!empty($page['video'])) $hasVideo = true;
         }
-        $container_id = ig_create_container($base, $ig, [
-            'media_type' => 'CAROUSEL',
-            'children'   => implode(',', $children),
-            'caption'    => $caption,
-        ]);
+        try {
+            $container_id = ig_carousel_container($base, $ig, $pages, $caption, true);
+        } catch (Throwable $e) {
+            if (!$hasVideo) throw $e;
+            error_log('ig: carousel with video failed (' . $e->getMessage() . '), retrying with stills only');
+            $container_id = ig_carousel_container($base, $ig, $pages, $caption, false);
+        }
     }
 
     $publish = ig_graph_call("$base/$ig/media_publish", [

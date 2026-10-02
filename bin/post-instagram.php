@@ -57,11 +57,16 @@ $films   = ig_today_films($conn);
 $compose = ig_compose_read($now);
 $images  = ig_build_images($films, $now, $compose);
 $pages   = ig_save_images($images, $now);
+// Animated list pages: any video not already rendered is rendered now (CLI
+// has no time limit), and anything that fails stays a still — see
+// list/instagram_animation.php.
+$pages   = ig_attach_animations($pages, ig_plan_pages($films, $now, $compose), $now, true);
 $caption = ig_caption($films, $now);
 
 printf(
-    "%s ig: %d screenings today, %s mode, %d page(s) written (%s)\n",
-    date('c'), count($films), $compose['mode'], count($pages), implode(', ', array_column($pages, 0))
+    "%s ig: %d screenings today, %s mode, %d page(s) written (%s), %d with video\n",
+    date('c'), count($films), $compose['mode'], count($pages), implode(', ', array_column($pages, 0)),
+    count(array_filter($pages, fn($p) => !empty($p['video'])))
 );
 
 if ($dry_run) {
@@ -72,6 +77,10 @@ if ($dry_run) {
     foreach ($pages as $i => [$path, $url]) {
         $public = ig_public_url($url, $path);
         printf("--- page %d image URL Meta would fetch: %s ---\n", $i + 1, $public !== '' ? $public : '(CTX_SITE_URL unset)');
+        if (!empty($pages[$i]['video'])) {
+            $video = ig_public_url($pages[$i]['video'][1], $pages[$i]['video'][0]);
+            printf("--- page %d is animated; video URL Meta would fetch instead: %s ---\n", $i + 1, $video !== '' ? $video : '(CTX_SITE_URL unset)');
+        }
     }
     echo "--- (dry run, nothing posted) ---\n";
 } else {

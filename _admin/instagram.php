@@ -63,6 +63,19 @@ $images  = ig_build_images($films, $now, $compose);
 $pages   = ig_save_images($images, $now);
 $caption = ig_caption($films, $now);
 
+// Animated list pages. Only for the *saved* composition ($dirty = a live
+// preview of unsaved changes, which the post step would never publish), and
+// never rendered here: videos that already exist are attached and played in
+// the mockup below, and any that are missing are started in the background
+// — the page loads immediately with the still and a note.
+$anim_pending = [];
+if (!$dirty) {
+    $anim_plan    = ig_plan_pages($films, $now, $compose);
+    $pages        = ig_attach_animations($pages, $anim_plan, $now, false);
+    $anim_pending = ig_pending_animations($anim_plan, $now);
+    if ($anim_pending) ig_spawn_animation_render($now);
+}
+
 $posted_flag    = dirname(__DIR__) . '/uploads/social/.posted-' . date('Y-m-d', $now);
 $already_posted = file_exists($posted_flag);
 $configured     = defined('IG_ACCESS_TOKEN') && IG_ACCESS_TOKEN
@@ -129,12 +142,21 @@ require dirname(__DIR__) . '/v7/_chrome.php';
                 // on every load, while a regenerated one still busts. ?>
           <?php if (count($pages) > 1): ?>
           <div class="ig-mock__strip">
-            <?php foreach ($pages as $i => [$path, $url]): ?>
+            <?php foreach ($pages as $i => [$path, $url]): $video = $pages[$i]['video'] ?? null; ?>
             <div class="ig-mock__page">
+              <?php if ($video): // The animated version of this slide — the still is its poster. ?>
+              <video class="ig-mock__image" src="<?php echo $e($video[1] . '?v=' . @filemtime($video[0])); ?>" poster="<?php echo $e($url . '?v=' . @filemtime($path)); ?>" autoplay muted loop playsinline></video>
+              <?php else: ?>
               <img class="ig-mock__image" src="<?php echo $e($url . '?v=' . @filemtime($path)); ?>" alt="Instagram card, page <?php echo $i + 1; ?>" />
+              <?php endif; ?>
             </div>
             <?php endforeach; ?>
           </div>
+          <?php if ($anim_pending): ?>
+          <div class="admin-note" style="margin:var(--s-2) var(--s-4)">
+            Rendering the animated slide<?php echo count($anim_pending) === 1 ? '' : 's'; ?> in the background &mdash; the still shows for now. Reload in a minute.
+          </div>
+          <?php endif; ?>
           <?php else: [$path, $url] = $pages[0]; ?>
           <img class="ig-mock__image" src="<?php echo $e($url . '?v=' . @filemtime($path)); ?>" alt="Today's Instagram card" />
           <?php endif; ?>

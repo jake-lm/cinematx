@@ -33,6 +33,10 @@ list/imdb_ratings.tsv.gz*
 
 # Generated daily Instagram cards — regenerated on each cron run
 uploads/social/*.png
+# Animated list-page videos and the cache/lock/log files beside them
+uploads/social/*.mp4
+uploads/social/*.mp4.*
+uploads/social/*.log
 
 # Downloaded poster thumbnails for the Instagram card — refetched on a cache miss
 list/poster_cache/

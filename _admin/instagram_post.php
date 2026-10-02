@@ -24,6 +24,10 @@ $films   = ig_today_films($conn);
 $compose = ig_compose_read($now);
 $images  = ig_build_images($films, $now, $compose);
 $pages   = ig_save_images($images, $now);
+// Animated list pages: normally already rendered by the admin page's
+// background job; if not, they are rendered here (web PHP has no time limit
+// on this server) and any failure leaves that slide a still.
+$pages   = ig_attach_animations($pages, ig_plan_pages($films, $now, $compose), $now, true);
 $caption = ig_caption($films, $now);
 
 try {
