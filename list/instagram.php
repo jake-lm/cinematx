@@ -813,11 +813,22 @@ function ig_build_feature_page(array $film, $date, $theme = 'paper') {
 // glow behind a bright core — GD has no light-bleed primitive, so the glow
 // is just a larger, low-alpha circle drawn first. The marquee theme's
 // signature: every page gets framed by it, list and feature alike.
-function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haunted = false) {
+function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haunted = false, $anim = null) {
     $top   = $x2 - $x1;
     $side  = $y2 - $y1;
     $perim = 2 * $top + 2 * $side;
     $n     = max(4, (int) round($perim / $spacing));
+    // Animated: a marquee chase — one bulb in four at full strength,
+    // stepping around the frame in distinct beats rather than gliding. The
+    // count is rounded to a multiple of four so the pattern joins up at the
+    // seam instead of leaving one odd gap where the loop wraps. $anim = a
+    // frame spec (see ig_build_list_page_marquee()); a still render passes
+    // null and is unaffected.
+    if ($anim !== null) {
+        $n = 4 * max(2, (int) round($n / 4));
+        // One step every six frames (12 fps: two beats a second).
+        $step = intdiv($anim['frame'], 6) % 4;
+    }
 
     // Haunted: a fixed, index-keyed handful of bulbs are burnt out and a
     // few more flicker at half strength. Keyed on the bulb's own position
@@ -829,8 +840,39 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haun
         $deadBulb = imagecolorallocate($im, 0x3A, 0x36, 0x2E);
     }
 
+    // The still's pattern is kept as it is (it is what already posts).
+    // The animation uses a hash chosen for balance: an arbitrary one
+    // clusters the burnt-out bulbs on some phases of the chase (the
+    // original crc32('bulb'.$i) % 7 put 14 of 39 on one phase against
+    // 5-6 on the others), and the sweep then visibly pulses as it
+    // travels. This key was searched for at the 116-bulb count: exactly
+    // four burnt-out bulbs on each of the four phases.
+    $stateOf = function ($i) use ($haunted, $anim) {
+        return $haunted
+            ? ($anim !== null ? (crc32('mq32:' . $i) >> 7) % 7 : crc32('bulb' . $i) % 7)
+            : 99;
+    };
+
+    // Weak bulbs (animation only): a few live bulbs that stay on all the
+    // time but dimly, outside the chase, as if on their last legs — and the
+    // first one on each phase also gutters. Searched for like the burnt-out
+    // key above: eight of them, exactly two per phase and none adjacent, so
+    // taking them out of the chase leaves it just as even.
+    // $weakFlicker maps bulb index => whether it flickers.
+    $weakFlicker = [];
+    if ($anim !== null && $haunted) {
+        $seenPhase = [];
+        for ($i = 0; $i < $n; $i++) {
+            if ($stateOf($i) === 0) continue;
+            if (((crc32('wk33:' . $i) >> 8) % 14) !== 0) continue;
+            $p = $i % 4;
+            $weakFlicker[$i] = !isset($seenPhase[$p]);
+            $seenPhase[$p] = true;
+        }
+    }
+
     for ($i = 0; $i < $n; $i++) {
-        $state = $haunted ? crc32('bulb' . $i) % 7 : 99;
+        $state = $stateOf($i);
         $d = ($i / $n) * $perim;
         if ($d < $top) {
             $x = $x1 + $d; $y = $y1;
@@ -840,6 +882,47 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haun
             $x = $x2 - ($d - $top - $side); $y = $y2;
         } else {
             $x = $x1; $y = $y2 - ($d - 2 * $top - $side);
+        }
+        if ($anim !== null) {
+            if ($state === 0) {
+                imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $deadBulb);
+                continue;
+            }
+            if (isset($weakFlicker[$i])) {
+                // Steady weak bulbs sit at a low level; the flickering ones
+                // wander between nearly out and a little brighter, changing
+                // every other frame.
+                $level = $weakFlicker[$i]
+                    ? [0.10, 0.35, 0.55, 0.30][crc32('wf' . $i . ':' . intdiv($anim['frame'], 2)) % 4]
+                    : 0.38;
+                $rgbG = imagecolorsforindex($im, $glow);
+                $weakGlow = imagecolorallocatealpha($im, $rgbG['red'], $rgbG['green'], $rgbG['blue'], 127 - (int) round(32 * $level));
+                $rgbB = imagecolorsforindex($im, $bulb);
+                $weakCore = imagecolorallocate(
+                    $im,
+                    (int) round(0x3A + ($rgbB['red']   - 0x3A) * $level * 1.2),
+                    (int) round(0x36 + ($rgbB['green'] - 0x36) * $level * 1.2),
+                    (int) round(0x2E + ($rgbB['blue']  - 0x2E) * $level * 1.2)
+                );
+                imagefilledellipse($im, (int) $x, (int) $y, 15, 15, $weakGlow);
+                imagefilledellipse($im, (int) $x, (int) $y, 6, 6, $weakCore);
+                continue;
+            }
+            // Every live bulb follows the chase, so the sweep stays regular
+            // with only the burnt-out ones leaving gaps; the flickerers
+            // additionally drop out now and then when it reaches them.
+            $lit = ((($i - $step) % 4) + 4) % 4 === 0;
+            if ($lit && $state === 1 && crc32('f' . $i . ':' . intdiv($anim['frame'], 6)) % 3 === 0) {
+                $lit = false;
+            }
+            if ($lit) {
+                imagefilledellipse($im, (int) $x, (int) $y, 20, 20, $glow);
+                imagefilledellipse($im, (int) $x, (int) $y, 8, 8, $bulb);
+            } else {
+                imagefilledellipse($im, (int) $x, (int) $y, 12, 12, $haunted ? $dimGlow : $glow);
+                imagefilledellipse($im, (int) $x, (int) $y, 5, 5, $deadBulb ?? $bulb);
+            }
+            continue;
         }
         if ($state === 0) {
             imagefilledellipse($im, (int) $x, (int) $y, 7, 7, $deadBulb);
@@ -898,11 +981,72 @@ function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1) {
     }
 }
 
+// A small storm cloud centred on ($cx,$cy), about 100px wide: rain streaks
+// under it and a lightning bolt. A still shows the cloud with one bolt
+// frozen mid-strike; an animation ($anim = ['frame', 'frames']) strikes
+// twice per loop — the cloud and a halo flare for the frames the bolt is
+// up — while the rain falls eight cycles per loop so it closes cleanly.
+function ig_storm_cloud($im, $cx, $cy, $anim = null) {
+    $t = $anim !== null ? $anim['frame'] / $anim['frames'] : 0.0;
+    // Rain falls at a 4-second loop's pace however long the loop is (see $k
+    // in ig_build_list_page_marquee()); the strikes are timed separately.
+    $k = $anim !== null ? ($anim['frames'] / $anim['fps']) / 4 : 1;
+
+    // Which bolt is up, if any: 0 none, 1 first strike, 2 second.
+    $bolt = 0;
+    if ($anim === null)                   $bolt = 1;
+    // Two strikes, each up for exactly 3 frames (a quarter-second): frames
+    // 20-22 and 62-64 of the 96-frame loop — slow weather, quick flash.
+    elseif ($t >= 20 / 96 && $t < 23 / 96) $bolt = 1;
+    elseif ($t >= 62 / 96 && $t < 65 / 96) $bolt = 2;
+    $flash = $anim !== null && $bolt > 0;
+
+    if ($flash) {
+        foreach ([46, 34, 22] as $rad) {
+            imagefilledellipse($im, $cx + ($bolt === 2 ? 30 : 8), $cy + 46, $rad * 2, $rad * 2, imagecolorallocatealpha($im, 0xFF, 0xF0, 0xB0, 122));
+        }
+    }
+
+    $body  = $flash ? imagecolorallocate($im, 0x8A, 0x91, 0xB0) : imagecolorallocate($im, 0x3B, 0x40, 0x52);
+    $under = $flash ? imagecolorallocate($im, 0x6A, 0x71, 0x90) : imagecolorallocate($im, 0x2B, 0x2F, 0x3E);
+    $rim   = imagecolorallocatealpha($im, 0x9A, 0xA2, 0xC4, 90);
+
+    // Flat-bottomed cumulus: a shaded base, then overlapping puffs on top.
+    imagefilledellipse($im, $cx + 6, $cy + 12, 100, 26, $under);
+    foreach ([[-28, 6, 40], [-6, -6, 52], [22, -2, 44], [40, 8, 32]] as [$dx, $dy, $d]) {
+        imagefilledellipse($im, $cx + $dx, $cy + $dy, $d, $d, $body);
+    }
+    imagefilledellipse($im, $cx + 6, $cy + 10, 98, 22, $body);
+    foreach ([[-6, -6, 52], [22, -2, 44]] as [$dx, $dy, $d]) {
+        imagearc($im, $cx + $dx, $cy + $dy, $d, $d, 200, 340, $rim);
+    }
+
+    // Rain: six short streaks that wrap from the cloud's base down to just
+    // above the date headline.
+    $rain = imagecolorallocatealpha($im, 0x9F, 0xB4, 0xE0, 60);
+    $yTop = $cy + 26;
+    $span = 44;
+    foreach ([-34, -17, 0, 17, 34, 50] as $k => $dx) {
+        $phase = fmod($k * 0.23, 1.0);
+        $y = $yTop + (fmod($t * 8 * $k + $phase, 1.0)) * $span;
+        imageline($im, $cx + $dx, (int) $y, $cx + $dx - 3, (int) $y + 10, $rain);
+    }
+
+    if ($bolt > 0) {
+        $shape = $bolt === 1
+            ? [[10, 26], [-4, 46], [5, 46], [-10, 70], [16, 40], [6, 40], [18, 26]]
+            : [[40, 26], [54, 44], [45, 44], [58, 68], [32, 40], [42, 40], [30, 26]];
+        $pts = [];
+        foreach ($shape as [$dx, $dy]) { $pts[] = $cx + $dx; $pts[] = $cy + $dy; }
+        imagefilledpolygon($im, $pts, imagecolorallocate($im, 0xFF, 0xF3, 0xB0));
+    }
+}
+
 // A plain pumpkin sitting on $baseY, $r px from its centre to either side
 // (so 2*$r wide, about 1.75*$r tall): overlapping lobes for the ribs, a
 // darker outline on each, and a short stem. Drawn bottom-anchored so two
 // different sizes line up on the same ground without hand-tuning each cy.
-function ig_pumpkin($im, $cx, $baseY, $r, $face = false) {
+function ig_pumpkin($im, $cx, $baseY, $r, $face = false, $anim = null) {
     $shade = imagecolorallocate($im, 0xB0, 0x4A, 0x0E);
     $mid   = imagecolorallocate($im, 0xD9, 0x6A, 0x18);
     $base  = imagecolorallocate($im, 0xEC, 0x7E, 0x22);
@@ -932,22 +1076,71 @@ function ig_pumpkin($im, $cx, $baseY, $r, $face = false) {
     // the rind or needed a halo.) $glow keeps its name from that version.
     if ($face) {
         $glow = imagecolorallocate($im, 0x0B, 0x0A, 0x08);
-        $poly = function (array $rel, $color) use ($im, $cx, $cy, $r) {
+        $poly = function (array $rel, $color, $scale = 1.0, $center = null) use ($im, $cx, $cy, $r) {
+            // Scaled about the vertex average unless told otherwise; the
+            // jagged grin's vertex average sits well off its visual centre,
+            // so it passes its own.
+            [$mx, $my] = $center ?? [array_sum(array_column($rel, 0)) / count($rel), array_sum(array_column($rel, 1)) / count($rel)];
             $pts = [];
             foreach ($rel as [$px, $py]) {
-                $pts[] = (int) round($cx + $px * $r);
-                $pts[] = (int) round($cy + $py * $r);
+                $pts[] = (int) round($cx + ($mx + ($px - $mx) * $scale) * $r);
+                $pts[] = (int) round($cy + ($my + ($py - $my) * $scale) * $r);
             }
             imagefilledpolygon($im, $pts, $color);
         };
-        $poly([[-0.66, -0.02], [-0.20, -0.02], [-0.43, -0.46]], $glow);     // left eye
-        $poly([[ 0.20, -0.02], [ 0.66, -0.02], [ 0.43, -0.46]], $glow);     // right eye
-        $poly([[-0.10,  0.20], [ 0.10,  0.20], [ 0.00,  0.03]], $glow);     // nose
-        $poly([                                                             // grin
-            [-0.66, 0.30], [-0.42, 0.44], [-0.26, 0.30], [-0.10, 0.46], [0.06, 0.30],
-            [ 0.22, 0.46], [ 0.40, 0.30], [ 0.66, 0.28], [0.50, 0.60], [0.20, 0.70],
-            [-0.20, 0.70], [-0.50, 0.60],
-        ], $glow);
+        $features = [
+            'eyeL'  => [[-0.66, -0.02], [-0.20, -0.02], [-0.43, -0.46]],
+            'eyeR'  => [[ 0.20, -0.02], [ 0.66, -0.02], [ 0.43, -0.46]],
+            'nose'  => [[-0.10,  0.20], [ 0.10,  0.20], [ 0.00,  0.03]],
+            'grin'  => [
+                [-0.66, 0.30], [-0.42, 0.44], [-0.26, 0.30], [-0.10, 0.46], [0.06, 0.30],
+                [ 0.22, 0.46], [ 0.40, 0.30], [ 0.66, 0.28], [0.50, 0.60], [0.20, 0.70],
+                [-0.20, 0.70], [-0.50, 0.60],
+            ],
+        ];
+
+        if ($anim === null) {
+            foreach ($features as $rel) $poly($rel, $glow);
+        } else {
+            // Candle-lit: each cutout keeps its black silhouette (so the
+            // shape stays readable against the rind — a flat amber fill
+            // washes straight into it) with a flame inside that flickers
+            // across a narrow band of warm yellows. A slow swell (whole
+            // cycles per loop, so it closes) plus a quick per-frame jitter —
+            // the jitter is what reads as flame rather than a pulse.
+            $t = $anim['frame'] / $anim['frames'];
+            // One flame for the whole face — a single brightness shared by
+            // every cutout, since it is one candle lighting all of them —
+            // kept to a narrow, mostly-bright range so it reads as a gentle
+            // flicker rather than a strobe.
+            // The swell's cycle counts scale with the loop's length in
+            // seconds (0.75 and 1.75 cycles a second), so the flame keeps
+            // its speed however long the loop is; the jitter is per frame.
+            $secs   = $anim['frames'] / $anim['fps'];
+            $swell  = 0.05 * sin(2 * M_PI * (0.75 * $secs * $t)) + 0.03 * sin(2 * M_PI * (1.75 * $secs * $t));
+            $jitter = ((crc32('flame:' . $anim['frame']) % 100) / 100 - 0.5) * 0.14;
+            $b = max(0.0, min(1.0, 0.80 + $swell + $jitter));
+            $lights = [];
+            foreach ($features as $rel) $lights[] = [$rel, $b];
+            // A faint spill of light onto the rind around each cut, then the
+            // black cutouts, then the flames inside them.
+            $grinCenter = [0.0, 0.48];
+            foreach ($lights as [$rel, $b]) {
+                $isGrin = count($rel) > 6;
+                $poly($rel, imagecolorallocatealpha($im, 0xFF, 0xC8, 0x50, 125 - (int) round(10 * $b)), 1.3, $isGrin ? $grinCenter : null);
+            }
+            foreach ($lights as [$rel, $b]) $poly($rel, $glow);
+            foreach ($lights as [$rel, $b]) {
+                $isGrin = count($rel) > 6;
+                $flame = imagecolorallocate(
+                    $im,
+                    (int) round(0x8A + (0xFF - 0x8A) * $b),
+                    (int) round(0x2E + (0xE0 - 0x2E) * $b),
+                    (int) round(0x04 + (0x70 - 0x04) * $b)
+                );
+                $poly($rel, $flame, $isGrin ? 0.82 : 0.68, $isGrin ? $grinCenter : null);
+            }
+        }
     }
 
     $stemW = max(4, (int) round(0.30 * $r));
@@ -964,13 +1157,16 @@ function ig_pumpkin($im, $cx, $baseY, $r, $face = false) {
 // A filled bat silhouette, wings spread, ~$size px across half-span. Drawn
 // as polygons rather than ig_bat_mark()'s two arcs — those read as distant
 // birds, this reads as a bat at close range.
-function ig_bat_silhouette($im, $x, $y, $size, $color) {
+function ig_bat_silhouette($im, $x, $y, $size, $color, $flap = 0.0) {
     $wing = [[0.12, -0.10], [0.55, -0.42], [1.0, -0.30], [0.86, 0.0], [0.76, 0.26], [0.55, 0.06], [0.35, 0.30], [0.15, 0.12]];
     foreach ([1, -1] as $m) {
         $pts = [];
         foreach ($wing as [$wx, $wy]) {
+            // $flap (-1..1) swings the wings: raised at 1, lowered at -1,
+            // the tips moving most and the root not at all. 0 is the
+            // original spread-wing pose.
             $pts[] = (int) round($x + $m * $wx * $size);
-            $pts[] = (int) round($y + $wy * $size);
+            $pts[] = (int) round($y + ($wy - $flap * $wx * 0.7) * $size);
         }
         imagefilledpolygon($im, $pts, $color);
         imagefilledpolygon($im, [
@@ -1117,11 +1313,22 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
 // bulbs, showtimes in the same gold rather than paper's red. Row geometry
 // comes from the shared ig_list_row_geometry() — only the palette and the
 // bulb frame change, so this stays a drop-in for the same pagination math.
-function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
     imagealphablending($im, true);
+
+    // $anim = ['frame' => int, 'frames' => int, 'fps' => int] renders one
+    // frame of the looping version of this panel (96 frames at 12 fps, an
+    // 8-second loop); null is the ordinary still and is unchanged. Every
+    // moving part is a whole number of cycles over the loop so the last
+    // frame leads straight back into the first.
+    $t = $anim !== null ? $anim['frame'] / $anim['frames'] : 0.0;
+    // The bats, rain and moon move at the pace of a 4-second loop; on a
+    // longer one they simply repeat more cycles of it. $k stays a whole
+    // number while the loop is a multiple of 4 seconds, so they still close.
+    $k = $anim !== null ? ($anim['frames'] / $anim['fps']) / 4 : 1;
 
     // In October the marquee's gold bulbs and accents turn pumpkin orange
     // (the fall half of the seasonal look); the Halloween half is drawn
@@ -1143,7 +1350,7 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
     $stripe      = ig_hex($im, $season ? '#211810' : '#1C1912');
 
     imagefill($im, 0, 0, $bg);
-    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold, $season);
+    ig_marquee_bulbs($im, 28, 28, $w - 28, $h - 28, 40, $goldGlow, $gold, $season, $anim);
 
     if ($season) {
         // A pale moon in the empty band right of the kicker (the date
@@ -1151,19 +1358,50 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0) {
         // right-hand corners — the left ones would sit under the kicker and
         // the footer text.
         $mx = 770; $my = 98; $mr = 46;
+        // The moon's halo breathes: its rings brighten and settle once per loop.
+        $pulse = $anim === null ? 0 : (int) round(9 * (0.5 + 0.5 * sin(2 * M_PI * $k * $t)));
         foreach ([34, 24, 14] as $grow) {
-            imagefilledellipse($im, $mx, $my, ($mr + $grow) * 2, ($mr + $grow) * 2, imagecolorallocatealpha($im, $ar, $ag, $ab, 120));
+            imagefilledellipse($im, $mx, $my, ($mr + $grow) * 2, ($mr + $grow) * 2, imagecolorallocatealpha($im, $ar, $ag, $ab, 120 - $pulse));
         }
         imagefilledellipse($im, $mx, $my, $mr * 2, $mr * 2, ig_hex($im, '#EADFC2'));
+        // A little storm cloud over the moon's left edge, drawn before the
+        // bats so they fly in front of it.
+        ig_storm_cloud($im, $mx - 66, $my - 8, $anim);
         $batDark = ig_hex($im, '#0B0A08');
-        ig_bat_silhouette($im, $mx - 8, $my + 6, 30, $batDark);
-        ig_bat_silhouette($im, $mx + 30, $my - 20, 17, $batDark);
-        $batDim = ig_hex($im, '#6A3A16');
-        ig_bat_silhouette($im, $mx + 92, $my + 14, 20, $batDim);
-        ig_bat_silhouette($im, $mx - 96, $my - 8, 15, $batDim);
+        $batDim  = ig_hex($im, '#6A3A16');
+        // Each bat: [base x, base y, size, colour, x-sway, y-sway, phase].
+        // Sways are one lap of a loop-closing figure-eight (x once, y twice
+        // per loop); wings flap eight times per loop at their own phase.
+        $bats = [
+            [$mx - 8,  $my + 6,  30, $batDark, 14,  8, 0.0],
+            [$mx + 30, $my - 20, 17, $batDark, -12, 7, 1.3],
+            [$mx + 92, $my + 14, 20, $batDim,  18, 12, 2.1],
+            [$mx - 96, $my - 8,  15, $batDim, -16, 10, 4.0],
+            [$mx + 124, $my - 34, 16, $batDim, -14, 9, 5.2],
+        ];
+        foreach ($bats as [$bx, $by, $bs, $bc, $sx, $sy, $ph]) {
+            if ($anim === null) {
+                ig_bat_silhouette($im, $bx, $by, $bs, $bc);
+                continue;
+            }
+            ig_bat_silhouette(
+                $im,
+                $bx + $sx * cos(2 * M_PI * $k * $t + $ph),
+                $by + $sy * sin(4 * M_PI * $k * $t + $ph),
+                $bs,
+                $bc,
+                sin(2 * M_PI * (8 * $k * $t + $ph / 6))
+            );
+        }
         $web = imagecolorallocatealpha($im, 0xB5, 0xAF, 0xA0, 78);
-        ig_cobweb($im, $w - 46, 46, 118, $web, -1, 1);
-        ig_cobweb($im, $w - 46, $h - 46, 118, $web, -1, -1);
+        // Small webs in the two top corners — the left one is kept just
+        // short of the kicker beneath it — and a big one in the bottom-right
+        // with the pumpkins sitting over its left edge.
+        ig_cobweb($im, 46, 46, 80, $web, 1, 1);
+        ig_cobweb($im, $w - 46, 46, 80, $web, -1, 1);
+        ig_cobweb($im, $w - 46, $h - 46, 180, $web, -1, -1);
+        ig_pumpkin($im, $w - 190, $h - 50, 44, true, $anim);
+        ig_pumpkin($im, $w - 268, $h - 50, 28);
     }
 
     $margin = 80;
