@@ -3,7 +3,7 @@
 //  Animated list pages — a looping video in place of a still slide
 //
 //  A theme that supports it draws one frame of a looping version of its list
-//  page when ig_build_list_page() is handed an $anim spec (today: Marquee, in
+//  page when ig_build_list_page() is handed an $anim spec (today: Marquee, Paper and Neon, in
 //  October). This file turns those frames into an MP4, caches it, and tells
 //  the carousel publisher which slides have one.
 //
@@ -32,9 +32,22 @@ const IG_VIDEO_FPS   = 24;
 const IG_VIDEO_POLL_ATTEMPTS = 60;
 const IG_VIDEO_POLL_SLEEP    = 5;
 
+// Frames in a theme's loop. Most are one 8-second cycle (IG_ANIM_FRAMES);
+// Neon's ghost drifts the whole height of the card at a leisurely pace, so its
+// video is six of those cycles back to back — everything else in the scene
+// repeats every cycle, the ghost makes a single slow journey across all six.
+// Newsprint's classifieds likewise turn over slowly: three ads, each up for a
+// third of the video, while its bat makes one crossing in each third too —
+// three cycles of 82 frames (6.8s). Instagram wants carousel videos under a
+// minute: 6 x 8s = 48s, 3 x 6.83s = 20.5s.
+function ig_anim_frames($theme) {
+    if ($theme === 'newsprint') return 3 * 82;
+    return ($theme === 'neon' ? 6 : 1) * IG_ANIM_FRAMES;
+}
+
 // Which themes have an animated list page, for a post on $date.
 function ig_theme_animates($theme, $date) {
-    return in_array($theme, ['marquee', 'paper'], true) && ig_halloween_season($date);
+    return in_array($theme, ['marquee', 'paper', 'neon', 'newsprint'], true) && ig_halloween_season($date);
 }
 
 // Whether a planned page (see ig_plan_pages()) gets a video.
@@ -104,13 +117,16 @@ function ig_render_anim(array $item, $date, $i, $wait = true) {
         if ($found !== 0) throw new RuntimeException('ffmpeg is not installed');
 
         mkdir($frames, 0700);
-        for ($f = 0; $f < IG_ANIM_FRAMES; $f++) {
+        $nFrames = ig_anim_frames($item['theme']);
+        for ($f = 0; $f < $nFrames; $f++) {
             $im = ig_build_list_page($item['films'], $date, $item['theme'], $item['moreCount'],
-                ['frame' => $f, 'frames' => IG_ANIM_FRAMES, 'fps' => IG_ANIM_FPS]);
+                ['frame' => $f, 'frames' => $nFrames, 'fps' => IG_ANIM_FPS]);
             imagepng($im, sprintf('%s/f%03d.png', $frames, $f), 1);
             imagedestroy($im);
         }
 
+        // -t is a float: a video whose frame count is not a whole number of
+        // seconds (Newsprint's is 25.5s) would be cut short by an integer.
         // A silent stereo track rides along: some Meta video paths expect
         // one, and it costs nothing a muted loop would miss. Meta's spec
         // rules out edit lists and wants the index at the front: -bf 0 and
@@ -119,11 +135,11 @@ function ig_render_anim(array $item, $date, $i, $wait = true) {
         // the index forward.
         $cmd = sprintf(
             'ffmpeg -y -loglevel error -framerate %d -i %s -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 '
-            . '-shortest -t %d -r %d -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -profile:v high -bf 0 -g %d '
+            . '-shortest -t %.4F -r %d -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p -profile:v high -bf 0 -g %d '
             . '-c:a aac -b:a 64k -use_editlist 0 -movflags +faststart %s 2>&1',
             IG_ANIM_FPS,
             escapeshellarg($frames . '/f%03d.png'),
-            IG_ANIM_FRAMES / IG_ANIM_FPS,
+            $nFrames / IG_ANIM_FPS,
             IG_VIDEO_FPS,
             IG_VIDEO_FPS,
             escapeshellarg($tmp)

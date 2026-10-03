@@ -366,6 +366,280 @@ function ig_neon_border($im, $x1, $y1, $x2, $y2, $glowColor, $lineColor) {
     imagesetthickness($im, 1);
 }
 
+// ── October's neon accents ───────────────────────────────────────────────────
+// Glowing tubes for the Neon theme's Halloween look: each stroke is a wide dim
+// halo, a narrower brighter one, then the coloured tube itself with a hotter
+// core — the same low-alpha-then-crisp idea as ig_neon_text(), for shapes.
+// $pts is a list of [x, y]; $closed joins the last point back to the first.
+//
+// $level (0..1) dims the whole tube — the halo thins and the colour sinks
+// toward the card's background — which is how the animated version makes
+// tubes flicker and fade; 1, the default, is the still.
+function ig_neon_tube($im, array $pts, array $rgb, $closed = false, $core = 3, $level = 1.0) {
+    $n = count($pts);
+    $haloA = fn($a) => $a;
+    if ($level < 1.0) {
+        $level = max(0.0, $level);
+        if ($level < 0.03) return;
+        $bgc = [0x15, 0x08, 0x29];
+        $rgb = [(int) round($bgc[0] + ($rgb[0] - $bgc[0]) * $level), (int) round($bgc[1] + ($rgb[1] - $bgc[1]) * $level), (int) round($bgc[2] + ($rgb[2] - $bgc[2]) * $level)];
+        $haloA = fn($a) => (int) round(127 - (127 - $a) * $level);
+    }
+    $draw = function ($color) use ($im, $pts, $n, $closed) {
+        for ($i = 0; $i < $n - 1; $i++) imageline($im, (int) round($pts[$i][0]), (int) round($pts[$i][1]), (int) round($pts[$i + 1][0]), (int) round($pts[$i + 1][1]), $color);
+        if ($closed) imageline($im, (int) round($pts[$n - 1][0]), (int) round($pts[$n - 1][1]), (int) round($pts[0][0]), (int) round($pts[0][1]), $color);
+    };
+    foreach ([[14, 118, $rgb], [8, 100, $rgb], [$core + 1, 40, $rgb]] as [$th, $a, $c]) {
+        imagesetthickness($im, $th);
+        $draw(imagecolorallocatealpha($im, $c[0], $c[1], $c[2], $haloA($a)));
+    }
+    imagesetthickness($im, max(1, $core - 1));
+    $draw(imagecolorallocate($im, min(255, $rgb[0] + 70), min(255, $rgb[1] + 70), min(255, $rgb[2] + 70)));
+    imagesetthickness($im, 1);
+}
+
+// Points along an elliptical arc ($a0..$a1 degrees, 0 = right, clockwise on
+// screen) — the building block for rounded tube shapes.
+function ig_neon_arc($cx, $cy, $rx, $ry, $a0 = 0, $a1 = 360, $steps = 32) {
+    $pts = [];
+    for ($i = 0; $i <= $steps; $i++) {
+        $a = deg2rad($a0 + ($a1 - $a0) * $i / $steps);
+        $pts[] = [$cx + $rx * cos($a), $cy + $ry * sin($a)];
+    }
+    return $pts;
+}
+
+// A skull in violet tube with pink eyes and nose and cyan teeth, $r px from
+// its centre to the edge of the cranium.
+//
+// Animated, $st = ['outline' => 0..1, 'eyes' => 0..1] dims the cranium and the
+// eyes/nose independently; null is the still.
+function ig_neon_skull($im, $cx, $cy, $r, $st = null) {
+    $lo = $st['outline'] ?? 1.0; $le = $st['eyes'] ?? 1.0;
+    $violet = [170, 110, 255]; $pink = [255, 46, 154]; $cyan = [45, 226, 230];
+    $outline = ig_neon_arc($cx, $cy - 0.1 * $r, 0.7 * $r, 0.72 * $r, 150, 390, 32);
+    array_push($outline,
+        [$cx + 0.42 * $r, $cy + 0.55 * $r], [$cx + 0.42 * $r, $cy + 0.9 * $r],
+        [$cx - 0.42 * $r, $cy + 0.9 * $r],  [$cx - 0.42 * $r, $cy + 0.55 * $r]);
+    $k = $r / 68;   // stroke weights were drawn for r=68; smaller skulls get lighter tubes
+    $t4 = max(2, (int) round(4 * $k)); $t3 = max(2, (int) round(3 * $k)); $t2 = max(1, (int) round(2 * $k));
+    ig_neon_tube($im, $outline, $violet, true, $t4, $lo);
+    foreach ([-1, 1] as $m) {
+        ig_neon_tube($im, ig_neon_arc($cx + $m * 0.28 * $r, $cy - 0.05 * $r, 0.2 * $r, 0.22 * $r, 0, 360, 20), $pink, true, $t3, $le);
+    }
+    ig_neon_tube($im, [[$cx, $cy + 0.2 * $r], [$cx - 0.09 * $r, $cy + 0.4 * $r], [$cx + 0.09 * $r, $cy + 0.4 * $r]], $pink, true, $t3, $le);
+    foreach ([-0.2, 0.0, 0.2] as $dx) {
+        ig_neon_tube($im, [[$cx + $dx * $r, $cy + 0.62 * $r], [$cx + $dx * $r, $cy + 0.9 * $r]], $cyan, false, $t2, $lo);
+    }
+}
+
+// "CINEMA, TX" with its E burnt out: the title drawn a letter at a time, the
+// E an unlit plum tube with no glow, the M beside it sagging to half
+// brightness, and a few sparks jumping off the dead tube. Drawn exactly where
+// the plain title sits ($x, $baseline) so nothing around it shifts. Letter
+// positions come from the width of everything before each letter.
+//
+// Animated, $st = ['e' => 0..1, 'm' => 0..1, 'spark' => 0..1, 'seed' => int]
+// says how lit the E is (0 dead, 1 full neon), how bright the M is, how
+// hard the sparks are firing, and which way they jump; null is the still.
+function ig_neon_dying_title($im, $size, $x, $baseline, $font, $pink, $pinkGlow, $st = null) {
+    $text = 'CINEMA, TX';
+    $dead = ig_hex($im, '#5B1B48');
+    $dim  = imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, 58);
+    $span = function ($s) use ($size, $font) { $b = imagettfbbox($size, 0, $font, $s . 'l'); $l = imagettfbbox($size, 0, $font, 'l'); return $b[2] - $l[2]; };
+    $eX = $x;
+    for ($i = 0; $i < strlen($text); $i++) {
+        $ch = $text[$i];
+        $px = $x + ($i === 0 ? 0 : $span(substr($text, 0, $i)));
+        if ($ch === 'E') {
+            $eX = $px;
+            $e = $st['e'] ?? 0.0;
+            if ($e <= 0.0) {
+                imagettftext($im, $size, 0, $px, $baseline, $dead, $font, $ch);
+            } else {
+                // Lit: blend from the dead plum up to the full pink, and only
+                // once it is mostly up does it throw a glow.
+                $dr = ($dead >> 16) & 255; $dg = ($dead >> 8) & 255; $db = $dead & 255;
+                $lit = imagecolorallocate($im, (int) round($dr + (0xFF - $dr) * $e), (int) round($dg + (0x2E - $dg) * $e), (int) round($db + (0x9A - $db) * $e));
+                if ($e >= 0.5) ig_neon_text($im, $size, $px, $baseline, $font, $ch, $lit, imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, (int) round(127 - 27 * $e)));
+                else           imagettftext($im, $size, 0, $px, $baseline, $lit, $font, $ch);
+            }
+        }
+        elseif ($ch === 'M') {
+            $mc = isset($st['m']) ? imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, (int) round(127 - 127 * min(1.0, max(0.0, $st['m'])))) : $dim;
+            if (isset($st['m']) && $st['m'] > 0.9) ig_neon_text($im, $size, $px, $baseline, $font, $ch, $pink, $pinkGlow);
+            else                                   imagettftext($im, $size, 0, $px, $baseline, $mc, $font, $ch);
+        }
+        else                  ig_neon_text($im, $size, $px, $baseline, $font, $ch, $pink, $pinkGlow);
+    }
+    // Sparks: short bright strokes jumping off the top of the E.
+    $spark = imagecolorallocate($im, 255, 214, 100);
+    $hot   = imagecolorallocatealpha($im, 255, 180, 60, 90);
+    $k = $size / 34;
+    $level = $st['spark'] ?? 1.0;
+    $seed  = $st['seed'] ?? 0;
+    foreach ([[10, -26, -10, -48], [18, -26, 30, -44], [14, -28, 14, -54], [24, -22, 44, -30]] as $si => [$x1, $y1, $x2, $y2]) {
+        if ($level <= 0.0) break;
+        if ($st !== null) {
+            // Each frame the sparks jump a little differently, and a weak
+            // burst drops the outer ones.
+            if ($si >= 2 && $level < 0.75) continue;
+            $x2 += (int) round(9 * sin($seed * 2.31 + $si * 1.7));
+            $y2 += (int) round(7 * sin($seed * 1.37 + $si * 2.9));
+            $scale = $k * (0.55 + 0.45 * $level);
+        } else $scale = $k;
+        [$x1, $y1, $x2, $y2] = [(int) round($eX + $x1 * $scale), (int) round($baseline + $y1 * $scale), (int) round($eX + $x2 * $scale), (int) round($baseline + $y2 * $scale)];
+        imagesetthickness($im, 6); imageline($im, $x1, $y1, $x2, $y2, $hot);
+        imagesetthickness($im, 2); imageline($im, $x1, $y1, $x2, $y2, $spark);
+    }
+    imagesetthickness($im, 1);
+}
+
+// A little graveyard along the ground, in tube: a ground line, four stones
+// (rounded RIP slab, cross, tall arch, a slab leaning the other way) and a few
+// grass tufts. $x0..$x1 is the span, $base the ground's y.
+//
+// Animated ($anim = ['frame', 'frames', ...]): the cross flickers once in a
+// while, and a small ghost rises out of the RIP slab, sways its way up the
+// right-hand side of the card (clear of the skull and, mostly, of the list
+// text) and out through the top edge. It is off-screen for the loop's first
+// and last stretch, so the loop closes on an empty graveyard.
+function ig_neon_tombstones($im, $x0, $x1, $base, $anim = null) {
+    $crossLevel = 1.0; $ghost = null;
+    if ($anim !== null) {
+        $f = $anim['frame'] % IG_ANIM_FRAMES;
+        if (in_array($f, [40, 41, 44], true)) $crossLevel = 0.15;
+        elseif (in_array($f, [42, 45], true)) $crossLevel = 0.6;
+        // The ghost's single journey spans the whole video, not one cycle.
+        $gp = ($anim['frame'] / $anim['frames'] - 0.03) / 0.895;
+        if ($gp > 0 && $gp < 1) {
+            // Fades in as it leaves the slab, then climbs steadily until it is
+            // past the top edge (centre at -40, so the whole ghost and its
+            // glow are clear of the frame by the time it stops being drawn).
+            $ghost = [$x0 + 150 + 14 * sin(2 * M_PI * 10 * $gp), ($base - 96) - (($base - 96) + 40) * $gp, min(1.0, $gp / 0.08) * 0.9];
+        }
+    }
+    $pink = [255, 46, 154]; $violet = [170, 110, 255]; $cyan = [45, 226, 230]; $green = [120, 255, 90];
+    ig_neon_tube($im, [[$x0, $base], [$x1, $base]], $violet, false, 2);
+    $slab = function ($cx, $w, $h, $color, $lean = 0) use ($im, $base) {
+        $half = $w / 2;
+        $pts = [[$cx - $half, $base]];
+        foreach (ig_neon_arc($cx, $base - $h + $half, $half, $half, 180, 360, 14) as $p) $pts[] = $p;
+        $pts[] = [$cx + $half, $base];
+        if ($lean) foreach ($pts as &$p) $p[0] += $lean * ($base - $p[1]) / $h;
+        unset($p);
+        ig_neon_tube($im, $pts, $color, false, 3);
+    };
+    $slab($x0 + 150, 66, 84, $pink);
+    $slab($x0 + 40,  44, 50, $cyan, -8);
+    $slab($x0 + 262, 40, 76, $violet);
+    // Cross.
+    $cxm = $x0 + 214;
+    ig_neon_tube($im, [[$cxm, $base], [$cxm, $base - 62]], $cyan, false, 3, $crossLevel);
+    ig_neon_tube($im, [[$cxm - 17, $base - 44], [$cxm + 17, $base - 44]], $cyan, false, 3, $crossLevel);
+    // Grass.
+    foreach ([$x0 + 92, $x0 + 188, $x0 + 300] as $gx) {
+        foreach ([[-7, -11], [0, -15], [7, -11]] as [$dx, $dy]) ig_neon_tube($im, [[$gx, $base], [$gx + $dx, $base + $dy]], $green, false, 2);
+    }
+    // R.I.P. on the big slab.
+    $rip = imagecolorallocatealpha($im, 255, 46, 154, 100);
+    ig_neon_text($im, 15, $x0 + 150 - 17, $base - 40, IG_FONT_NEON_TITLE, 'RIP', ig_hex($im, '#FF7FC4'), $rip);
+    if ($ghost) ig_neon_ghost($im, $ghost[0], $ghost[1], 20, $ghost[2]);
+}
+
+// A small cyan ghost, pink-eyed, $r px across its dome, drawn at $level.
+function ig_neon_ghost($im, $cx, $cy, $r, $level = 1.0) {
+    $cyan = [45, 226, 230]; $pink = [255, 46, 154];
+    $pts = ig_neon_arc($cx, $cy - 0.2 * $r, 0.62 * $r, 0.7 * $r, 180, 360, 20);
+    $pts[] = [$cx + 0.62 * $r, $cy + 0.7 * $r];
+    for ($i = 1; $i <= 6; $i++) $pts[] = [$cx + 0.62 * $r - 1.24 * $r * $i / 6, $cy + 0.7 * $r + ($i % 2 === 0 ? 0 : 0.28 * $r)];
+    ig_neon_tube($im, $pts, $cyan, true, 2, $level);
+    foreach ([-1, 1] as $m) ig_neon_tube($im, ig_neon_arc($cx + $m * 0.24 * $r, $cy - 0.28 * $r, 0.08 * $r, 0.13 * $r, 0, 360, 10), $pink, true, 2, $level);
+    ig_neon_tube($im, ig_neon_arc($cx, $cy + 0.12 * $r, 0.1 * $r, 0.14 * $r, 0, 360, 10), $pink, true, 2, $level);
+}
+
+// ── October's newsprint accents ──────────────────────────────────────────────
+// Kept to the page's own two inks (black and the brick red) and its own
+// vocabulary: a masthead "ear", a halftone engraving, a classifieds box.
+
+// The boxed note newspapers put beside their title — here a forecast.
+function ig_news_ear($im, $x1, $y1, $x2, $y2, $ink, $red, array $lines) {
+    imagerectangle($im, $x1, $y1, $x2, $y2, $ink);
+    imagerectangle($im, $x1 + 3, $y1 + 3, $x2 - 3, $y2 - 3, $ink);
+    imagettftext($im, 11, 0, $x1 + 14, $y1 + 21, $red, IG_FONT_BODY, 'FORECAST');
+    $y = $y1 + 39;
+    foreach ($lines as $l) { imagettftext($im, 15, 0, $x1 + 14, $y, $ink, IG_FONT_BODY, $l); $y += 19; }
+}
+
+// A halftone-engraved moon: a staggered grid of dots whose size follows the
+// shading — bare paper on the lit (left) side, heavy dots in the shadow and
+// toward the rim — with a few cratered patches, and a thin outline.
+function ig_halftone_moon($im, $cx, $cy, $r, $ink) {
+    $g = 9;
+    for ($y = -$r; $y <= $r; $y += $g) {
+        for ($x = -$r; $x <= $r; $x += $g) {
+            $xo = $x + (((int) ($y / $g)) % 2 ? $g / 2 : 0);
+            $d = sqrt($xo * $xo + $y * $y);
+            if ($d > $r - 1) continue;
+            $shade = 0.12 + 0.88 * pow(($xo + $r) / (2 * $r), 1.3) + 0.25 * pow($d / $r, 4);
+            $dot = max(0.0, min(1.0, $shade)) * 4.4;
+            foreach ([[-0.35, -0.25, 0.22], [0.1, 0.35, 0.18], [-0.1, -0.5, 0.12]] as [$ox, $oy, $orr]) {
+                if (hypot($xo - $ox * $r, $y - $oy * $r) < $orr * $r) $dot *= 0.55;
+            }
+            if ($dot > 0.6) imagefilledellipse($im, (int) ($cx + $xo), (int) ($cy + $y), (int) round($dot * 2), (int) round($dot * 2), $ink);
+        }
+    }
+    imageellipse($im, $cx, $cy, 2 * $r, 2 * $r, $ink);
+}
+
+// The little classifieds box: an ink title bar, then a few lines of ad. $ads is
+// a list of 3-line ads; the still shows the first. Animated, the ads cycle like
+// a reel being advanced a frame at a time: the video is split evenly among the
+// ads, and at the end of each one's share it rolls up and out as the next
+// rolls up from below (a six-frame, smoothstepped slip); the last rolls into
+// the first at the loop's wrap so the cycle closes. Drawn with the clip set to the ad window
+// so a rolling ad is cut off at the box edge.
+function ig_news_classifieds($im, $x1, $y1, $x2, $y2, $ink, $red, $paper, array $ads, $anim = null) {
+    imagerectangle($im, $x1, $y1, $x2, $y2, $ink);
+    imagefilledrectangle($im, $x1, $y1, $x2, $y1 + 22, $ink);
+    imagettftext($im, 11, 0, $x1 + 10, $y1 + 16, $paper, IG_FONT_BODY, 'CLASSIFIEDS');
+
+    $cur = 0; $next = 0; $p = 0.0;
+    if ($anim !== null) {
+        $n = count($ads);
+        $f = $anim['frame'] % $anim['frames'];
+        $per = $anim['frames'] / $n;
+        $cur = (int) floor($f / $per);
+        $phase = $f - $cur * $per;
+        $roll = 6;
+        if ($phase >= $per - $roll) {
+            $p = ig_ease(($phase - ($per - $roll) + 1) / $roll);
+            $next = ($cur + 1) % $n;
+        }
+    }
+
+    $winTop = $y1 + 24; $winH = $y2 - $winTop - 1;
+    imagesetclip($im, $x1 + 1, $winTop, $x2 - 1, $y2 - 1);
+    foreach ($p > 0 ? [[$cur, -$p * $winH], [$next, (1 - $p) * $winH]] : [[$cur, 0]] as [$ai, $dy]) {
+        $y = $y1 + 46 + (int) round($dy);
+        foreach ($ads[$ai] as $li => $line) {
+            // The first line opens with the ad's category ("FOR SALE:"), which
+            // alone is in red, like a classified's headline word.
+            $colon = $li === 0 ? strpos($line, ':') : false;
+            if ($colon !== false) {
+                $label = substr($line, 0, $colon + 1);
+                $lw = imagettfbbox(15, 0, IG_FONT_BODY, $label . 'l')[2] - imagettfbbox(15, 0, IG_FONT_BODY, 'l')[2];
+                imagettftext($im, 15, 0, $x1 + 10, $y, $red, IG_FONT_BODY, $label);
+                imagettftext($im, 15, 0, $x1 + 10 + $lw, $y, $ink, IG_FONT_BODY, substr($line, $colon + 1));
+            } else {
+                imagettftext($im, 15, 0, $x1 + 10, $y, $ink, IG_FONT_BODY, $line);
+            }
+            $y += 21;
+        }
+    }
+    imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
+}
+
 // A final overlay pass — faint horizontal lines the full width of the
 // card — the one texture that has to be drawn last, over everything else,
 // since a real CRT's scanlines sit in front of the whole picture.
@@ -790,8 +1064,8 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         // that animate — see ig_theme_animates(); the rest ignore it.
         case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount, $anim);
         case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
-        case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount);
-        case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount);
+        case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount, $anim);
+        case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount, $anim);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
         case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount);
         case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount);
@@ -1852,7 +2126,7 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
 // a thick/thin double rule beneath it, the way a real paper's name sits
 // over its own folio rule, rather than a chip or a stamp. Labels are flat
 // rectangles, not rounded pills — newsprint has no rounded corners anywhere.
-function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -1870,14 +2144,26 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 
     $margin = 80;
 
-    imagettftext($im, 34, 0, $margin, 108, $ink, IG_FONT_NEWSPRINT_TITLE, 'CINEMA, TX');
+    // The wordmark is a small masthead line sitting on the double rule; the
+    // day's headline below it, "Today in Austin", is the loud thing on the page.
+    imagettftext($im, 24, 0, $margin, 112, $ink, IG_FONT_NEWSPRINT_TITLE, 'CINEMA, TX');
     imagefilledrectangle($im, $margin, 126, $w - $margin, 130, $ink);
     imagefilledrectangle($im, $margin, 136, $w - $margin, 137, $ink);
 
-    $y = 182;
-    imagettftext($im, 24, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
-    $y += 46;
-    imagettftext($im, 34, 0, $margin, $y, $ink, IG_FONT_BODY, date('l, F j', $date));
+    // October: the masthead's right-hand ear carries a forecast, and a
+    // halftone moon with a bat across it sits in the header's empty right
+    // side. The bat is still a bat on the moon; animated it flies across.
+    $season = ig_halloween_season($date);
+    $moonCx = 905; $moonCy = 201; $moonR = 56;
+    if ($season) {
+        ig_news_ear($im, 660, 52, $w - $margin, 120, $ink, $red, ['Fog, then screams after dusk.', 'Chance of fright: 90%.']);
+        ig_halftone_moon($im, $moonCx, $moonCy, $moonR, $ink);
+    }
+
+    $y = 188;
+    imagettftext($im, 36, 0, $margin, $y, $red, IG_FONT_BODY, strtoupper('Today in Austin'));
+    $y += 40;
+    imagettftext($im, 30, 0, $margin, $y, $ink, IG_FONT_BODY, date('l, F j', $date));
     $y += 34;
     imagefilledrectangle($im, $margin, $y, $w - $margin, $y + 2, $ink);
     $y += 38;
@@ -1958,6 +2244,36 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
+    if ($season) {
+        // The bat: perched across the moon in the still. Animated it makes
+        // one crossing of the header per loop — in from the left of the moon,
+        // over it, and off the right edge of the card — flapping, bobbing,
+        // and fading in so it does not simply appear. It is off the card at
+        // the loop's wrap.
+        $bx = $moonCx - 37; $by = $moonCy - 23; $bs = 46; $flap = 0.0; $batColor = $ink;
+        if ($anim !== null) {
+            $cycle = $anim['frames'] / 3;   // three crossings per video (see ig_anim_frames())
+            $t = fmod($anim['frame'], $cycle) / $cycle;
+            $u = ($t - 0.06) / 0.88;
+            if ($u >= 0 && $u <= 1) {
+                $bx = 560 + 560 * $u;
+                $by = $moonCy - 8 + 12 * sin(2 * M_PI * 1.5 * $u) - 8 * sin(M_PI * $u);
+                $flap = 0.7 * sin(2 * M_PI * 13 * $t);
+                $a = min(1.0, $u / 0.08);
+                $batColor = imagecolorallocatealpha($im, 0x1C, 0x1B, 0x19, (int) round(127 * (1 - $a)));
+            } else {
+                $bs = 0;
+            }
+        }
+        if ($bs > 0) ig_bat_silhouette($im, $bx, $by, $bs, $batColor, $flap);
+
+        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, [
+            ['MISSING: projectionist. Last', 'seen entering the booth. The', 'film is still running.'],
+            ['FOR SALE: haunted theatre', 'seats, row F. Sold as-is.', 'They talk during previews.'],
+            ['NOTICE: will the person', 'screaming in row C please', 'keep it down? — Management'],
+        ], $anim);
+    }
+
     return $im;
 }
 
@@ -1968,7 +2284,7 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0) {
 // The wordmark is glowing letters with no box around them (a real neon
 // sign has no chip), every page sits inside a glowing border frame like
 // Marquee's bulb border, and scanlines are the final pass over everything.
-function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_neon(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -1990,12 +2306,45 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     $margin = 80;
 
     $pinkGlow = imagecolorallocatealpha($im, 0xFF, 0x2E, 0x9A, 100);
-    ig_neon_text($im, 34, $margin, 108, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
+    $season = ig_halloween_season($date);
+
+    // Animated (October only): the E sputters back to life in three bursts —
+    // each burst a few frames of it flaring up, the M beside it brightening and
+    // sparks jumping — while the skull's eyes black out in sympathy, as if the
+    // sign were drawing the power. Frames are 12 fps, so each flicker is a
+    // twelfth of a second. Outside the bursts the E is dead, as in the still.
+    $titleSt = null; $skullSt = null; $recOn = true;
+    if ($anim !== null && $season) {
+        // Everything but the ghost repeats every IG_ANIM_FRAMES-frame cycle;
+        // the video may be several cycles long (see ig_anim_frames()).
+        $f = $anim['frame'] % IG_ANIM_FRAMES; $t = $f / IG_ANIM_FRAMES;
+        $flash = [14 => 1.0, 16 => 1.0, 19 => 0.8, 52 => 1.0, 53 => 1.0, 55 => 0.8, 58 => 1.0, 80 => 1.0, 82 => 0.7];
+        $lit   = $flash[$f] ?? null;
+        $after = isset($flash[$f - 1]) && $lit === null;
+        $titleSt = [
+            'e'     => $lit ?? ($after ? 0.3 : 0.0),
+            'm'     => $lit !== null ? 0.95 : 0.54 + 0.10 * sin(2 * M_PI * 3 * $t),
+            'spark' => $lit !== null ? $lit : ($after ? 0.5 : 0.0),
+            'seed'  => $f,
+        ];
+        $dark = $lit !== null || $after || in_array($f, [33, 34, 71], true);
+        $skullSt = [
+            'outline' => $lit !== null ? 0.6 : 0.93 + 0.07 * sin(2 * M_PI * 5 * $t),
+            'eyes'    => $dark ? 0.1 : 0.7 + 0.3 * (0.5 + 0.5 * sin(2 * M_PI * 2 * $t - M_PI / 2)),
+        ];
+        // The REC light blinks: on for just over half of each two seconds.
+        $recOn = fmod($t * 4, 1.0) < 0.55;
+    }
+    if ($season) ig_neon_dying_title($im, 34, $margin, 108, IG_FONT_NEON_TITLE, $pink, $pinkGlow, $titleSt);
+    else         ig_neon_text($im, 34, $margin, 108, IG_FONT_NEON_TITLE, 'CINEMA, TX', $pink, $pinkGlow);
 
     // A recording-light dot — the one place this theme borrows red, since
     // nothing else reads "REC" like it does.
-    imagefilledellipse($im, $w - $margin - 58, 60, 12, 12, ig_hex($im, '#FF3355'));
+    if ($recOn) imagefilledellipse($im, $w - $margin - 58, 60, 12, 12, ig_hex($im, '#FF3355'));
     imagettftext($im, 20, 0, $w - $margin - 42, 66, $ink, IG_FONT_BODY, 'REC');
+
+    // October: a neon skull in the header's empty right-hand side.
+    if ($season) ig_neon_skull($im, $w - $margin - 95, 178, 68, $skullSt);
 
     $y = 175;
     imagettftext($im, 24, 0, $margin, $y, $cyan, IG_FONT_BODY, strtoupper('Today in Austin'));
@@ -2102,6 +2451,9 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0) {
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    // October: a graveyard along the ground, right of the footer line.
+    if ($season) ig_neon_tombstones($im, $w - $margin - 340, $w - $margin, $h - 40, $anim);
 
     ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
 
@@ -3153,6 +3505,11 @@ function ig_build_feature_page_neon(array $film, $date) {
 
     ig_neon_border($im, 24, 24, $w - 24, $h - 24, $cyanGlow, $cyan);
 
+    // October: the graveyard from the list page, in the footer's empty right
+    // side. (The skull and dying-E sign were tried in the hero's top-right and
+    // dropped — the pills own that corner and the photo is the star.)
+    $season = ig_halloween_season($date);
+
     $pillFont = 30;
     $pillPadX = 30;
     $pillH    = 60;
@@ -3226,6 +3583,8 @@ function ig_build_feature_page_neon(array $film, $date) {
         imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if ($season) ig_neon_tombstones($im, $w - $margin - 340, $w - $margin, $h - 40);
 
     ig_scanlines($im, $w, $h, imagecolorallocatealpha($im, 0, 0, 0, 112));
 
