@@ -795,7 +795,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
         case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount);
         case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount);
-        default:          return ig_build_list_page_paper($films, $date, $moreCount);
+        default:          return ig_build_list_page_paper($films, $date, $moreCount, $anim);
     }
 }
 
@@ -949,7 +949,10 @@ function ig_halloween_season($date) {
 
 // A corner cobweb: spokes fanning from ($cx,$cy) across a quarter turn,
 // joined by sagging rings. $sx/$sy (+1/-1) pick which corner it hangs in.
-function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1) {
+// $wobble (about -0.4..0.4) deepens or relaxes every strand's sag, so
+// animating it from frame to frame makes the web shiver as if in a breeze;
+// 0, the default, is the still web.
+function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1, $wobble = 0.0) {
     $angles = [0, 22.5, 45, 67.5, 90];
     $pt = function ($deg, $r) use ($cx, $cy, $sx, $sy) {
         $rad = deg2rad($deg);
@@ -966,7 +969,7 @@ function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1) {
             // Each strand is a short polyline bowed toward the corner — a
             // chord with a sine-shaped dip, so it hangs in a smooth curve
             // instead of kinking at a single pulled-in midpoint.
-            $sag = 0.09 * $len * $f;
+            $sag = 0.09 * $len * $f * (1 + $wobble);
             $px = $x1; $py = $y1;
             for ($s = 1; $s <= 6; $s++) {
                 $t  = $s / 6;
@@ -1043,6 +1046,133 @@ function ig_storm_cloud($im, $cx, $cy, $anim = null) {
         foreach ($shape as [$dx, $dy]) { $pts[] = $cx + $dx; $pts[] = $cy + $dy; }
         imagefilledpolygon($im, $pts, imagecolorallocate($im, 0xFF, 0xF3, 0xB0));
     }
+}
+
+// A spider seen from above, head up: a small thorax, a larger abdomen below it
+// and eight two-jointed legs (knees raised, feet planted). $size is roughly the
+// width of the abdomen; the legs reach about 1.4x that to either side.
+// ($x,$y) is where a hanging spider's thread ends and the body begins — pass
+// $thread > 0 for a line from ($x,$y-$thread) down to it, 0 for a spider
+// sitting or crawling on something. $mark, when given, paints a black widow's
+// hourglass on the abdomen in that colour.
+// Animation hooks, both off by default (the still is unchanged): $anchorX
+// moves the top of the thread to a different x than the body, so a swinging
+// spider hangs from a fixed point on an angled line; $legPhase (radians)
+// makes the legs twitch, each at its own offset around that phase.
+function ig_spider($im, $x, $y, $thread, $size, $color, $mark = null, $anchorX = null, $legPhase = null) {
+    $s  = $size;
+    $tx = $x;            $ty = $y + 0.22 * $s;   // thorax centre
+    $ax = $x;            $ay = $y + 0.80 * $s;   // abdomen centre
+
+    if ($thread > 0) {
+        imageline($im, (int) round($anchorX ?? $x), (int) round($y - $thread), (int) round($x), (int) round($ty), $color);
+    }
+
+    // [root, knee, foot] per leg, in units of $s from the thorax centre,
+    // mirrored for the other side. Front legs reach up and out, the rear
+    // pair sweeps back and down.
+    $legs = [
+        [[0.12, -0.08], [0.70, -0.64], [1.22, -0.26]],
+        [[0.18,  0.00], [0.86, -0.26], [1.42,  0.26]],
+        [[0.18,  0.08], [0.86,  0.30], [1.34,  0.86]],
+        [[0.14,  0.14], [0.62,  0.72], [0.94,  1.42]],
+    ];
+    imagesetthickness($im, max(1, (int) round($s / 11)));
+    foreach ([1, -1] as $m) {
+        foreach ($legs as $li => [$r, $k, $f]) {
+            $rx = $tx + $m * $r[0] * $s; $ry = $ty + $r[1] * $s;
+            $kx = $tx + $m * $k[0] * $s; $ky = $ty + $k[1] * $s;
+            $fx = $tx + $m * $f[0] * $s; $fy = $ty + $f[1] * $s;
+            if ($legPhase !== null) {
+                // Opposite sides twitch in opposition and each pair a beat
+                // apart, so the legs ripple rather than all bobbing together.
+                $ph  = $legPhase + $li * 1.1 + ($m < 0 ? M_PI : 0);
+                $ky += 0.05 * $s * sin($ph);
+                $fy += 0.11 * $s * sin($ph + 0.7);
+            }
+            imageline($im, (int) round($rx), (int) round($ry), (int) round($kx), (int) round($ky), $color);
+            imageline($im, (int) round($kx), (int) round($ky), (int) round($fx), (int) round($fy), $color);
+        }
+    }
+    imagesetthickness($im, 1);
+
+    imagefilledellipse($im, (int) round($ax), (int) round($ay), (int) round(0.95 * $s), (int) round(1.15 * $s), $color);
+    imagefilledellipse($im, (int) round($tx), (int) round($ty), (int) round(0.6 * $s), (int) round(0.58 * $s), $color);
+
+    if ($mark !== null) {
+        $hw = 0.15 * $s; $hh = 0.24 * $s;
+        imagefilledpolygon($im, [
+            (int) round($ax - $hw), (int) round($ay - $hh), (int) round($ax + $hw), (int) round($ay - $hh), (int) round($ax), (int) round($ay),
+        ], $mark);
+        imagefilledpolygon($im, [
+            (int) round($ax - $hw), (int) round($ay + $hh), (int) round($ax + $hw), (int) round($ay + $hh), (int) round($ax), (int) round($ay),
+        ], $mark);
+    }
+}
+
+// Smoothstep: 0 -> 1 with zero slope at both ends, for motion that eases in
+// and out.
+function ig_ease($x) {
+    $x = max(0.0, min(1.0, $x));
+    return $x * $x * (3 - 2 * $x);
+}
+
+// A four-point sparkle at ($x,$y), $size px from centre to tip: two thin
+// diamonds crossed. $color should already carry whatever alpha it needs.
+function ig_glint($im, $x, $y, $size, $color) {
+    $n = 0.2 * $size;
+    imagefilledpolygon($im, [(int) round($x), (int) round($y - $size), (int) round($x + $n), (int) round($y),
+                             (int) round($x), (int) round($y + $size), (int) round($x - $n), (int) round($y)], $color);
+    imagefilledpolygon($im, [(int) round($x - $size), (int) round($y), (int) round($x), (int) round($y - $n),
+                             (int) round($x + $size), (int) round($y), (int) round($x), (int) round($y + $n)], $color);
+}
+
+// The point where a cobweb's spoke at $deg meets its ring at fraction $f of
+// $len — the same geometry ig_cobweb() uses, so a glint placed here sits on
+// a real junction of the web it was asked about.
+function ig_web_junction($cx, $cy, $len, $sx, $sy, $deg, $f) {
+    $rad = deg2rad($deg);
+    return [$cx + $sx * $len * $f * cos($rad), $cy + $sy * $len * $f * sin($rad)];
+}
+
+// A tiny spider facing $heading (radians; 0 is up, increasing clockwise on
+// screen), seen from above like ig_spider() but turned to face where it is
+// going. Drawn as rotated polygons rather than ig_spider()'s axis-aligned
+// ellipses, which is why it is its own function: ig_spider() has to stay
+// byte-for-byte what the stills were drawn with. $legPhase (radians) runs the
+// legs and $scuttle (0..1) says how hard — full when walking, a gentle
+// paddle when turning on the spot.
+function ig_spider_crawl($im, $x, $y, $size, $color, $heading, $legPhase, $scuttle) {
+    $co = cos($heading); $si = sin($heading); $s = $size;
+    $P = fn($lx, $ly) => [$x + ($lx * $co - $ly * $si) * $s, $y + ($lx * $si + $ly * $co) * $s];
+    $ellipse = function ($lx, $ly, $rx, $ry) use ($im, $P, $color) {
+        $pts = [];
+        for ($i = 0; $i < 20; $i++) { $a = 2 * M_PI * $i / 20; [$px, $py] = $P($lx + $rx * cos($a), $ly + $ry * sin($a)); $pts[] = (int) round($px); $pts[] = (int) round($py); }
+        imagefilledpolygon($im, $pts, $color);
+    };
+    $legs = [
+        [[0.12, -0.08], [0.70, -0.64], [1.22, -0.26]],
+        [[0.18,  0.00], [0.86, -0.26], [1.42,  0.26]],
+        [[0.18,  0.08], [0.86,  0.30], [1.34,  0.86]],
+        [[0.14,  0.14], [0.62,  0.72], [0.94,  1.42]],
+    ];
+    imagesetthickness($im, max(1, (int) round($s / 9)));
+    foreach ([1, -1] as $m) {
+        foreach ($legs as $li => [$r, $k, $f]) {
+            // Alternate legs lift in turn (the tripod gait): each leg's foot
+            // swings fore and aft on its own beat.
+            $ph = $legPhase + $li * 1.6 + ($m < 0 ? M_PI : 0);
+            $swing = $scuttle * 0.28 * sin($ph);
+            [$ax, $ay] = $P($m * $r[0], $r[1]);
+            [$bx, $by] = $P($m * $k[0], $k[1] + 0.5 * $swing);
+            [$cx2, $cy2] = $P($m * $f[0], $f[1] + $swing);
+            imageline($im, (int) round($ax), (int) round($ay), (int) round($bx), (int) round($by), $color);
+            imageline($im, (int) round($bx), (int) round($by), (int) round($cx2), (int) round($cy2), $color);
+        }
+    }
+    imagesetthickness($im, 1);
+    $ellipse(0, 0.58, 0.48, 0.58);
+    $ellipse(0, 0.0, 0.30, 0.29);
 }
 
 // A plain pumpkin sitting on $baseY, $r px from its centre to either side
@@ -1181,25 +1311,89 @@ function ig_bat_silhouette($im, $x, $y, $size, $color, $flap = 0.0) {
     imagefilledellipse($im, (int) $x, (int) $y, (int) round(0.26 * $size), (int) round(0.46 * $size), $color);
 }
 
-function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
 
-    $paper   = ig_hex($im, '#F4F1EB');
-    $red     = ig_hex($im, '#922E32');
+    // $anim = ['frame', 'frames', 'fps'] renders one frame of the looping
+    // October version (see ig_theme_animates()); null is the still, which is
+    // unaffected. Every moving part is a whole number of cycles per loop so
+    // the last frame leads straight back into the first.
+    $t = $anim !== null ? $anim['frame'] / $anim['frames'] : 0.0;
+
+    // In October the paper warms to a parchment and the brand red turns a
+    // burnt pumpkin orange (the fall half of the seasonal look; the
+    // Halloween half is drawn after the top rule below). The variable keeps
+    // its $red name — it is "the accent", whichever hue the season makes it.
+    $season  = ig_halloween_season($date);
+    $paper   = ig_hex($im, $season ? '#F6EBD9' : '#F4F1EB');
+    $red     = ig_hex($im, $season ? '#B8531A' : '#922E32');
     $ink     = ig_hex($im, '#14120F');
-    $muted   = ig_hex($im, '#6B6659');
-    $divider = ig_hex($im, '#DED7C7');
-    $placeholder = ig_hex($im, '#E4DECE');
+    $muted   = ig_hex($im, $season ? '#76654F' : '#6B6659');
+    $divider = ig_hex($im, $season ? '#E2D3B8' : '#DED7C7');
+    $placeholder = ig_hex($im, $season ? '#EBDCC3' : '#E4DECE');
     // A few points darker than $paper — extremely subtle by design, same
     // idea as Newsprint/Neon's own zebra fill, just tinted for this palette.
-    $stripe  = ig_hex($im, '#ECE7DD');
+    $stripe  = ig_hex($im, $season ? '#EFE1CA' : '#ECE7DD');
 
     imagefill($im, 0, 0, $paper);
 
     // Red rule under the header, same visual role as the accent bars in v7.
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    if ($season) {
+        // The Halloween half, and for Paper it is spiders. The header's
+        // right-hand band is empty (the kicker and date sit left and lower),
+        // so a big web fills the top-right corner with a black widow hanging
+        // inside it and a smaller spider off to its left; the bottom-right
+        // has a web of its own, drawn later over the list. The widow's
+        // hourglass is the accent colour. The top-left stays clear for the
+        // wordmark chip, and the left of the footer for its text.
+        $web  = imagecolorallocatealpha($im, 0x4A, 0x3B, 0x2E, 78);
+        $dark = ig_hex($im, '#1A1511');
+
+        // Animated: both spiders sway on their threads (the top of each
+        // thread stays put while the body swings) and lower and raise
+        // themselves, legs twitching; the webs shiver. Still: all zeros.
+        $wobTop = $wobBot = 0.0;
+        $big = ['x' => 925.0, 'len' => 100.0, 'phase' => null];
+        $small = ['x' => 800.0, 'len' => 54.0, 'phase' => null];
+        if ($anim !== null) {
+            $tau = 2 * M_PI;
+            $wobTop = 0.30 * sin($tau * 2 * $t);
+            $wobBot = 0.30 * sin($tau * 2 * $t + 1.7);
+            // Once a loop the widow drops: a fast fall that decelerates to
+            // 220px lower (about a third of a second — far enough to hang
+            // below the divider and over the top of the list), a beat's
+            // pause, then a slow, eased climb back up the thread (two
+            // seconds). Zero outside that window, so the loop closes.
+            $dropPx = 220;
+            $drop = 0.0;
+            if ($t >= 0.58 && $t < 0.62)     $drop = $dropPx * (1 - pow(1 - ($t - 0.58) / 0.04, 3));
+            elseif ($t >= 0.62 && $t < 0.67) $drop = (float) $dropPx;
+            elseif ($t >= 0.67 && $t < 0.93) $drop = $dropPx * (1 - ig_ease(($t - 0.67) / 0.26));
+            $big   = ['x' => 925 + 7 * sin($tau * 2 * $t),       'len' => 100 + 8 * sin($tau * $t + 1.0) + $drop, 'phase' => $tau * 8 * $t];
+            $small = ['x' => 800 + 4 * sin($tau * 3 * $t + 0.9), 'len' => 54 + 5 * sin($tau * 2 * $t + 0.6),     'phase' => $tau * 12 * $t + 2.0];
+        }
+        ig_cobweb($im, $w - 40, 30, 210, $web, -1, 1, $wobTop);
+        if ($anim !== null) {
+            // Glints: the accent colour, twinkling on junctions of the web —
+            // each on its own beat, once a loop, so one is catching the light
+            // somewhere most of the time. Narrow peaks (sin^8) keep each one
+            // brief.
+            $accent = imagecolorsforindex($im, $red);
+            foreach ([[22.5, 0.46, 0.00], [45, 0.68, 0.43], [67.5, 0.46, 0.71], [45, 0.92, 0.14], [67.5, 0.92, 0.57], [22.5, 0.68, 0.86], [45, 0.26, 0.29]] as [$deg, $f, $ph]) {
+                $i = pow(max(0.0, sin(2 * M_PI * ($t + $ph))), 8);
+                if ($i < 0.08) continue;
+                [$gx, $gy] = ig_web_junction($w - 40, 30, 210, -1, 1, $deg, $f);
+                ig_glint($im, $gx, $gy, 4 + 9 * $i, imagecolorallocatealpha($im, $accent['red'], $accent['green'], $accent['blue'], 127 - (int) round(105 * $i)));
+            }
+        }
+        // Thread tops are fixed at y 20 and y 16; the body hangs $len below.
+        ig_spider($im, $big['x'],   20 + $big['len'],   $big['len'],   26, $dark, $red, 925, $big['phase']);
+        ig_spider($im, $small['x'], 16 + $small['len'], $small['len'], 13, $dark, null, 800, $small['phase']);
+    }
 
     $margin = 80;
 
@@ -1281,6 +1475,40 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0) {
         $y += $rowHeight;
         if ($i < $lastIndex) {
             imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $divider);
+        }
+    }
+
+    // The bottom-right web goes down after the rows, not before them, so it
+    // lies across the corner of the list itself — over the last row's stripe
+    // — rather than being painted over by it. ($web is the October colour
+    // allocated with the other Halloween pieces above.)
+    if ($season) {
+        ig_cobweb($im, $w - 46, $h - 46, 180, $web, -1, -1, $wobBot);
+
+        if ($anim !== null) {
+            // Glints on this web too, drawn over the list with it.
+            $accent = imagecolorsforindex($im, $red);
+            foreach ([[22.5, 0.68, 0.07], [45, 0.46, 0.50], [67.5, 0.68, 0.79], [45, 0.92, 0.21], [22.5, 0.92, 0.64], [67.5, 0.46, 0.36]] as [$deg, $f, $ph]) {
+                $i = pow(max(0.0, sin(2 * M_PI * ($t + $ph))), 8);
+                if ($i < 0.08) continue;
+                [$gx, $gy] = ig_web_junction($w - 46, $h - 46, 180, -1, -1, $deg, $f);
+                ig_glint($im, $gx, $gy, 4 + 9 * $i, imagecolorallocatealpha($im, $accent['red'], $accent['green'], $accent['blue'], 127 - (int) round(105 * $i)));
+            }
+
+            // A tiny spider patrols this web and the corner of the list: out
+            // along a diagonal from the web's corner, a turn on the spot, back
+            // again, another turn — facing the way it is going throughout.
+            // The timeline is shifted so frame 0 falls in the middle of the
+            // turn at the corner, and every segment is eased, so the loop
+            // closes with the spider already standing still.
+            $ax = 1012.0; $ay = 1292.0; $bx = 940.0; $by = 1219.0;
+            $hAB = atan2($bx - $ax, -($by - $ay));
+            $u = fmod($t + 0.93, 1.0);
+            if ($u < 0.38)      { $s = ig_ease($u / 0.38);                 $hd = $hAB;                                   $sc = 0.2 + 0.8 * sin(M_PI * $u / 0.38); }
+            elseif ($u < 0.48)  { $s = 1.0;                                $hd = $hAB + M_PI * ig_ease(($u - 0.38) / 0.10); $sc = 0.3; }
+            elseif ($u < 0.86)  { $s = 1 - ig_ease(($u - 0.48) / 0.38);    $hd = $hAB + M_PI;                            $sc = 0.2 + 0.8 * sin(M_PI * ($u - 0.48) / 0.38); }
+            else                { $s = 0.0;                                $hd = $hAB + M_PI + M_PI * ig_ease(($u - 0.86) / 0.14); $sc = 0.3; }
+            ig_spider_crawl($im, $ax + ($bx - $ax) * $s, $ay + ($by - $ay) * $s, 13, $dark, $hd, 2 * M_PI * 20 * $t, $sc);
         }
     }
 
@@ -2410,12 +2638,17 @@ function ig_build_feature_page_paper(array $film, $date) {
     $im = imagecreatetruecolor($w, $h);
     imagealphablending($im, true);
 
-    $paper       = ig_hex($im, '#F4F1EB');
-    $red         = ig_hex($im, '#922E32');
+    // Same October palette as the list page: warmer paper, the red accent
+    // turned burnt orange. $pr/$pg/$pb is the paper colour as numbers, which
+    // the hero's fade below needs to blend into it without a seam.
+    $season = ig_halloween_season($date);
+    [$pr, $pg, $pb] = $season ? [0xF6, 0xEB, 0xD9] : [0xF4, 0xF1, 0xEB];
+    $paper       = imagecolorallocate($im, $pr, $pg, $pb);
+    $red         = ig_hex($im, $season ? '#B8531A' : '#922E32');
     $ink         = ig_hex($im, '#14120F');
-    $muted       = ig_hex($im, '#6B6659');
-    $divider     = ig_hex($im, '#DED7C7');
-    $placeholder = ig_hex($im, '#E4DECE');
+    $muted       = ig_hex($im, $season ? '#76654F' : '#6B6659');
+    $divider     = ig_hex($im, $season ? '#E2D3B8' : '#DED7C7');
+    $placeholder = ig_hex($im, $season ? '#EBDCC3' : '#E4DECE');
 
     imagefill($im, 0, 0, $paper);
 
@@ -2441,7 +2674,7 @@ function ig_build_feature_page_paper(array $film, $date) {
     $fadeH = 120;
     for ($i = 0; $i < $fadeH; $i++) {
         $alpha = (int) round(127 * (1 - $i / $fadeH));
-        $band  = imagecolorallocatealpha($im, 0xF4, 0xF1, 0xEB, $alpha);
+        $band  = imagecolorallocatealpha($im, $pr, $pg, $pb, $alpha);
         imagefilledrectangle($im, 0, $heroH - $fadeH + $i, $w, $heroH - $fadeH + $i + 1, $band);
     }
 
@@ -2453,6 +2686,13 @@ function ig_build_feature_page_paper(array $film, $date) {
     // showings of the same film in a day) reads as two pills rather than a
     // single cramped line.
     imagefilledrectangle($im, 0, 0, $w, 14, $red);
+
+    // A spotlight page's Halloween piece — Paper's spider theme, scaled down:
+    // a web in the bottom-right corner, clear of the left-aligned footer and
+    // director lines. The top corners belong to the hero image and its pills.
+    if ($season) {
+        ig_cobweb($im, $w - 46, $h - 46, 118, imagecolorallocatealpha($im, 0x4A, 0x3B, 0x2E, 78), -1, -1);
+    }
 
     $pillFont = 30;
     $pillPadX = 30;

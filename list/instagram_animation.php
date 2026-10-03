@@ -34,7 +34,7 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 
 // Which themes have an animated list page, for a post on $date.
 function ig_theme_animates($theme, $date) {
-    return $theme === 'marquee' && ig_halloween_season($date);
+    return in_array($theme, ['marquee', 'paper'], true) && ig_halloween_season($date);
 }
 
 // Whether a planned page (see ig_plan_pages()) gets a video.
