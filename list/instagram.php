@@ -592,6 +592,17 @@ function ig_halftone_moon($im, $cx, $cy, $r, $ink) {
     imageellipse($im, $cx, $cy, 2 * $r, 2 * $r, $ink);
 }
 
+// The classifieds' three ads, three short lines each (the first line opens
+// with a category that is set in red). Shared by the list page, which cycles
+// through them, and the spotlight pages, which each show one.
+function ig_news_ads() {
+    return [
+        ['MISSING: projectionist. Last', 'seen entering the booth. The', 'film is still running.'],
+        ['FOR SALE: haunted theatre', 'seats, row F. Sold as-is.', 'They talk during previews.'],
+        ['NOTICE: will the person', 'screaming in row C please', 'keep it down? — Management'],
+    ];
+}
+
 // The little classifieds box: an ink title bar, then a few lines of ad. $ads is
 // a list of 3-line ads; the still shows the first. Animated, the ads cycle like
 // a reel being advanced a frame at a time: the video is split evenly among the
@@ -2797,11 +2808,7 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
         }
         if ($bs > 0) ig_bat_silhouette($im, $bx, $by, $bs, $batColor, $flap);
 
-        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, [
-            ['MISSING: projectionist. Last', 'seen entering the booth. The', 'film is still running.'],
-            ['FOR SALE: haunted theatre', 'seats, row F. Sold as-is.', 'They talk during previews.'],
-            ['NOTICE: will the person', 'screaming in row C please', 'keep it down? — Management'],
-        ], $anim);
+        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, ig_news_ads(), $anim);
     }
 
     return $im;
@@ -4047,6 +4054,13 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
+    // October: one of the list page's classified ads in the footer's empty
+    // right side, picked by the film so a carousel's spotlights differ.
+    if (ig_halloween_season($date)) {
+        $ads = ig_news_ads();
+        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, [$ads[crc32((string) ($film['title'] ?? '')) % count($ads)]]);
+    }
+
     return $im;
 }
 
@@ -4383,6 +4397,9 @@ function ig_build_feature_page_darkroom(array $film, $date) {
 
     ig_sprocket_edge($im, 0, $h, 56, $strip, $bg);
     ig_sprocket_edge($im, $w - 56, $h, 56, $strip, $bg);
+    // October: a couple of pairs of eyes watching from the sprocket holes.
+    $season = ig_halloween_season($date);
+    if ($season) foreach ([[28, 32 + 64 * 11], [28, 32 + 64 * 17], [1052, 32 + 64 * 14]] as [$ex, $ey]) ig_sprocket_eyes($im, $ex, $ey);
 
     // No "CINEMA, TX" wordmark or leader mark here — full-color hero art
     // underneath means no guaranteed contrast for plain text the way the
@@ -4454,6 +4471,14 @@ function ig_build_feature_page_darkroom(array $film, $date) {
         imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    // October: the little film in the footer's empty right side, caught on a
+    // different frame for each film (house, hall, ghost, skull, pumpkin) — so
+    // swiping through a carousel is, a little, running the reel.
+    if ($season) {
+        $frames = [8, 24, 45, 55, 65, 75, 95];
+        ig_darkroom_reel($im, 600, 1226, 980, 1304, (float) $frames[crc32((string) ($film['title'] ?? '')) % count($frames)]);
+    }
 
     return $im;
 }
