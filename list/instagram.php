@@ -640,6 +640,536 @@ function ig_news_classifieds($im, $x1, $y1, $x2, $y2, $ink, $red, $paper, array 
     imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
 }
 
+// ── October's darkroom accents ───────────────────────────────────────────────
+// Spirit photography, in the safelight's one warm family: a print with
+// something developing in it, eyes watching from the film's sprocket holes,
+// and a strip of film with something approaching frame by frame.
+
+// A cream ghost standing on $by at scale $s (about 44*$s tall), with dark eyes.
+function ig_ghost_shape($im, $cx, $by, $s, $col, $eye) {
+    $h = 44 * $s; $w = 34 * $s; $r = $w / 2; $top = $by - $h; $pts = [];
+    for ($a = 180; $a <= 360; $a += 15) { $pts[] = (int) round($cx + $r * cos(deg2rad($a))); $pts[] = (int) round($top + $r + $r * sin(deg2rad($a))); }
+    $pts[] = (int) round($cx + $r); $pts[] = (int) round($by);
+    for ($i = 1; $i <= 8; $i++) { $pts[] = (int) round($cx + $r - $w * $i / 8); $pts[] = (int) round($by - ($i % 2 ? 0 : 5 * $s)); }
+    imagefilledpolygon($im, $pts, $col);
+    foreach ([-0.2, 0.2] as $dx) imagefilledellipse($im, (int) round($cx + $dx * $w), (int) round($top + $r + $s), (int) round(5 * $s + 1), (int) round(8 * $s + 1), $eye);
+    imagefilledellipse($im, (int) $cx, (int) round($top + $r + 12 * $s), (int) round(5 * $s + 1), (int) round(7 * $s + 1), $eye);
+}
+
+// A print lying at $angle degrees with a ghost showing in it. $develop (0..1)
+// is how far the image has come up in the developer: 0 is a blank, warmly lit
+// print, 1 the ghost in full (the still). Instant film comes out of the camera
+// as a milky white cloud that slowly clears, the picture showing through it
+// first as faint outlines: $milk (0..1) is how much of that cloud is still
+// over the image, and $flash (0..1) is a burst of white light round the print
+// at the instant it is taken. All zero (the still) leaves the finished print.
+//
+// $subject says what is in the picture ('scream', the still, 'sonofman',
+// 'psycho' or 'gothic' — each a famous picture or film with one of the October
+// characters in the lead; 'ghost', 'cat', 'pumpkin' and 'cinema' are the plain
+// originals) and $caption is what is written under it.
+function ig_darkroom_print($im, $cx, $cy, $angle, $develop = 1.0, $milk = 0.0, $flash = 0.0, $subject = 'scream', $caption = 'booooo') {
+    $W = 128; $H = 158;
+    if ($flash > 0.02) {
+        // Twenty faint rings (about 2% each) so the burst reads as a smooth
+        // glow rather than bands, kept inside the header: clear of the date on
+        // the left and of the rule underneath.
+        imagesetclip($im, (int) $cx - 125, 20, (int) $cx + 135, 258);
+        $ring = imagecolorallocatealpha($im, 0xFF, 0xF4, 0xE0, 127 - (int) round(3 * $flash));
+        for ($g = 20; $g >= 1; $g--) imagefilledellipse($im, (int) $cx, (int) $cy, 100 + $g * 7, 118 + $g * 8, $ring);
+        imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
+    }
+    $S = imagecreatetruecolor($W + 30, $H + 30);
+    imagesavealpha($S, true); imagealphablending($S, false);
+    $clear = imagecolorallocatealpha($S, 0, 0, 0, 127);
+    imagefill($S, 0, 0, $clear); imagealphablending($S, true);
+    imagefilledrectangle($S, 15, 15, 15 + $W, 15 + $H, imagecolorallocate($S, 0xE9, 0xDF, 0xCB));
+    $ix1 = 15 + 10; $iy1 = 15 + 10; $ix2 = 15 + $W - 10; $iy2 = 15 + $H - 32;
+    imagefilledrectangle($S, $ix1, $iy1, $ix2, $iy2, imagecolorallocate($S, 0x1B, 0x12, 0x0C));
+    $gx = (int) (($ix1 + $ix2) / 2);
+    for ($i = 0; $i < 14; $i++) imagefilledellipse($S, $gx, (int) (($iy1 + $iy2) / 2) + 3, 90 - $i * 5, 100 - $i * 5, imagecolorallocatealpha($S, 0xE0, 0x8A, 0x3E, 118 - $i));
+    $gb = $iy2 - 11;
+    if ($develop > 0.02 && $subject === 'cat') {
+        // A black cat in silhouette against the amber glow: ears, head and
+        // shoulders, whiskers, and a pair of lit slit-pupilled eyes that come
+        // up last, once the picture is mostly there.
+        $a   = (int) round(127 * (1 - $develop));
+        $blk = imagecolorallocatealpha($S, 0x0A, 0x07, 0x05, $a);
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        imagefilledellipse($S, $gx, $iy2 + 2, 84, 62, $blk);
+        imagefilledellipse($S, $gx, $iy2 - 40, 54, 46, $blk);
+        foreach ([-1, 1] as $m) {
+            imagefilledpolygon($S, [$gx + $m * 25, $iy2 - 46, $gx + $m * 20, $iy2 - 84, $gx + $m * 4, $iy2 - 60], $blk);
+            foreach ([-6, 0, 6] as $wy) imageline($S, $gx + $m * 18, $iy2 - 34 + (int) ($wy / 2), $gx + $m * 50, $iy2 - 38 + $wy, imagecolorallocatealpha($S, 0xE0, 0xA0, 0x60, (int) round(127 - 70 * $develop)));
+        }
+        $ea = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        foreach ([-1, 1] as $m) {
+            $ex = $gx + $m * 10; $ey = $iy2 - 42;
+            if ($ea > 0.02) {
+                for ($g = 3; $g >= 1; $g--) imagefilledellipse($S, $ex, $ey, 12 + $g * 6, 9 + $g * 5, imagecolorallocatealpha($S, 0xFF, 0xB8, 0x4A, (int) round(127 - (127 - (116 - $g * 2)) * $ea)));
+                imagefilledellipse($S, $ex, $ey, 12, 9, imagecolorallocatealpha($S, 0xFF, 0xC8, 0x5A, (int) round(127 * (1 - $ea))));
+                imagefilledellipse($S, $ex, $ey, 2, 9, imagecolorallocatealpha($S, 0x0A, 0x07, 0x05, (int) round(127 * (1 - $ea))));
+            }
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'scream') {
+        // The Scream's setting — Munch's swirling bands of sky in the
+        // safelight's ambers and rusts, the bridge, two small figures walking
+        // away — with the ordinary little ghost standing where the screamer
+        // stood.
+        $a  = (int) round(127 * (1 - $develop));
+        $fa = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        ['c' => $c, 'poly' => $poly, 'ell' => $ell, 'line' => $line, 'X' => $X, 'Y' => $Y, 'k' => $k] = ig_dr_tools($S, $ix1, $iy1, $a, 1.25, 56, 58);
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        foreach ([[0, 0x5A, 0x24, 0x18], [8, 0xB3, 0x3B, 0x1E], [17, 0xE0, 0x8A, 0x3E], [26, 0xF2, 0xB0, 0x4A], [35, 0xE0, 0x8A, 0x3E], [44, 0xB3, 0x3B, 0x1E], [52, 0x7A, 0x2A, 0x16], [60, 0x2A, 0x1E, 0x16]] as $bi => [$y0, $r, $g, $b]) {
+            $pts = [];
+            for ($x = -30; $x <= 140; $x += 4) $pts[] = [$x, $y0 + 4.5 * sin($x / 11.0 + $bi * 1.3)];
+            $pts[] = [140, 140]; $pts[] = [-30, 140];
+            $poly($pts, $c($r, $g, $b));
+        }
+        for ($i = 0; $i < 3; $i++) {
+            for ($x = -30; $x <= 140; $x += 4) $line($x, 68 + $i * 7 + 2 * sin($x / 7.0 + $i), $x + 4, 68 + $i * 7 + 2 * sin(($x + 4) / 7.0 + $i), $c(0x4A, 0x32, 0x20));
+        }
+        // the bridge, running up to the right, with its railing
+        $dark = $c(0x1A, 0x12, 0x0C);
+        $poly([[-30, 98], [140, 53], [140, 67], [-30, 116]], $dark);
+        $line(-30, 88, 140, 43, $dark, 2);
+        foreach ([-20, -2, 16, 34, 52, 70, 88, 106, 124] as $px) $line($px, 88 - 0.268 * ($px + 30), $px, 98 - 0.268 * ($px + 30), $dark);
+        foreach ([86, 94] as $bx) {
+            $by = 98 - 0.268 * ($bx + 30);
+            $poly([[$bx - 2, $by - 14], [$bx + 2, $by - 14], [$bx + 2.5, $by], [$bx - 2.5, $by]], $dark);
+            $ell($bx, $by - 16, 2.3, 2.3, $dark); $poly([[$bx - 4, $by - 17], [$bx + 4, $by - 17], [$bx + 2, $by - 20], [$bx - 2, $by - 20]], $dark);
+        }
+        // the ghost: the original cute one, standing on the bridge. Its eyes
+        // come up last.
+        $ghostEye = imagecolorallocatealpha($S, 0x1B, 0x12, 0x0C, (int) round(127 * (1 - $fa)));
+        ig_ghost_shape($S, $X(38), $Y(97), 1.15 * $k, $c(0xF0, 0xE6, 0xD8), $ghostEye);
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'sonofman') {
+        // Magritte's Son of Man, with the pumpkin for the apple: a man in a
+        // dark overcoat, red tie and bowler hat before a low wall, a cloudy
+        // sky and the sea behind him, a pumpkin hanging where his face
+        // should be. Its carved face lights up last.
+        $a  = (int) round(127 * (1 - $develop));
+        $fa = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        ['c' => $c, 'poly' => $poly, 'ell' => $ell, 'rect' => $rect, 'line' => $line, 'X' => $X, 'Y' => $Y, 'k' => $k] = ig_dr_tools($S, $ix1, $iy1, $a, 1.25, 54, 60);
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        foreach ([[0, 0x4A, 0x3A, 0x2E], [14, 0x5E, 0x48, 0x34], [28, 0x76, 0x5A, 0x3C], [42, 0x92, 0x70, 0x46], [56, 0xA8, 0x84, 0x52]] as [$y0, $r, $g, $b]) $rect(-40, $y0 - ($y0 === 0 ? 40 : 0), 150, 74, $c($r, $g, $b));
+        foreach ([[22, 34, 14, 5], [30, 38, 12, 4], [80, 24, 16, 5], [90, 48, 12, 4], [70, 58, 14, 4]] as [$x, $y, $rx, $ry]) $ell($x, $y, $rx, $ry, $c(0xC8, 0xA8, 0x78, min($a + 40, 127)));
+        $rect(-40, 72, 150, 82, $c(0x2A, 0x20, 0x18));
+        $rect(-40, 82, 150, 150, $c(0x4A, 0x36, 0x26));
+        $line(-40, 82, 150, 82, $c(0x6E, 0x52, 0x38), 2);
+        for ($x = -30; $x < 140; $x += 18) $line($x, 83, $x, 150, $c(0x38, 0x28, 0x1C));
+        // the man
+        $coat = $c(0x0C, 0x09, 0x07);
+        $poly([[10, 118], [18, 86], [54, 74], [90, 86], [98, 118]], $coat);
+        $poly([[44, 74], [54, 90], [64, 74]], $c(0xE6, 0xDE, 0xCC));
+        $poly([[54, 82], [50, 90], [54, 114], [58, 90]], $c(0xB3, 0x3B, 0x1E)); $ell(54, 82.5, 3, 2.4, $c(0xB3, 0x3B, 0x1E));
+        $poly([[44, 74], [48, 82], [40, 84]], $coat); $poly([[64, 74], [60, 82], [68, 84]], $coat);
+        // the pumpkin where the face should be
+        foreach ([[44.5, 56, 14, 17, 0xC8, 0x66, 0x1A], [63.5, 56, 14, 17, 0xC8, 0x66, 0x1A], [54, 56, 15, 18, 0xE0, 0x7A, 0x22]] as [$px, $py, $rx, $ry, $r, $g, $b]) $ell($px, $py, $rx, $ry, $c($r, $g, $b));
+        foreach ([44.5, 63.5] as $px) imageellipse($S, $X($px), $Y(56), (int) round(28 * $k), (int) round(34 * $k), $c(0x8A, 0x3A, 0x0C));
+        // the bowler hat
+        $poly([[40, 40], [68, 40], [66, 22], [54, 17], [42, 22]], $coat); $ell(54, 26, 14.5, 10, $coat);
+        $ell(54, 39, 22, 4.2, $coat); $line(40, 36, 68, 36, $c(0x2A, 0x21, 0x18), 2);
+        // the leaf, in front of the brim
+        $poly([[60, 41], [68, 38], [66, 45]], $c(0x5E, 0x6B, 0x2A)); $line(57, 42, 62, 41, $c(0x5E, 0x6B, 0x2A), 2);
+        if ($fa > 0.02) {
+            for ($g = 4; $g >= 1; $g--) imagefilledellipse($S, $X(54), $Y(56), (int) round((38 + $g * 6) * $k), (int) round((44 + $g * 6) * $k), imagecolorallocatealpha($S, 0xFF, 0xC0, 0x40, (int) round(127 - (127 - (121 - $g)) * $fa)));
+            $lit = imagecolorallocatealpha($S, 0xFF, 0xDC, 0x6A, (int) round(127 * (1 - $fa)));
+            foreach ([-1, 1] as $m) $poly([[54 + $m * 14, 52], [54 + $m * 5, 52], [54 + $m * 9.5, 41]], $lit);
+            $poly([[51, 58], [57, 58], [54, 53]], $lit);
+            $poly([[40, 63], [47, 70], [51, 64], [54, 71], [57, 64], [61, 70], [68, 63]], $lit);
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'psycho') {
+        // Psycho: the Bates house on its hill under the moon — mansard roof,
+        // steep gable, a porch — with a figure standing in the lit upstairs
+        // window. The windows and the door light last.
+        $a   = (int) round(127 * (1 - $develop));
+        $fa  = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        ['c' => $c, 'poly' => $poly, 'ell' => $ell, 'rect' => $rect, 'line' => $line] = ig_dr_tools($S, $ix1, $iy1, $a);
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        for ($g = 4; $g >= 1; $g--) $ell(26, 24, 15 + $g * 4, 15 + $g * 4, imagecolorallocatealpha($S, 0xFF, 0xE2, 0xA0, (int) round(127 - (127 - (118 - $g)) * $develop)));
+        $ell(26, 24, 15, 15, $c(0xF6, 0xE6, 0xB8));
+        $blk = $c(0x0A, 0x07, 0x05);
+        foreach ([[40, 18, 9], [50, 28, 6]] as [$bx, $by, $bs]) ig_bat_silhouette($S, $ix1 + $bx, $iy1 + $by, $bs, $blk);
+        if ($fa > 0.02) {
+            for ($g = 4; $g >= 1; $g--) $ell(54, 62, 40 + $g * 9, 50 + $g * 9, imagecolorallocatealpha($S, 0xFF, 0xB8, 0x40, (int) round(127 - (127 - (120 - $g)) * $fa)));
+        }
+        $poly([[-2, 102], [18, 94], [54, 88], [90, 94], [110, 100], [110, 118], [-2, 118]], $blk);
+        $rect(30, 58, 78, 94, $blk);
+        $poly([[26, 58], [32, 44], [76, 44], [82, 58]], $blk); $rect(32, 40, 76, 44, $blk);
+        $poly([[44, 58], [54, 26], [64, 58]], $blk); $line(54, 26, 54, 17, $blk, 2);
+        $poly([[36, 46], [40, 38], [44, 46]], $blk); $poly([[64, 46], [68, 38], [72, 46]], $blk);
+        $rect(72, 34, 77, 46, $blk);
+        $rect(78, 74, 94, 94, $blk); $poly([[76, 74], [86, 64], [96, 74]], $blk);
+        imagesetthickness($S, 2);
+        foreach ([[10, 100, 10, 66], [10, 82, 2, 70], [10, 88, 18, 74], [10, 72, 14, 62], [10, 76, 4, 62]] as [$x1, $y1, $x2, $y2]) imageline($S, $ix1 + $x1, $iy1 + $y1, $ix1 + $x2, $iy1 + $y2, $blk);
+        imagesetthickness($S, 1);
+        if ($fa > 0.02) {
+            $lit = imagecolorallocatealpha($S, 0xFF, 0xD8, 0x62, (int) round(127 * (1 - $fa)));
+            $rect(49, 42, 59, 58, $lit);                           // the gable window...
+            $rect(35, 62, 40, 74, $lit); $rect(68, 62, 73, 74, $lit); $rect(50, 82, 58, 94, $lit); $rect(82, 80, 88, 88, $lit);
+            $fig = imagecolorallocatealpha($S, 0x0A, 0x07, 0x05, (int) round(127 * (1 - $fa)));
+            $ell(54, 48.5, 2.8, 3.4, $fig); $ell(54, 44.6, 1.7, 1.5, $fig); $poly([[50, 58], [51, 53.5], [57, 53.5], [58, 58]], $fig);  // ...and who is standing in it
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'gothic') {
+        // American Gothic, with a skeleton for the farmer (and his pitchfork)
+        // and a zombie for his daughter, in front of the farmhouse's pointed
+        // window. Drawn in a 108 x 116 design space, then zoomed in $k times
+        // about ($fx, $fy) so the faces fill the little picture: every point,
+        // radius and line weight goes through that. The bodies come up first;
+        // the window lights and the zombie's eyes catch last.
+        $a  = (int) round(127 * (1 - $develop));
+        $fa = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        $ox = $ix1; $oy = $iy1; $k = 1.45; $fx = 54; $fy = 60;
+        $X = fn($x) => (int) round($ox + $fx + ($x - $fx) * $k);
+        $Y = fn($y) => (int) round($oy + $fy + ($y - $fy) * $k);
+        $c   = fn($r, $g, $b, $al = null) => imagecolorallocatealpha($S, $r, $g, $b, $al ?? $a);
+        $poly = function (array $pts, $col) use ($S, $X, $Y) { $o = []; foreach ($pts as [$x, $y]) { $o[] = $X($x); $o[] = $Y($y); } imagefilledpolygon($S, $o, $col); };
+        $ell  = fn($x, $y, $rx, $ry, $col) => imagefilledellipse($S, $X($x), $Y($y), (int) round($rx * 2 * $k), (int) round($ry * 2 * $k), $col);
+        $rect = fn($x1, $y1, $x2, $y2, $col) => imagefilledrectangle($S, $X($x1), $Y($y1), $X($x2), $Y($y2), $col);
+        $line = function ($x1, $y1, $x2, $y2, $col, $t = 1) use ($S, $X, $Y, $k) { imagesetthickness($S, max(1, (int) round($t * $k))); imageline($S, $X($x1), $Y($y1), $X($x2), $Y($y2), $col); imagesetthickness($S, 1); };
+        $wall = $c(0x22, 0x17, 0x0E); $plank = $c(0x2C, 0x1E, 0x12); $black = $c(0x0C, 0x09, 0x07);
+        $bone = $c(0xF0, 0xE6, 0xD0); $boneSh = $c(0xB8, 0xAC, 0x92); $fork = $c(0xC8, 0xBE, 0xA6);
+        $skin = $c(0x8F, 0xA6, 0x7A); $skinD = $c(0x62, 0x7A, 0x52); $hair = $c(0x1E, 0x18, 0x14); $dress = $c(0x1D, 0x18, 0x15);
+        $blood = $c(0x6E, 0x1E, 0x1A); $white = $c(0xE6, 0xDE, 0xCC); $trim = $c(0x3A, 0x32, 0x2A);
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        // the farmhouse wall and its pointed window (dark until it lights)
+        $rect(4, 8, 104, 116, $wall);
+        for ($y = 12; $y < 116; $y += 6) $line(4, $y, 104, $y, $plank);
+        $win = [[48, 66], [48, 40], [55, 26], [62, 40], [62, 66]];
+        $poly($win, $c(0x3A, 0x2A, 0x1C));
+        if ($fa > 0.02) {
+            for ($g = 4; $g >= 1; $g--) imagefilledellipse($S, $X(55), $Y(46), (int) round((14 + $g * 9) * $k), (int) round((40 + $g * 9) * $k), imagecolorallocatealpha($S, 0xFF, 0xB8, 0x40, (int) round(127 - (127 - (124 - $g)) * $fa)));
+            $poly($win, imagecolorallocatealpha($S, 0xFF, 0xC2, 0x4A, (int) round(127 * (1 - $fa))));
+            $mun = imagecolorallocatealpha($S, 0xC9, 0x84, 0x20, (int) round(127 * (1 - $fa)));
+            $line(55, 26, 55, 66, $mun); $line(48, 52, 62, 52, $mun); $line(48, 40, 62, 40, $mun);
+        }
+        // him: the skeleton
+        $poly([[18, 116], [19, 76], [29, 66], [38, 68], [47, 66], [57, 76], [58, 116]], $black);
+        $poly([[32, 66], [38, 82], [44, 66]], $white);
+        $line(32, 66, 36, 70, $boneSh); $line(44, 66, 40, 70, $boneSh);
+        $rect(36, 56, 40, 66, $bone); foreach ([58, 61, 64] as $vy) $line(35, $vy, 41, $vy, $boneSh);
+        $ell(38, 45, 10, 11, $bone); $rect(32, 50, 44, 59, $bone);
+        $ell(33, 44, 3, 3.6, $black); $ell(43, 44, 3, 3.6, $black);
+        $poly([[38, 48], [36, 52], [40, 52]], $black);
+        $line(32, 55, 44, 55, $black);
+        foreach ([34, 36, 38, 40, 42] as $tx) $line($tx, 55, $tx, 59, $boneSh);
+        $line(26, 30, 26, 116, $fork, 2);
+        foreach ([20, 26, 32] as $px) $line($px, 20, $px, 36, $fork, 2);
+        $line(20, 36, 32, 36, $fork, 2);
+        $rect(23, 84, 29, 88, $bone); foreach ([24, 26, 28] as $hx) $line($hx, 88, $hx, 91, $bone);
+        // her: the zombie
+        $poly([[56, 116], [58, 88], [64, 80], [72, 82], [80, 80], [86, 88], [88, 116]], $dress);
+        $line(68, 84, 68, 116, $trim); $line(76, 84, 76, 116, $trim);
+        $rect(69, 70, 75, 80, $skinD);
+        $ell(72, 80, 8, 3.4, $white); $ell(72, 83, 1.6, 1.6, $c(0xD8, 0xC8, 0x9C));
+        $ell(72, 46, 10, 8, $hair); $ell(72, 36, 4.5, 3.5, $hair);
+        $ell(72, 57, 9.5, 12, $skin);
+        $ell(72, 47, 10.2, 6.5, $hair); $line(72, 40, 72, 47, $c(0x3A, 0x30, 0x28));
+        $ell(66, 60, 3, 4, $skinD);
+        $ell(67, 57, 2.4, 2.8, $black); $ell(77, 57, 2.4, 2.8, $black);
+        $line(68, 66, 76, 66, $black);
+        foreach ([69, 72, 75] as $sx) $line($sx, 64, $sx, 68, $black);
+        $ell(78, 62, 2.2, 3.2, $blood); $line(77, 59, 79, 65, $black);
+        if ($fa > 0.02) {
+            $glint = imagecolorallocatealpha($S, 0xC8, 0xE0, 0x7A, (int) round(127 * (1 - $fa)));
+            $ell(67, 57, 0.9, 0.9, $glint); $ell(77, 57, 0.9, 0.9, $glint);
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'cinema') {
+        // A haunted cinema against a big moon: a black silhouette with a
+        // peaked tower whose two slanted windows are eyes and whose lit marquee
+        // is a jagged grin, a gabled wing either side, a bare tree and two
+        // bats. The lit parts (eyes, grin, windows, door) come up last.
+        $a   = (int) round(127 * (1 - $develop));
+        $blk = imagecolorallocatealpha($S, 0x0A, 0x07, 0x05, $a);
+        $gb  = $iy2 - 6;
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        // moon, with a halo
+        $mx = $gx - 30; $my = $iy1 + 28;
+        for ($g = 4; $g >= 1; $g--) imagefilledellipse($S, $mx, $my, 34 + $g * 7, 34 + $g * 7, imagecolorallocatealpha($S, 0xFF, 0xE2, 0xA0, (int) round(127 - (127 - (118 - $g)) * $develop)));
+        imagefilledellipse($S, $mx, $my, 34, 34, imagecolorallocatealpha($S, 0xF6, 0xE6, 0xB8, (int) round(127 - 127 * min(1.0, $develop * 1.2))));
+        foreach ([[$mx + 4, $my - 22, 9], [$mx + 14, $my - 14, 6]] as [$bx, $by, $bs]) ig_bat_silhouette($S, $bx, $by, $bs, $blk);
+        // the lit windows' glow, behind the building so only a rim of it shows
+        $fa = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        if ($fa > 0.02) {
+            for ($g = 4; $g >= 1; $g--) imagefilledellipse($S, $gx, $gb - 34, 56 + $g * 11, 70 + $g * 11, imagecolorallocatealpha($S, 0xFF, 0xB8, 0x40, (int) round(127 - (127 - (119 - $g)) * $fa)));
+        }
+        // building
+        imagefilledrectangle($S, $ix1, $gb, $ix2, $iy2, $blk);
+        imagefilledrectangle($S, $gx - 52, $gb - 34, $gx - 20, $gb, $blk);
+        imagefilledpolygon($S, [$gx - 54, $gb - 34, $gx - 36, $gb - 52, $gx - 18, $gb - 34], $blk);
+        imagefilledrectangle($S, $gx + 20, $gb - 30, $gx + 52, $gb, $blk);
+        imagefilledpolygon($S, [$gx + 18, $gb - 30, $gx + 36, $gb - 44, $gx + 54, $gb - 30], $blk);
+        imagefilledrectangle($S, $gx + 42, $gb - 52, $gx + 47, $gb - 38, $blk);
+        imagefilledrectangle($S, $gx - 20, $gb - 56, $gx + 20, $gb, $blk);
+        imagefilledpolygon($S, [$gx - 24, $gb - 56, $gx, $gb - 86, $gx + 24, $gb - 56], $blk);
+        imagesetthickness($S, 2); imageline($S, $gx, $gb - 86, $gx, $gb - 97, $blk); imagesetthickness($S, 1);
+        imagefilledpolygon($S, [$gx - 25, $gb - 22, $gx + 25, $gb - 22, $gx + 21, $gb - 8, $gx - 21, $gb - 8], $blk);
+        // bare tree, foreground left
+        imagefilledpolygon($S, [$ix1 + 5, $gb, $ix1 + 8, $gb - 40, $ix1 + 13, $gb], $blk);
+        imagesetthickness($S, 2);
+        foreach ([[8, 28, 0, 46], [9, 33, 20, 52], [8, 40, 10, 62], [3, 40, -3, 52], [16, 46, 24, 56]] as [$x1, $y1, $x2, $y2]) imageline($S, $ix1 + $x1, $gb - $y1, $ix1 + $x2, $gb - $y2, $blk);
+        imagesetthickness($S, 1);
+        // the lights
+        if ($fa > 0.02) {
+            $lit = imagecolorallocatealpha($S, 0xFF, 0xD8, 0x62, (int) round(127 * (1 - $fa)));
+            imagefilledpolygon($S, [$gx - 16, $gb - 45, $gx - 5, $gb - 38, $gx - 7, $gb - 32, $gx - 16, $gb - 35], $lit);
+            imagefilledpolygon($S, [$gx + 16, $gb - 45, $gx + 5, $gb - 38, $gx + 7, $gb - 32, $gx + 16, $gb - 35], $lit);
+            imagefilledpolygon($S, [$gx - 19, $gb - 21, $gx + 19, $gb - 21, $gx + 17, $gb - 16, $gx + 12, $gb - 10, $gx + 6, $gb - 16, $gx, $gb - 10, $gx - 6, $gb - 16, $gx - 12, $gb - 10, $gx - 17, $gb - 16], $lit);
+            imagefilledrectangle($S, $gx - 4, $gb - 7, $gx + 4, $gb, $lit);
+            foreach ([[-46, -26], [-33, -26], [28, -22], [40, -22]] as [$wx, $wy]) imagefilledrectangle($S, $gx + $wx, $gb + $wy, $gx + $wx + 5, $gb + $wy + 7, $lit);
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02 && $subject === 'pumpkin') {
+        // A jack-o'-lantern: the carved face lights up last, once the pumpkin
+        // itself has come up out of the dark.
+        $a  = (int) round(127 * (1 - $develop));
+        $pc = $iy2 - 38;
+        imagesetclip($S, $ix1, $iy1, $ix2, $iy2);
+        foreach ([[-15, 38, 52, 0xC8, 0x66, 0x1A], [15, 38, 52, 0xC8, 0x66, 0x1A], [0, 40, 56, 0xE0, 0x7A, 0x22]] as [$dx, $lw, $lh, $r, $g, $b]) {
+            imagefilledellipse($S, $gx + $dx, $pc, $lw, $lh, imagecolorallocatealpha($S, $r, $g, $b, $a));
+        }
+        foreach ([-15, 15] as $dx) imageellipse($S, $gx + $dx, $pc, 38, 52, imagecolorallocatealpha($S, 0x8A, 0x3A, 0x0C, $a));
+        imagefilledpolygon($S, [$gx - 3, $pc - 26, $gx - 5, $pc - 40, $gx + 6, $pc - 42, $gx + 4, $pc - 26], imagecolorallocatealpha($S, 0x5E, 0x6B, 0x2A, $a));
+        $fa = max(0.0, min(1.0, ($develop - 0.55) / 0.45));
+        if ($fa > 0.02) {
+            for ($g = 4; $g >= 1; $g--) imagefilledellipse($S, $gx, $pc + 2, 40 + $g * 9, 34 + $g * 8, imagecolorallocatealpha($S, 0xFF, 0xC0, 0x40, (int) round(127 - (127 - (118 - $g * 2)) * $fa)));
+            $lit = imagecolorallocatealpha($S, 0xFF, 0xDC, 0x6A, (int) round(127 * (1 - $fa)));
+            foreach ([-1, 1] as $m) imagefilledpolygon($S, [$gx + $m * 17, $pc - 6, $gx + $m * 6, $pc - 6, $gx + $m * 12, $pc - 19], $lit);
+            imagefilledpolygon($S, [$gx - 3, $pc + 1, $gx + 3, $pc + 1, $gx, $pc - 5], $lit);
+            imagefilledpolygon($S, [$gx - 19, $pc + 9, $gx - 12, $pc + 17, $gx - 6, $pc + 11, $gx, $pc + 18, $gx + 6, $pc + 11, $gx + 12, $pc + 17, $gx + 19, $pc + 9], $lit);
+        }
+        imagesetclip($S, 0, 0, imagesx($S) - 1, imagesy($S) - 1);
+    } elseif ($develop > 0.02) {
+        $a = fn($full) => (int) round(127 - (127 - $full) * $develop);   // alpha of the ghost at $full, scaled in
+        for ($g = 3; $g >= 1; $g--) ig_ghost_shape($S, $gx, $gb + 2, 1.45 + $g * 0.14, imagecolorallocatealpha($S, 0xF0, 0xE6, 0xD8, $a(118)), imagecolorallocatealpha($S, 0, 0, 0, 127));
+        ig_ghost_shape($S, $gx, $gb, 1.45, imagecolorallocatealpha($S, 0xF0, 0xE6, 0xD8, $a(25)), imagecolorallocate($S, 0x1B, 0x12, 0x0C));
+    }
+    mt_srand(5);
+    for ($i = 0; $i < 600; $i++) imagesetpixel($S, mt_rand($ix1, $ix2), mt_rand($iy1, $iy2), imagecolorallocatealpha($S, 0xE0, 0xC0, 0x90, mt_rand(90, 120)));
+    if ($milk > 0.01) {
+        // The cloud: opaque milky white at 1, clear at 0, over the picture only.
+        imagefilledrectangle($S, $ix1, $iy1, $ix2, $iy2, imagecolorallocatealpha($S, 0xF3, 0xEE, 0xE2, (int) round(127 * (1 - min(1.0, $milk)))));
+    }
+    imagettftext($S, 9, 0, 15 + 11, 15 + $H - 11, imagecolorallocate($S, 0x5A, 0x44, 0x30), IG_FONT_BODY, $caption);
+    $R = imagerotate($S, $angle, $clear);
+    imagesavealpha($R, true);
+    imagecopy($im, $R, (int) ($cx - imagesx($R) / 2), (int) ($cy - imagesy($R) / 2), 0, 0, imagesx($R), imagesy($R));
+}
+
+// A pair of amber slit-pupilled eyes looking out of a sprocket hole centred
+// at ($x, $cy). $level (0..1) fades them in and out of the dark, $open
+// (0..1) is the lid (a blink is a frame or two near 0), $look (-2..2) slides
+// the pupils sideways.
+function ig_sprocket_eyes($im, $x, $cy, $level = 1.0, $open = 1.0, $look = 0) {
+    if ($level < 0.05) return;
+    $hh = max(1, (int) round(7 * $open));
+    foreach ([-7, 7] as $dx) {
+        for ($g = 3; $g >= 1; $g--) {
+            imagefilledellipse($im, $x + $dx, $cy, 8 + $g * 5, $hh + $g * 5, imagecolorallocatealpha($im, 0xE0, 0x8A, 0x3E, (int) round(127 - (127 - (118 - $g * 3)) * $level)));
+        }
+        imagefilledellipse($im, $x + $dx, $cy, 9, $hh, imagecolorallocatealpha($im, 0xFF, 0xB0, 0x5C, (int) round(127 * (1 - $level))));
+        if ($open > 0.4) imagefilledellipse($im, $x + $dx + $look, $cy, 2, $hh, imagecolorallocatealpha($im, 0x12, 0x0D, 0x0A, (int) round(127 * (1 - $level))));
+    }
+}
+
+// Drawing tools for one darkroom picture, all in its own 108 x 116 design
+// space (origin at the picture's top-left corner at ($ox, $oy)) and all at
+// colour alpha $a unless a colour says otherwise — which is how a picture
+// comes up out of the developer: $a falls from 127 (nothing) to 0 (solid).
+// $k zooms the whole picture in about the design-space point ($fx, $fy):
+// every point, radius and line weight goes through it, so a picture drawn at
+// 1x can be framed tighter without being redrawn. 'X'/'Y' map a point for
+// the odd call that has to talk to GD directly.
+function ig_dr_tools($S, $ox, $oy, $a, $k = 1.0, $fx = 54, $fy = 58) {
+    $X = fn($x) => (int) round($ox + $fx + ($x - $fx) * $k);
+    $Y = fn($y) => (int) round($oy + $fy + ($y - $fy) * $k);
+    return [
+        'c'    => fn($r, $g, $b, $al = null) => imagecolorallocatealpha($S, $r, $g, $b, $al ?? $a),
+        'X'    => $X, 'Y' => $Y, 'k' => $k,
+        'poly' => function (array $pts, $col) use ($S, $X, $Y) { $o = []; foreach ($pts as [$x, $y]) { $o[] = $X($x); $o[] = $Y($y); } imagefilledpolygon($S, $o, $col); },
+        'ell'  => fn($x, $y, $rx, $ry, $col) => imagefilledellipse($S, $X($x), $Y($y), (int) round($rx * 2 * $k), (int) round($ry * 2 * $k), $col),
+        'rect' => fn($x1, $y1, $x2, $y2, $col) => imagefilledrectangle($S, $X($x1), $Y($y1), $X($x2), $Y($y2), $col),
+        'line' => function ($x1, $y1, $x2, $y2, $col, $th = 1) use ($S, $X, $Y, $k) { imagesetthickness($S, max(1, (int) round($th * $k))); imageline($S, $X($x1), $Y($y1), $X($x2), $Y($y2), $col); imagesetthickness($S, 1); },
+    ];
+}
+
+// ── The film reel in the footer ──────────────────────────────────────────────
+// A strip of 103 frames that plays a short film as it runs through the
+// projector's gate. A four-frame countdown leader (4, 3, 2, 1) and a blank, then
+// a 96-frame story in seven shots:
+//    A  0-11   the house under the moon, a slow push in
+//    B  12-23  the hallway, the door at the far end opening
+//    C  24-55  the ghost comes down the hall, bigger every frame, eyes lighting
+//    D  56-63  a reaction shot: a skull, jaw dropping
+//    E  64-79  the ghost right up at the lens, the lights failing, the camera shaking
+//    F  80-83  strobing white-out
+//    G  84-95  the empty hall again, and a pumpkin rolling through it
+// then a blank and THE END.
+const IG_REEL_FRAMES = 103;
+const IG_REEL_STORY  = 96;
+
+// The hallway, in one-point perspective, in an 88 x 52 frame at ($ox, $fy):
+// $flicker (0..1) is how bright the lights are, $o (0..1) how far the door at the
+// far end is open.
+function ig_reel_hall($im, $ox, $fy, $flicker, $o) {
+    $col = fn($r, $g, $b, $al = 0) => imagecolorallocatealpha($im, (int) $r, (int) $g, (int) $b, $al);
+    $d   = fn($r, $g, $b) => $col(round($r * $flicker), round($g * $flicker), round($b * $flicker));
+    $poly = function (array $pts, $c) use ($im, $ox, $fy) { $q = []; foreach ($pts as [$x, $y]) { $q[] = (int) round($ox + $x); $q[] = (int) round($fy + $y); } imagefilledpolygon($im, $q, $c); };
+    $poly([[0, 0], [34, 12], [34, 30], [0, 52]], $d(0x4A, 0x32, 0x1C));
+    $poly([[88, 0], [54, 12], [54, 30], [88, 52]], $d(0x4A, 0x32, 0x1C));
+    $poly([[0, 0], [88, 0], [54, 12], [34, 12]], $d(0x2A, 0x1C, 0x10));
+    $poly([[34, 12], [54, 12], [54, 30], [34, 30]], $d(0x36, 0x24, 0x16));
+    $poly([[34, 30], [54, 30], [88, 52], [0, 52]], $d(0x66, 0x44, 0x26));
+    foreach ([8, 28, 44, 60, 80] as $lx) imageline($im, (int) round($ox + 44), $fy + 30, (int) round($ox + $lx), $fy + 52, $d(0x80, 0x58, 0x32));
+    $poly([[39, 16], [49, 16], [49, 30], [39, 30]], $col(0x0F, 0x0A, 0x07));
+    if ($o > 0) {
+        imagefilledellipse($im, (int) round($ox + 44), $fy + 23, (int) round(16 + 16 * $o), (int) round(18 + 16 * $o), $col(0xFF, 0xB8, 0x40, (int) round(127 - 60 * $o)));
+        $poly([[44 - 4 * $o, 30], [44 + 4 * $o, 30], [44 + 22 * $o, 52], [44 - 22 * $o, 52]], $col(0xFF, 0xB8, 0x40, 104));
+        $poly([[44 - 5 * $o, 16], [44 + 5 * $o, 16], [44 + 5 * $o, 30], [44 - 5 * $o, 30]], $col(0xFF, 0xC2, 0x4A));
+    }
+}
+
+// Frame $idx of the film, drawn into the $W x $H box at ($fx, $fy) (clipped
+// to $clipX1..$clipX2 horizontally, the part of it that is on the strip).
+function ig_reel_frame($im, $fx, $fy, $W, $H, $idx, $clipX1, $clipX2) {
+    $col  = fn($r, $g, $b, $al = 0) => imagecolorallocatealpha($im, (int) $r, (int) $g, (int) $b, $al);
+    $x1 = max($fx, $clipX1); $x2 = min($fx + $W - 1, $clipX2);
+    if ($x2 <= $x1) return;
+    imagesetclip($im, $x1, $fy, $x2, $fy + $H - 1);
+    imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + $H - 1, $col(0x0A, 0x07, 0x05));
+    $story0 = 5; $end = $story0 + IG_REEL_STORY + 1;
+    $cream = $col(0xF0, 0xE6, 0xD8);
+    if ($idx >= 0 && $idx <= 3) {
+        // The countdown leader: a ring, crosshairs and a big numeral.
+        $cx = $fx + $W / 2; $cy = $fy + $H / 2; $amber = $col(0xE0, 0x8A, 0x3E);
+        imageline($im, $fx, (int) $cy, $fx + $W - 1, (int) $cy, $col(0x5A, 0x3A, 0x1E));
+        imageline($im, (int) $cx, $fy, (int) $cx, $fy + $H - 1, $col(0x5A, 0x3A, 0x1E));
+        imagesetthickness($im, 2); imageellipse($im, (int) $cx, (int) $cy, 42, 42, $amber); imagesetthickness($im, 1);
+        imageellipse($im, (int) $cx, (int) $cy, 34, 34, $col(0x7A, 0x4E, 0x26));
+        $n = (string) (4 - $idx);
+        $b = imagettfbbox(26, 0, IG_FONT_DARKROOM_TITLE, $n);
+        imagettftext($im, 26, 0, (int) round($cx - ($b[2] - $b[0]) / 2 - $b[0]), (int) round($cy + ($b[1] - $b[7]) / 2 - $b[1]), $cream, IG_FONT_DARKROOM_TITLE, $n);
+    } elseif ($idx >= $story0 && $idx < $story0 + IG_REEL_STORY) {
+        $j = $idx - $story0;
+        $dips = in_array($j, [30, 39, 47, 66, 71, 76], true);
+        $flicker = $dips ? 0.3 : 0.78 + 0.22 * sin($j * 2.3);
+        $ghostEyes = fn($glow) => $glow ? $col(0xFF, 0xC2, 0x4A) : $col(0x1B, 0x12, 0x0C);
+        if ($j < 12) {
+            // A: the house under the moon, pushing in. Everything is drawn about the
+            // door, scaled by $z.
+            $z = 1 + 0.55 * ($j / 11);
+            $M = fn($x, $y) => [$fx + 44 + ($x - 44) * $z, $fy + 46 + ($y - 46) * $z];
+            $P = function (array $pts, $c) use ($im, $M) { $q = []; foreach ($pts as [$x, $y]) { [$X, $Y] = $M($x, $y); $q[] = (int) round($X); $q[] = (int) round($Y); } imagefilledpolygon($im, $q, $c); };
+            imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + 30, $col(0x1E, 0x13, 0x0B));
+            imagefilledrectangle($im, $fx, $fy + 30, $fx + $W - 1, $fy + 46, $col(0x34, 0x20, 0x10));
+            imagefilledellipse($im, $fx + 20, $fy + 12, (int) round(18 * $z), (int) round(18 * $z), $col(0xF6, 0xE6, 0xB8, 40));
+            imagefilledellipse($im, $fx + 20, $fy + 12, (int) round(13 * $z), (int) round(13 * $z), $col(0xF6, 0xE6, 0xB8));
+            $blk = $col(0x0A, 0x07, 0x05);
+            $P([[-20, 46], [20, 42], [44, 40], [70, 42], [108, 45], [108, 70], [-20, 70]], $blk);
+            $P([[30, 24], [58, 24], [58, 46], [30, 46]], $blk);
+            $P([[27, 24], [31, 16], [57, 16], [61, 24]], $blk);
+            $P([[38, 24], [44, 8], [50, 24]], $blk);
+            $P([[55, 10], [58, 10], [58, 18], [55, 18]], $blk);
+            $lit = $col(0xFF, 0xD8, 0x62);
+            $P([[33, 28], [36, 28], [36, 34], [33, 34]], $lit); $P([[52, 28], [55, 28], [55, 34], [52, 34]], $lit);
+            $P([[42, 38], [46, 38], [46, 46], [42, 46]], $lit);
+            if ($j % 3 !== 1) $P([[42, 16], [46, 16], [46, 22], [42, 22]], $lit);
+        } elseif ($j < 24) {
+            // B: the hall, and the door at the far end opening.
+            ig_reel_hall($im, $fx, $fy, $flicker, max(0.0, min(1.0, ($j - 12 - 5) / 6)));
+        } elseif ($j < 56) {
+            // C: the ghost comes down the hall.
+            $k = $j - 24;
+            ig_reel_hall($im, $fx, $fy, $flicker, 1.0);
+            $sc = 0.10 * pow(1.089, $k);
+            $by = $sc <= 1.0 ? 30 + 22 * $sc : 52 + ($sc - 1) * 30;
+            $gx = $W / 2 + 3 * sin($k * 0.9) * min(1.0, $sc);
+            $glow = $k >= 14;
+            if ($glow) imagefilledellipse($im, (int) round($fx + $gx), (int) round($fy + $by - 20 * $sc), (int) round(34 * $sc + 14), (int) round(44 * $sc + 14), $col(0xFF, 0xB8, 0x40, 118));
+            ig_ghost_shape($im, $fx + $gx, $fy + $by, $sc, $cream, $ghostEyes($glow));
+        } elseif ($j < 64) {
+            // D: a reaction shot — a skull, its jaw dropping and its eyes widening.
+            $k = $j - 56; $open = $k / 7; $ox = $fx;
+            imagefilledellipse($im, $fx + 44, $fy + 26, 80, 60, $col(0xFF, 0xB8, 0x40, 118));
+            $blk = $col(0x0A, 0x07, 0x05); $bone = $col(0xF0, 0xE6, 0xD0); $sh = $col(0xB8, 0xAC, 0x92);
+            imagefilledellipse($im, $fx + 44, $fy + 22, 50, 46, $bone);
+            imagefilledrectangle($im, $fx + 30, $fy + 34, $fx + 58, $fy + 38, $bone);
+            $ew = (int) round(13 + 4 * $open); $eh = (int) round(14 + 6 * $open);
+            imagefilledellipse($im, $fx + 35, $fy + 20, $ew, $eh, $blk); imagefilledellipse($im, $fx + 53, $fy + 20, $ew, $eh, $blk);
+            imagefilledpolygon($im, [$fx + 44, $fy + 27, $fx + 41, $fy + 33, $fx + 47, $fy + 33], $blk);
+            $dj = (int) round($open * 12);
+            imagefilledrectangle($im, $fx + 33, $fy + 38, $fx + 55, $fy + 39 + $dj, $blk);
+            imagefilledrectangle($im, $fx + 33, $fy + 40 + $dj, $fx + 55, $fy + 50 + $dj, $bone);
+            foreach ([34, 38, 42, 46, 50, 54] as $tx) { imageline($im, $fx + $tx, $fy + 34, $fx + $tx, $fy + 38, $sh); imageline($im, $fx + $tx, $fy + 40 + $dj, $fx + $tx, $fy + 44 + $dj, $sh); }
+        } elseif ($j < 80) {
+            // E: the ghost at the lens, the lights failing, the camera shaking.
+            $k = $j - 64; $sh = ($k % 2) ? 2 : -2;
+            ig_reel_hall($im, $fx + $sh, $fy, $flicker, 1.0);
+            $sc = 1.5 * pow(1.075, $k);
+            $by = 52 + ($sc - 1) * 30;
+            imagefilledellipse($im, (int) round($fx + $sh + $W / 2), (int) round($fy + $by - 20 * $sc), (int) round(34 * $sc + 14), (int) round(44 * $sc + 14), $col(0xFF, 0xB8, 0x40, 118));
+            ig_ghost_shape($im, $fx + $sh + $W / 2, $fy + $by, $sc, $cream, $ghostEyes(true));
+        } elseif ($j < 84) {
+            // F: strobing white-out.
+            $white = [true, false, true, false][$j - 80];
+            if ($white) imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + $H - 1, $col(0xFF, 0xF4, 0xE0));
+        } else {
+            // G: the empty hall, and a pumpkin rolling through it.
+            $k = $j - 84; $u = $k / 11;
+            ig_reel_hall($im, $fx, $fy, 0.85, 0.0);
+            $px = $fx + $W + 8 - ($W + 16) * $u; $py = $fy + 42 - abs(sin($u * M_PI * 5)) * 5;
+            $or = $col(0xE0, 0x7A, 0x22); $orD = $col(0xB8, 0x5A, 0x14);
+            imagefilledellipse($im, (int) round($px - 3), (int) round($py), 9, 12, $orD); imagefilledellipse($im, (int) round($px + 3), (int) round($py), 9, 12, $orD);
+            imagefilledellipse($im, (int) round($px), (int) round($py), 10, 13, $or);
+            imagefilledrectangle($im, (int) round($px) - 1, (int) round($py) - 8, (int) round($px) + 1, (int) round($py) - 6, $col(0x5E, 0x6B, 0x2A));
+        }
+    } elseif ($idx === $end) {
+        $b = imagettfbbox(9, 0, IG_FONT_BODY, 'THE END');
+        imagettftext($im, 9, 0, (int) round($fx + ($W - ($b[2] - $b[0])) / 2), $fy + (int) ($H / 2) + 4, $cream, IG_FONT_BODY, 'THE END');
+        imageline($im, $fx + 14, $fy + (int) ($H / 2) - 9, $fx + $W - 15, $fy + (int) ($H / 2) - 9, $col(0x7A, 0x4E, 0x26));
+        imageline($im, $fx + 14, $fy + (int) ($H / 2) + 10, $fx + $W - 15, $fy + (int) ($H / 2) + 10, $col(0x7A, 0x4E, 0x26));
+    }
+    imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
+}
+
+// The strip itself: four frames visible, the film running through. $p is the
+// (fractional) index of the film frame sitting in the gate — the second slot,
+// outlined in amber, the other three dimmed — so the countdown reads as
+// 4, 3, 2, 1 passing through it. The sprocket holes travel with the film.
+// The still shows the film caught partway down the hall.
+function ig_darkroom_reel($im, $x1, $y1, $x2, $y2, $p = 45.0) {
+    $bar = imagecolorallocate($im, 0x1D, 0x16, 0x11); $hole = imagecolorallocate($im, 0x12, 0x0D, 0x0A);
+    imagefilledrectangle($im, $x1, $y1, $x2, $y2, $bar);
+    $fw = ($x2 - $x1 - 10) / 4; $sp = $fw / 6;
+    imagesetclip($im, $x1, $y1, $x2, $y2);
+    $kmin = (int) floor((-14 - (1 - $p) * $fw) / $sp);
+    for ($k = $kmin; $k < $kmin + 48; $k++) {
+        $hx = (int) round($x1 + 6 + $k * $sp + (1 - $p) * $fw);
+        if ($hx < $x1 - 8 || $hx > $x2) continue;
+        imagefilledrectangle($im, $hx, $y1 + 4, $hx + 7, $y1 + 9, $hole);
+        imagefilledrectangle($im, $hx, $y2 - 9, $hx + 7, $y2 - 4, $hole);
+    }
+    $fy1 = $y1 + 13; $fy2 = $y2 - 13; $W = (int) round($fw - 4); $H = $fy2 - $fy1 + 1;
+    for ($m = (int) floor($p) - 2; $m <= (int) floor($p) + 3; $m++) {
+        $X = $x1 + 5 + ($m - $p + 1) * $fw;
+        ig_reel_frame($im, (int) round($X + 2), $fy1, $W, $H, $m, $x1 + 4, $x2 - 4);
+    }
+    imagesetclip($im, $x1, $y1, $x2, $y2);
+    $dim = imagecolorallocatealpha($im, 0x0A, 0x07, 0x05, 70);
+    foreach ([0, 2, 3] as $slot) imagefilledrectangle($im, (int) round($x1 + 5 + $slot * $fw), $fy1 - 1, (int) round($x1 + 5 + ($slot + 1) * $fw), $fy2 + 1, $dim);
+    $amber = imagecolorallocate($im, 0xE0, 0x8A, 0x3E);
+    imagesetthickness($im, 2);
+    imagerectangle($im, (int) round($x1 + 5 + $fw) + 1, $fy1 - 2, (int) round($x1 + 5 + 2 * $fw) - 1, $fy2 + 2, $amber);
+    imagesetthickness($im, 1);
+    imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
+}
+
 // A final overlay pass — faint horizontal lines the full width of the
 // card — the one texture that has to be drawn last, over everything else,
 // since a real CRT's scanlines sit in front of the whole picture.
@@ -1067,7 +1597,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount, $anim);
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount, $anim);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
-        case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount);
+        case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount, $anim);
         case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount);
         default:          return ig_build_list_page_paper($films, $date, $moreCount, $anim);
     }
@@ -2620,7 +3150,7 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
 // real safelight only ever shows one color — but posters stay untinted, full
 // color, like Neon's (unlike Zine's pink duotone or Newsprint's grayscale),
 // since a printed still isn't what's under the safelight, the film is.
-function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -2646,6 +3176,63 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, 122, $margin + ($stampBox[2] - $stampBox[0]), 124, $amber);
 
     ig_leader_mark($im, $w - $margin - 30, 70, 28, $amber);
+
+    // October: spirit photography. A print with a ghost developing in it sits
+    // in the header's empty right side, and slit-eyed pairs watch from a few
+    // of the film edges' sprocket holes. Animated (one 8s loop, whole cycles):
+    // the print comes up in the developer, holds, and fades back to blank;
+    // each pair of eyes opens out of the dark for a stretch, blinks and looks
+    // about; and the film in the footer plays one long film over the whole
+    // video — a 4-3-2-1 countdown, then a seven-shot haunted-house movie —
+    // its speed building and easing off again. (The leader mark in the corner
+    // stays still.)
+    $season = ig_halloween_season($date);
+    $dv = 1.0; $milk = 0.0; $flash = 0.0; $eyeSt = []; $reelP = 45.0; $stripFlash = 0.0;
+    $eyeSpots = [[28, 224, 6, 40, 22], [28, 608, 28, 70, 50], [28, 992, 52, 90, 74], [1052, 416, 14, 56, 38], [1052, 864, 40, 84, 62]];
+    foreach ($eyeSpots as $k => $_) $eyeSt[$k] = ['level' => 1.0, 'open' => 1.0, 'look' => 0];
+    $subject = 'scream'; $caption = 'booooo';
+    if ($anim !== null && $season) {
+        // The video is four 8-second cycles (see ig_anim_frames()): everything
+        // repeats each cycle except the print, which is a famous picture with
+        // an October character in the lead: the ghost in The Scream's setting,
+        // the pumpkin as Magritte's Son of Man, the haunted house as Psycho,
+        // and a skeleton and a zombie as American Gothic.
+        $f = $anim['frame'] % IG_ANIM_FRAMES; $t = $f / IG_ANIM_FRAMES;
+        $cyc = intdiv($anim['frame'], IG_ANIM_FRAMES) % 4;
+        // The new picture (and its caption) arrives with the flash at frame 5;
+        // until then the previous cycle's finished picture is still showing,
+        // so the loop's wrap does not pop: the video ends on the finished
+        // couple, and the first flash erases them.
+        $pic = $f >= 5 ? $cyc : ($cyc + 3) % 4;
+        [$subject, $caption] = [['scream', 'booooo'], ['sonofman', 'son of pumpkin'], ['psycho', 'vacancy'], ['gothic', 'american ghoulish']][$pic];
+        // The print, as an instant photo develops: the last picture sits
+        // finished until a flash of white at frame 5, which erases it; the new
+        // picture is a milky cloud for a second, then the cloud clears and the
+        // picture comes up through it (outlines first) and stays until the next
+        // flash.
+        $flash = $f === 5 ? 1.0 : ($f === 4 ? 0.4 : ($f === 6 ? 0.5 : 0.0));
+        $milk  = $f < 4 ? 0.0 : ($f === 4 ? 0.55 : ($f === 5 ? 1.0 : ($f < 20 ? 0.92 : ($f <= 60 ? 0.92 * (1 - ig_ease(($f - 20) / 40)) : 0.0))));
+        $dv    = $f < 5 ? 1.0 : ($f < 26 ? 0.0 : ($f <= 60 ? ig_ease(($f - 26) / 34) : 1.0));
+        foreach ($eyeSpots as $k => [$ex, $ey, $a0, $a1, $blink]) {
+            $lv = $f < $a0 || $f > $a1 ? 0.0 : min(1.0, ($f - $a0) / 4, ($a1 - $f) / 4);
+            $eyeSt[$k] = ['level' => $lv, 'open' => in_array($f, [$blink, $blink + 1], true) ? 0.1 : 1.0, 'look' => (int) round(2 * sin(2 * M_PI * 2 * $t + $k * 1.3))];
+        }
+        // The film runs once through the video: slowly through the countdown
+        // (about 0.7 frames a second), a rush through the story (peaking near
+        // 5.7), and a slow settle onto THE END. The speed is a constant under a
+        // sin^2 hump, which has no sharp edges to it. The
+        // first five frames of the video still show the end (so the wrap is
+        // exact); the first flash — a white burst across the strip too —
+        // cuts back to the start of the film.
+        $fv = $anim['frame']; $nv = $anim['frames'];
+        if ($fv < 5) $reelP = IG_REEL_FRAMES - 1.0;
+        else { $uu = ($fv - 5) / ($nv - 6); $reelP = (IG_REEL_FRAMES - 1) * (0.22 * $uu + 0.78 * ($uu - sin(2 * M_PI * $uu) / (2 * M_PI))); }
+        $stripFlash = $fv === 4 ? 0.4 : ($fv === 5 ? 1.0 : ($fv === 6 ? 0.5 : 0.0));
+    }
+    if ($season) {
+        ig_darkroom_print($im, 845, 163, -5, $dv, $milk, $flash, $subject, $caption);
+        foreach ($eyeSpots as $k => [$ex, $ey]) ig_sprocket_eyes($im, $ex, $ey, $eyeSt[$k]['level'], $eyeSt[$k]['open'], $eyeSt[$k]['look']);
+    }
 
     $y = 175;
     imagettftext($im, 24, 0, $margin, $y, $amber, IG_FONT_BODY, strtoupper("Today's Reel"));
@@ -2731,6 +3318,11 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0) {
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if ($season) {
+        ig_darkroom_reel($im, 600, 1226, 980, 1304, $reelP);
+        if ($stripFlash > 0) imagefilledrectangle($im, 600, 1226, 980, 1304, imagecolorallocatealpha($im, 0xFF, 0xF4, 0xE0, 127 - (int) round(127 * $stripFlash)));
+    }
 
     return $im;
 }

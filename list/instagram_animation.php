@@ -39,15 +39,18 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 // Newsprint's classifieds likewise turn over slowly: three ads, each up for a
 // third of the video, while its bat makes one crossing in each third too —
 // three cycles of 82 frames (6.8s). Instagram wants carousel videos under a
-// minute: 6 x 8s = 48s, 3 x 6.83s = 20.5s.
+// minute: 6 x 8s = 48s, 3 x 6.83s = 20.5s. Darkroom's print develops four
+// pictures, one per 8s cycle (The Scream, Son of Man, Psycho, American Gothic):
+// 4 x 8s = 32s.
 function ig_anim_frames($theme) {
     if ($theme === 'newsprint') return 3 * 82;
+    if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     return ($theme === 'neon' ? 6 : 1) * IG_ANIM_FRAMES;
 }
 
 // Which themes have an animated list page, for a post on $date.
 function ig_theme_animates($theme, $date) {
-    return in_array($theme, ['marquee', 'paper', 'neon', 'newsprint'], true) && ig_halloween_season($date);
+    return in_array($theme, ['marquee', 'paper', 'neon', 'newsprint', 'darkroom'], true) && ig_halloween_season($date);
 }
 
 // Whether a planned page (see ig_plan_pages()) gets a video.
