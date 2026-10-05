@@ -608,8 +608,7 @@ function ig_halftone_moon($im, $cx, $cy, $r, $ink) {
 }
 
 // The classifieds' three ads, three short lines each (the first line opens
-// with a category that is set in red). Shared by the list page, which cycles
-// through them, and the spotlight pages, which each show one.
+// with a category that is set in red), which the list page cycles through.
 function ig_news_ads() {
     return [
         ['MISSING: projectionist. Last', 'seen entering the booth. The', 'film is still running.'],
@@ -4044,11 +4043,13 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
-    // October: one of the list page's classified ads in the footer's empty
-    // right side, picked by the film so a carousel's spotlights differ.
+    // October: the list page's moon and clouds, smaller, in the footer's empty
+    // right side. (Small enough to clear the overview's last line, which can
+    // run down to about y 1190 when the title takes two lines.)
     if (ig_halloween_season($date)) {
-        $ads = ig_news_ads();
-        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, [$ads[crc32((string) ($film['title'] ?? '')) % count($ads)]]);
+        ig_halftone_moon($im, 900, 1252, 44, $ink);
+        ig_news_cloud($im, 940, 1272, 0.8, $ink, $paper);
+        ig_news_cloud($im, 846, 1226, 0.5, $ink, $paper);
     }
 
     return $im;
