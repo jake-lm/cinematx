@@ -1319,7 +1319,7 @@ function ig_zine_eye_front() {
     for ($a = 0; $a < 360; $a += 18) imageline($T, (int) round($cx + 16 * cos(deg2rad($a))), (int) round($cy + 16 * sin(deg2rad($a))), (int) round($cx + 36 * cos(deg2rad($a))), (int) round($cy + 36 * sin(deg2rad($a))), $blk);
     imagefilledellipse($T, $cx, $cy, 32, 32, $blk);
     imagefilledellipse($T, $cx - 11, $cy - 13, 13, 15, $white);
-    imagesetthickness($T, 6); imagepolygon($T, $eye, count($eye) / 2, $blk);
+    imagesetthickness($T, 6); imagepolygon($T, $eye, $blk);
     imagesetthickness($T, 4);
     for ($i = 1; $i <= 9; $i++) { $u = $i / 10; $x = 34 + $u * 142; $y = $cy - 52 * pow(sin(M_PI * $u), 0.85); $a = deg2rad(-90 + ($u - 0.5) * 100); imageline($T, (int) $x, (int) $y, (int) round($x + 22 * cos($a)), (int) round($y + 22 * sin($a)), $blk); }
     imagesetthickness($T, 1);
@@ -1369,16 +1369,21 @@ function ig_zine_skull_back() {
     return $T;
 }
 
-// A photocopied skull: the card turned $ang degrees and scaled by $k (1 is
-// 170 x 200), taped down at two corners.
-function ig_zine_skull_card($im, $cx, $cy, $k, $ang) {
-    $T = ig_zine_skull_front();
+// A taped poster: poster number $idx (see ig_zine_poster_front()) turned $ang
+// degrees and scaled by $k (1 is 170 x 200), taped down at two corners.
+function ig_zine_poster_card($im, $cx, $cy, $k, $ang, $idx = 0) {
+    $T = ig_zine_poster_front($idx);
     $clear = imagecolorallocatealpha($T, 0, 0, 0, 127);
-    $R = imagerotate($T, $ang, $clear); imagesavealpha($R, true);
+    $R = ig_rotate($T, $ang, $clear, true);
     $sw = (int) round(imagesx($R) * $k); $sh = (int) round(imagesy($R) * $k);
     imagecopyresampled($im, $R, (int) round($cx - $sw / 2), (int) round($cy - $sh / 2), 0, 0, $sw, $sh, imagesx($R), imagesy($R));
     ig_zine_tape($im, $cx - 68 * $k, $cy - 100 * $k, 64 * $k, 24 * $k, -32);
     ig_zine_tape($im, $cx + 68 * $k, $cy + 102 * $k, 64 * $k, 24 * $k, -28);
+}
+
+// The photocopied skull: poster 0, taped down.
+function ig_zine_skull_card($im, $cx, $cy, $k, $ang) {
+    ig_zine_poster_card($im, $cx, $cy, $k, $ang, 0);
 }
 
 // The card in flight: $sx (0..1) squashes it sideways (a turn about its
@@ -4214,6 +4219,7 @@ function ig_build_feature_page_marquee(array $film, $date) {
 // paper/marquee use. Special Elite's ascent/descent at these sizes measure
 // close enough to Fraunces' that this reuses paper's exact gap constants.
 function ig_build_feature_page_zine(array $film, $date) {
+    $season = ig_halloween_season($date);
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -4252,6 +4258,9 @@ function ig_build_feature_page_zine(array $film, $date) {
     }
 
     imagefilledrectangle($im, 0, 0, $w, 20, $ink);
+    // October: blood running down from the bar over the poster image (short
+    // where the showtime pills are, a different pattern for each film).
+    if ($season) ig_zine_blood($im, 0, $w, 20, crc32((string) ($film['title'] ?? '')) % 1000, 330, 38, 0);
 
     $pillFont = 30;
     $pillPadX = 30;
@@ -4277,7 +4286,13 @@ function ig_build_feature_page_zine(array $film, $date) {
     $kicker = strtoupper($film['venue'] ?? '');
     if (!empty($film['location'])) $kicker .= ' - ' . strtoupper($film['location']);
     if ($kicker !== '') {
-        imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
+        if ($season) {
+            // October: the venue as a ransom note, sized down to fit a long one
+            $ksz = (int) max(16, min(26, floor(880 / (mb_strlen($kicker) * 1.15))));
+            ig_zine_ransom($im, $margin, $y - 4, $kicker, $ksz, 21);
+        } else {
+            imagettftext($im, 24, 0, $margin, $y, $pink, IG_FONT_BODY, $kicker);
+        }
         $y += 68;
     }
 
@@ -4312,6 +4327,14 @@ function ig_build_feature_page_zine(array $film, $date) {
         imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    // October: one of the three posters, taped down in the bottom-right corner,
+    // a different one for each film (smaller than on the list page, and tucked
+    // low, to clear the overview's last line when the title takes two lines).
+    if ($season) {
+        $pi = crc32((string) ($film['title'] ?? '')) % 3;
+        ig_zine_poster_card($im, 915, 1264, 0.58, [5.0, 3.5, 6.5][$pi], $pi);
+    }
 
     return $im;
 }
