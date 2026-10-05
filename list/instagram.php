@@ -1118,6 +1118,351 @@ function ig_darkroom_reel($im, $x1, $y1, $x2, $y2, $p = 6.0) {
     imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
 }
 
+// ── October's zine accents ───────────────────────────────────────────────────
+// Cut-and-paste, photocopied, taped: a ransom-note headline, blood running
+// from the masthead bar, and a xerox skull on a black card.
+
+// imagerotate(), but never called with an angle of zero (or, if $guardSmall, a
+// hair off it): this GD build crashes the whole process on those, and a
+// rotation that small is no rotation, so the image comes back as it is.
+function ig_rotate($img, $ang, $clear, $guardSmall = false) {
+    if ($ang == 0.0 || ($guardSmall && abs($ang) < 0.5)) return $img;
+    $R = imagerotate($img, $ang, $clear); imagesavealpha($R, true);
+    return $R;
+}
+
+// Text as a ransom note: every letter its own cut-out tile, in a different
+// font and tile colour, at its own size and tilt with a slightly ragged cut.
+// Runs left to right from $x with the tiles' baseline near $y; $seed makes the
+// jumble the same every time. Returns the x the note ends at.
+// $frame (a video frame, or null for the still) re-poses every tile every other
+// frame — a nudge of tilt and position each, as if someone were moving the
+// paper between shots of a stop-motion film. The jitter comes from a hash, not
+// from mt_rand(), so the jumble itself is identical with or without it.
+function ig_zine_ransom($im, $x, $y, $text, $size, $seed, $frame = null, $jit = 1.0) {
+    $dir = dirname(__DIR__) . '/assets/fonts/';
+    $fonts = ['Anton-Regular.ttf', 'Fraunces-Bold.ttf', 'RobotoSlab-Bold.ttf', 'SpecialElite-Regular.ttf', 'Baloo2-Bold.ttf', 'AllertaStencil-Regular.ttf', 'InstrumentSans-SemiBold.ttf'];
+    $tiles = [['FBF9F2', '161513'], ['161513', 'F0EEE4'], ['FF3D8A', '161513'], ['E3D8BC', '161513'], ['FBF9F2', 'FF3D8A'], ['2A2724', 'FBF9F2']];
+    $hex = fn($T, $h) => imagecolorallocate($T, hexdec(substr($h, 0, 2)), hexdec(substr($h, 2, 2)), hexdec(substr($h, 4, 2)));
+    mt_srand($seed);
+    $cx = $x; $li = 0;
+    $f2 = $frame === null ? 0 : intdiv($frame, 2);
+    foreach (preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) as $ch) {
+        if ($ch === ' ') { $cx += $size * 0.55; continue; }
+        $li++;
+        $font = $dir . $fonts[mt_rand(0, count($fonts) - 1)];
+        $sz = (int) round($size * (0.78 + mt_rand(0, 40) / 100));
+        $b = imagettfbbox($sz, 0, $font, $ch);
+        $tw = $b[2] - $b[0]; $th = $b[1] - $b[7]; $pad = 7; $W = $tw + 2 * $pad; $H = $th + 2 * $pad;
+        $T = imagecreatetruecolor($W + 10, $H + 10); imagesavealpha($T, true); imagealphablending($T, false);
+        $clear = imagecolorallocatealpha($T, 0, 0, 0, 127); imagefill($T, 0, 0, $clear); imagealphablending($T, true);
+        [$bg, $fg] = $tiles[mt_rand(0, count($tiles) - 1)];
+        $j = fn() => mt_rand(-2, 2);
+        imagefilledpolygon($T, [5 + $j(), 5 + $j(), 5 + $W + $j(), 5 + $j(), 5 + $W + $j(), 5 + $H + $j(), 5 + $j(), 5 + $H + $j()], $hex($T, $bg));
+        imagettftext($T, $sz, 0, 5 + $pad - $b[0], 5 + $pad - $b[7], $hex($T, $fg), $font, $ch);
+        $jr = fn($k) => (crc32("$seed:$li:$f2:$k") % 1000) / 1000 - 0.5;
+        $ja = $frame === null ? 0.0 : 5 * $jit * $jr(0);
+        $ang = mt_rand(-70, 70) / 10 + $ja;
+        $R = ig_rotate($T, $ang, $clear, $frame !== null);
+        $oy = mt_rand(-6, 6);
+        $jx = $frame === null ? 0 : (int) round(3 * $jit * $jr(1)); $jy = $frame === null ? 0 : (int) round(3 * $jit * $jr(2));
+        imagecopy($im, $R, (int) $cx + $jx, (int) ($y - $H + $oy) + $jy, 0, 0, imagesx($R), imagesy($R));
+        $cx += $W + mt_rand(-1, 4);
+    }
+    return $cx;
+}
+
+// Blood running down from the edge of the masthead bar ($y0 is the bar's
+// bottom): a ragged pooled edge hanging off it, and runs of every width and
+// length that flare out of the pool, narrow to a neck, lean a little and end in
+// a small bulb — thick and thin, some long, a few with a drop that has let go.
+// A darker edge down one side and a glossy streak down the other give them
+// volume. Runs in the chip's column and the headline's stay short so they do
+// not run over either. Returns the runs ([x, length, lean] each) so
+// ig_zine_blood_drops() can let the beads go.
+// $wind (0..1) leans the runs to the right. $phase (0..1 round a cycle, or null for the still): each run's bulb swells
+// over the first part of its own turn of the cycle (they are staggered by the
+// golden ratio so they do not all go at once), stretching the run a few pixels,
+// then pinches off and snaps back small to start again.
+function ig_zine_blood($im, $x1, $x2, $y0, $seed, $clearUpTo = 0, $maxNearChip = 0, $maxNearText = 80, $phase = null, $wind = 0.0) {
+    mt_srand($seed);
+    $red  = imagecolorallocate($im, 0xB0, 0x12, 0x1A);
+    $dark = imagecolorallocate($im, 0x78, 0x0A, 0x10);
+    $gloss = imagecolorallocatealpha($im, 0xFF, 0x9A, 0x9A, 78);
+    // the pool
+    $pool = [[$x1 - 5, $y0 - 3]];
+    for ($x = $x1 - 5; $x <= $x2 + 5; $x += 5) $pool[] = [$x, $y0 + 7 + 5 * sin($x / 17) + 3 * sin($x / 6.5 + 1) + mt_rand(0, 3)];
+    $pool[] = [$x2 + 5, $y0 - 3];
+    $flat = []; foreach ($pool as [$px, $py]) { $flat[] = (int) round($px); $flat[] = (int) round($py); }
+    imagefilledpolygon($im, $flat, $red);
+    // the runs
+    $x = $x1 + mt_rand(14, 40);
+    $runs = [];
+    while ($x < $x2 - 12) {
+        $w = mt_rand(5, 12);
+        $long = mt_rand(0, 3) === 0;
+        $len = $long ? mt_rand(85, 140) : mt_rand(22, 64);
+        if ($x < 330) $len = min($len, $maxNearChip);                    // the chip's column
+        elseif ($x < $clearUpTo) $len = min($len, $maxNearText);         // the headline's column
+        $lean = mt_rand(-4, 4);
+        $runs[] = [$x, $len, $lean];
+        $lean += (int) round(8 * $wind);                                   // the gust leans every run to the right
+        $phi = $phase === null ? null : fmod($phase + (count($runs) - 1) * 0.381966, 1.0);
+        $bs = 1.0;                                                         // the bulb's size, as a fraction of full
+        if ($phi !== null) {
+            if ($phi < 0.6) { $e = ig_ease($phi / 0.6); $bs = 0.55 + 0.45 * $e; $len += 6 * $e; }
+            else            { $bs = max(0.55, 1 - ($phi - 0.6) / 0.06 * 0.45); }
+        }
+        $at = fn($t) => $x + $lean * $t;                                   // the run's centre line at fraction $t down it
+        $pts = [];
+        for ($k = 0; $k <= 6; $k++) { $t = $k / 6; $pts[] = [$at(0) - $w / 2 - 1.3 * $w * (1 - $t) ** 2, $y0 + 4 + $t * 18]; }   // left side, flaring out of the pool
+        $pts[] = [$at(1) - $w / 2, $y0 + $len - $w * 0.4];
+        for ($a = 180; $a >= 0; $a -= 30) $pts[] = [$at(1) + ($w / 2 + 2) * $bs * cos(deg2rad($a)), $y0 + $len + ($w / 2 + 3) * $bs * sin(deg2rad($a))];   // the bulb, left to right
+        $pts[] = [$at(1) + $w / 2, $y0 + $len - $w * 0.4];
+        for ($k = 6; $k >= 0; $k--) { $t = $k / 6; $pts[] = [$at(0) + $w / 2 + 1.3 * $w * (1 - $t) ** 2, $y0 + 4 + $t * 18]; }   // right side
+        $flat = []; foreach ($pts as [$px, $py]) { $flat[] = (int) round($px); $flat[] = (int) round($py); }
+        imagefilledpolygon($im, $flat, $red);
+        // shading: dark down the right edge, a glossy streak down the left, a shine on the bulb
+        imagesetthickness($im, 2); imageline($im, (int) round($at(0.18) + $w / 2 - 1), (int) round($y0 + 0.18 * $len), (int) round($at(1) + $w / 2 - 1), (int) round($y0 + $len - 2), $dark); imagesetthickness($im, 1);
+        imageline($im, (int) round($at(0.2) - $w / 2 + 2), (int) round($y0 + 0.2 * $len), (int) round($at(0.9) - $w / 2 + 2), (int) round($y0 + 0.9 * $len), $gloss);
+        imagefilledellipse($im, (int) round($at(1) - 2), (int) round($y0 + $len + 1), 3, 4, imagecolorallocatealpha($im, 0xFF, 0xC0, 0xC0, 40));
+        $dropAt = mt_rand(16, 28);
+        if (mt_rand(0, 2) === 0 && $x >= $clearUpTo && $phase === null) imagefilledellipse($im, (int) round($at(1)), (int) round($y0 + $len + $dropAt), 5, 8, $red);   // a drop that has let go (only where it has clear space; animated, the beads really fall)
+        $x += mt_rand(30, 96);
+    }
+    return $runs;
+}
+
+// The beads that pinch off the blood's runs and fall: for each run at or beyond
+// $dropFrom (clear of the date and the headline), the bead leaves the bulb at
+// 60% of that run's turn of the cycle and falls with gravity for a stretch of
+// the page, over the listings, fading out before it stops. Drawn last, so it
+// passes over everything. Same staggering as ig_zine_blood().
+function ig_zine_blood_drops($im, array $runs, $y0, $phase, $dropFrom, $wind = 0.0) {
+    foreach ($runs as $i => [$x, $len, $lean]) {
+        if ($x < $dropFrom) continue;
+        $phi = fmod($phase + $i * 0.381966, 1.0);
+        if ($phi < 0.6 || $phi >= 0.97) continue;
+        $u = ($phi - 0.6) / 0.37;
+        $bx = $x + $lean + 1.5 * sin($u * 9 + $i) + 70 * $wind * $u;
+        $by = $y0 + $len + 8 + 400 * $u * $u;
+        $a = $u < 0.8 ? 0 : (int) round(127 * ($u - 0.8) / 0.2);
+        $red = imagecolorallocatealpha($im, 0xB0, 0x12, 0x1A, $a);
+        imagefilledellipse($im, (int) round($bx), (int) round($by), 7, 10, $red);
+        imagefilledpolygon($im, [(int) round($bx) - 3, (int) round($by) - 2, (int) round($bx) + 3, (int) round($by) - 2, (int) round($bx), (int) round($by) - 10], $red);
+        imagefilledellipse($im, (int) round($bx) - 1, (int) round($by) + 1, 2, 3, imagecolorallocatealpha($im, 0xFF, 0xC0, 0xC0, min(127, 40 + $a)));
+    }
+}
+
+// A strip of translucent tape at ($cx, $cy), $w x $h, turned $ang degrees.
+function ig_zine_tape($im, $cx, $cy, $w, $h, $ang) {
+    $w = (int) round($w); $h = (int) round($h);
+    $ang = fmod($ang, 360.0);
+    if (abs(abs($ang) - 360) < 0.5) $ang = 0.0;
+    $T = imagecreatetruecolor($w + 4, $h + 4); imagesavealpha($T, true); imagealphablending($T, false);
+    $clear = imagecolorallocatealpha($T, 0, 0, 0, 127); imagefill($T, 0, 0, $clear); imagealphablending($T, true);
+    imagefilledrectangle($T, 2, 2, $w + 1, $h + 1, imagecolorallocatealpha($T, 0xE8, 0xDC, 0xA8, 40));
+    $R = ig_rotate($T, $ang, $clear, true);
+    imagecopy($im, $R, (int) round($cx - imagesx($R) / 2), (int) round($cy - imagesy($R) / 2), 0, 0, imagesx($R), imagesy($R));
+}
+
+// The photocopied skull's card as an image (before it is turned or scaled): a
+// roughly cut black card with a white skull and the photocopier's grain.
+function ig_zine_skull_front() {
+    $W = 170; $H = 200;
+    $T = imagecreatetruecolor($W + 40, $H + 40); imagesavealpha($T, true); imagealphablending($T, false);
+    $clear = imagecolorallocatealpha($T, 0, 0, 0, 127); imagefill($T, 0, 0, $clear); imagealphablending($T, true);
+    $blk = imagecolorallocate($T, 0x16, 0x15, 0x13); $wh = imagecolorallocate($T, 0xF4, 0xF1, 0xE6);
+    mt_srand(9);
+    $pts = []; foreach ([[20, 20], [20 + $W, 22], [18 + $W, 20 + $H], [22, 18 + $H]] as [$px, $py]) { $pts[] = $px + mt_rand(-3, 3); $pts[] = $py + mt_rand(-3, 3); }
+    imagefilledpolygon($T, $pts, $blk);
+    $x0 = 20 + $W / 2; $y0 = 20 + $H / 2 - 8;
+    imagefilledellipse($T, (int) $x0, (int) ($y0 - 14), 112, 104, $wh);
+    imagefilledrectangle($T, (int) ($x0 - 34), (int) ($y0 + 20), (int) ($x0 + 34), (int) ($y0 + 62), $wh);
+    imagefilledellipse($T, (int) ($x0 - 24), (int) ($y0 - 6), 34, 38, $blk); imagefilledellipse($T, (int) ($x0 + 24), (int) ($y0 - 6), 34, 38, $blk);
+    imagefilledpolygon($T, [(int) $x0, (int) ($y0 + 8), (int) $x0 - 9, (int) ($y0 + 28), (int) $x0 + 9, (int) ($y0 + 28)], $blk);
+    foreach ([-24, -12, 0, 12, 24] as $dx) imageline($T, (int) ($x0 + $dx), (int) ($y0 + 42), (int) ($x0 + $dx), (int) ($y0 + 62), $blk);
+    imageline($T, (int) ($x0 - 34), (int) ($y0 + 42), (int) ($x0 + 34), (int) ($y0 + 42), $blk);
+    for ($i = 0; $i < 1100; $i++) imagesetpixel($T, mt_rand(22, $W + 16), mt_rand(22, $H + 14), mt_rand(0, 1) ? $wh : $blk);
+    return $T;
+}
+
+// A card's blank canvas (transparent, 210 x 240) and its roughly cut outline
+// (170 x 200 with a little wobble at each corner, from the seed).
+function ig_zine_card_blank($seed) {
+    $T = imagecreatetruecolor(210, 240); imagesavealpha($T, true); imagealphablending($T, false);
+    imagefill($T, 0, 0, imagecolorallocatealpha($T, 0, 0, 0, 127)); imagealphablending($T, true);
+    mt_srand($seed);
+    $pts = []; foreach ([[20, 20], [190, 22], [188, 220], [22, 218]] as [$px, $py]) { $pts[] = $px + mt_rand(-3, 3); $pts[] = $py + mt_rand(-3, 3); }
+    return [$T, $pts];
+}
+
+// Poster two: a photocopied eye. Cream paper, a heavy black outline, a pink
+// iris with the lines of an ink drawing, bloodshot veins creeping in from the
+// corners, lashes — and the photocopier's grain.
+function ig_zine_eye_front() {
+    [$T, $pts] = ig_zine_card_blank(13);
+    $paper = imagecolorallocate($T, 0xF4, 0xF1, 0xE6); $blk = imagecolorallocate($T, 0x16, 0x15, 0x13);
+    $pink = imagecolorallocate($T, 0xFF, 0x3D, 0x8A); $red = imagecolorallocate($T, 0xB0, 0x12, 0x1A); $white = imagecolorallocate($T, 0xFB, 0xF9, 0xF2);
+    imagefilledpolygon($T, $pts, $paper);
+    $cx = 105; $cy = 120;
+    $eye = [];
+    for ($i = 0; $i <= 20; $i++) { $u = $i / 20; $eye[] = 34 + $u * 142; $eye[] = $cy - 52 * pow(sin(M_PI * $u), 0.85); }
+    for ($i = 20; $i >= 0; $i--) { $u = $i / 20; $eye[] = 34 + $u * 142; $eye[] = $cy + 42 * pow(sin(M_PI * $u), 0.85); }
+    imagefilledpolygon($T, $eye, $white);
+    // veins, drawn before the iris so it sits over their ends
+    imagesetthickness($T, 2);
+    foreach ([[40, 119, 78, 112], [44, 123, 76, 130], [60, 108, 82, 118], [170, 119, 132, 113], [166, 124, 134, 130], [150, 106, 128, 117]] as [$x1, $y1, $x2, $y2]) imageline($T, $x1, $y1, $x2, $y2, $red);
+    imagesetthickness($T, 1);
+    imagefilledellipse($T, $cx, $cy, 78, 78, $pink);
+    imagesetthickness($T, 5); imageellipse($T, $cx, $cy, 78, 78, $blk); imagesetthickness($T, 1);
+    for ($a = 0; $a < 360; $a += 18) imageline($T, (int) round($cx + 16 * cos(deg2rad($a))), (int) round($cy + 16 * sin(deg2rad($a))), (int) round($cx + 36 * cos(deg2rad($a))), (int) round($cy + 36 * sin(deg2rad($a))), $blk);
+    imagefilledellipse($T, $cx, $cy, 32, 32, $blk);
+    imagefilledellipse($T, $cx - 11, $cy - 13, 13, 15, $white);
+    imagesetthickness($T, 6); imagepolygon($T, $eye, count($eye) / 2, $blk);
+    imagesetthickness($T, 4);
+    for ($i = 1; $i <= 9; $i++) { $u = $i / 10; $x = 34 + $u * 142; $y = $cy - 52 * pow(sin(M_PI * $u), 0.85); $a = deg2rad(-90 + ($u - 0.5) * 100); imageline($T, (int) $x, (int) $y, (int) round($x + 22 * cos($a)), (int) round($y + 22 * sin($a)), $blk); }
+    imagesetthickness($T, 1);
+    mt_srand(31);
+    for ($i = 0; $i < 700; $i++) imagesetpixel($T, mt_rand(24, 184), mt_rand(24, 216), mt_rand(0, 3) ? imagecolorallocate($T, 0xD6, 0xD0, 0xBE) : $blk);
+    return $T;
+}
+
+// Poster three: a hot-pink flier, the page's one spot colour, with a heavy
+// black frame and the cinema's etiquette in Anton — the last line reversed out
+// of a black bar.
+function ig_zine_rules_front() {
+    [$T, $pts] = ig_zine_card_blank(17);
+    $pink = imagecolorallocate($T, 0xFF, 0x3D, 0x8A); $blk = imagecolorallocate($T, 0x16, 0x15, 0x13);
+    imagefilledpolygon($T, $pts, $pink);
+    imagesetthickness($T, 5); imagerectangle($T, 32, 32, 178, 208, $blk); imagesetthickness($T, 1);
+    $font = dirname(__DIR__) . '/assets/fonts/Anton-Regular.ttf';
+    $fit = function ($text, $maxW) use ($font) { for ($sz = 44; $sz > 8; $sz--) { $b = imagettfbbox($sz, 0, $font, $text); if ($b[2] - $b[0] <= $maxW) return [$sz, $b]; } return [8, imagettfbbox(8, 0, $font, $text)]; };
+    $lines = [['NO PHONES.', 78, false], ['NO TALKING.', 128, false], ['NO SURVIVORS.', 182, true]];
+    foreach ($lines as [$text, $base, $inv]) {
+        [$sz, $b] = $fit($text, 126);
+        $tw = $b[2] - $b[0]; $x = 105 - $tw / 2 - $b[0];
+        if ($inv) { imagefilledrectangle($T, 38, $base - $sz - 8, 172, $base + 10, $blk); imagettftext($T, $sz, 0, (int) round($x), $base, $pink, $font, $text); }
+        else imagettftext($T, $sz, 0, (int) round($x), $base, $blk, $font, $text);
+    }
+    mt_srand(41);
+    for ($i = 0; $i < 600; $i++) imagesetpixel($T, mt_rand(24, 184), mt_rand(24, 216), mt_rand(0, 2) ? imagecolorallocate($T, 0xE8, 0x2E, 0x7A) : $blk);
+    return $T;
+}
+
+// Poster $i of the three the flier is replaced with.
+function ig_zine_poster_front($i) {
+    return [ig_zine_skull_front(), ig_zine_eye_front(), ig_zine_rules_front()][$i % 3];
+}
+
+// The back of that card: plain paper, same cut.
+function ig_zine_skull_back() {
+    $W = 170; $H = 200;
+    $T = imagecreatetruecolor($W + 40, $H + 40); imagesavealpha($T, true); imagealphablending($T, false);
+    $clear = imagecolorallocatealpha($T, 0, 0, 0, 127); imagefill($T, 0, 0, $clear); imagealphablending($T, true);
+    mt_srand(9);
+    $pts = []; foreach ([[20, 20], [20 + $W, 22], [18 + $W, 20 + $H], [22, 18 + $H]] as [$px, $py]) { $pts[] = $px + mt_rand(-3, 3); $pts[] = $py + mt_rand(-3, 3); }
+    imagefilledpolygon($T, $pts, imagecolorallocate($T, 0xD9, 0xD2, 0xBA));
+    imagesetthickness($T, 3); imagepolygon($T, $pts, imagecolorallocate($T, 0x9C, 0x95, 0x80)); imagesetthickness($T, 1);
+    mt_srand(11);
+    for ($i = 0; $i < 500; $i++) imagesetpixel($T, mt_rand(26, $W + 12), mt_rand(26, $H + 10), imagecolorallocate($T, 0xC4, 0xBD, 0xA4));
+    return $T;
+}
+
+// A photocopied skull: the card turned $ang degrees and scaled by $k (1 is
+// 170 x 200), taped down at two corners.
+function ig_zine_skull_card($im, $cx, $cy, $k, $ang) {
+    $T = ig_zine_skull_front();
+    $clear = imagecolorallocatealpha($T, 0, 0, 0, 127);
+    $R = imagerotate($T, $ang, $clear); imagesavealpha($R, true);
+    $sw = (int) round(imagesx($R) * $k); $sh = (int) round(imagesy($R) * $k);
+    imagecopyresampled($im, $R, (int) round($cx - $sw / 2), (int) round($cy - $sh / 2), 0, 0, $sw, $sh, imagesx($R), imagesy($R));
+    ig_zine_tape($im, $cx - 68 * $k, $cy - 100 * $k, 64 * $k, 24 * $k, -32);
+    ig_zine_tape($im, $cx + 68 * $k, $cy + 102 * $k, 64 * $k, 24 * $k, -28);
+}
+
+// The card in flight: $sx (0..1) squashes it sideways (a turn about its
+// vertical axis), $back shows the plain reverse, $ang turns it in the plane.
+function ig_zine_card_blit($im, $front, $back, $cx, $cy, $k, $ang, $sx, $showBack) {
+    $src = $showBack ? $back : $front;
+    $ang = fmod($ang, 360.0);
+    if (abs(abs($ang) - 360) < 0.5) $ang = 0.0;
+    $w = max(2, (int) round(imagesx($src) * $sx));
+    $tmp = imagecreatetruecolor($w, imagesy($src)); imagesavealpha($tmp, true); imagealphablending($tmp, false);
+    $clear = imagecolorallocatealpha($tmp, 0, 0, 0, 127); imagefill($tmp, 0, 0, $clear);
+    imagecopyresampled($tmp, $src, 0, 0, 0, 0, $w, imagesy($src), imagesx($src), imagesy($src));
+    $R = ig_rotate($tmp, $ang, $clear, true);
+    $sw = (int) round(imagesx($R) * $k); $sh = (int) round(imagesy($R) * $k);
+    if ($sw < 1 || $sh < 1) return;
+    imagealphablending($im, true);
+    imagecopyresampled($im, $R, (int) round($cx - $sw / 2), (int) round($cy - $sh / 2), 0, 0, $sw, $sh, imagesx($R), imagesy($R));
+}
+
+// The wind (0..1) at video frame $f of the 96-frame loop: it rises over frames
+// 52-60, blows through 66, and dies away by 78.
+function ig_zine_wind($f) {
+    if ($f < 52 || $f >= 78) return 0.0;
+    if ($f < 60) return ig_ease(($f - 52) / 8);
+    if ($f <= 66) return 1.0;
+    return 1 - ig_ease(($f - 66) / 12);
+}
+
+// The flier on its tape at ($cx, $cy), scale $k, at frame $f of the 96-frame
+// cycle $cyc: a poster sits and wobbles (on threes), the flutter builds and the
+// top-left tape peels (50-57), then the card tears free and sails off to the
+// right, spinning and flipping to show its blank back, and both strips of tape
+// go with it (58-70) — and at frame 74 the next poster is slapped on with fresh
+// tape, a little oversized and settling in four frames, and wobbles on.
+// Poster number $cyc is the one on the wall at the start of cycle $cyc, so the
+// last cycle of the video hands the first poster back and the loop closes.
+function ig_zine_flier_anim($im, $cx, $cy, $k, $f, $cyc) {
+    $nowIdx = $f >= 74 ? ($cyc + 1) % 3 : $cyc;
+    $front = ig_zine_poster_front($nowIdx); $back = ig_zine_skull_back();
+    $poses = [[0, 0, 5.0], [1, -1, 6.4], [-1, 1, 3.8]];
+    $tlx = $cx - 68 * $k; $tly = $cy - 100 * $k; $brx = $cx + 68 * $k; $bry = $cy + 102 * $k;
+    if ($f < 58 || $f >= 74) {
+        $p = $poses[intdiv($f, 3) % 3]; $m = 1.0; $peel = 0.0; $sc = 1.0; $ang0 = 0.0;
+        if ($f >= 50 && $f < 58) { $q = ($f - 50) / 7; $m = 1 + 2.5 * $q; $peel = ig_ease($q); }
+        if ($f >= 74 && $f < 77) { $sc = [1.15, 1.07, 1.0][$f - 74]; $ang0 = [4.0, 2.0, 0.0][$f - 74]; }
+        $ang = 5.0 + ($p[2] - 5.0) * $m + 5 * $peel + $ang0;
+        ig_zine_card_blit($im, $front, $back, $cx + $p[0] * $m, $cy + $p[1] * $m, $k * $sc, $ang, 1.0, false);
+        ig_zine_tape($im, $brx, $bry, 64 * $k, 24 * $k, -28);
+        ig_zine_tape($im, $tlx - 6 * $peel, $tly - 10 * $peel, 64 * $k * (1 - 0.25 * $peel), 24 * $k, -32 + 65 * $peel);
+        return;
+    }
+    if ($f < 71) {
+        $t = ($f - 58) / 12;
+        $x = $cx + 400 * pow($t, 1.8); $y = $cy - 140 * $t + 35 * sin(2 * M_PI * 1.3 * $t);
+        $ang = 5.0 + 560 * $t; $flip = 2 * M_PI * 1.4 * $t; $c = cos($flip);
+        if ($x < 1080 + 160) ig_zine_card_blit($im, $front, $back, $x, $y, $k * (1 - 0.1 * $t), $ang, max(0.12, abs($c)), $c < 0);
+        // the two strips of tape go too, each on its own path and spin: the
+        // top-left one carries on from where it had peeled to
+        $tx1 = $tlx - 6 + 430 * pow($t, 1.7); $ty1 = $tly - 10 - 170 * $t + 40 * sin(2 * M_PI * 1.7 * $t);
+        if ($tx1 < 1080 + 60) ig_zine_tape($im, $tx1, $ty1, 48 * $k, 24 * $k, 33 + 700 * $t);
+        $tx2 = $brx + 390 * pow($t, 1.9); $ty2 = $bry - 90 * $t + 50 * sin(2 * M_PI * 1.2 * $t + 1);
+        if ($tx2 < 1080 + 60) ig_zine_tape($im, $tx2, $ty2, 64 * $k, 24 * $k, -28 + 520 * $t);
+    }
+    // frames 71-73: bare wall, nothing left to see, for a beat
+}
+
+// Marker whoosh lines trailing to the right of where the card was, sweeping
+// off to the right between frames 56 and 70.
+function ig_zine_whoosh($im, $f) {
+    if ($f < 56 || $f > 70) return;
+    $ink = imagecolorallocatealpha($im, 0x16, 0x15, 0x13, (int) round(127 - 105 * ig_zine_wind($f)));
+    imagesetthickness($im, 3);
+    foreach ([[690, 1188, 150], [740, 1232, 180], [700, 1276, 140], [790, 1160, 120]] as $i => [$x0, $y0, $len]) {
+        $ox = 14 * ($f - 56) + $i * 6;
+        $px = null;
+        for ($u = 0; $u <= 1.001; $u += 0.1) {
+            $x = $x0 + $ox + $u * $len; $y = $y0 + 5 * sin($u * 6 + $i * 1.5);
+            if ($px !== null) imageline($im, (int) round($px[0]), (int) round($px[1]), (int) round($x), (int) round($y), $ink);
+            $px = [$x, $y];
+        }
+    }
+    imagesetthickness($im, 1);
+}
+
 // A final overlay pass — faint horizontal lines the full width of the
 // card — the one texture that has to be drawn last, over everything else,
 // since a real CRT's scanlines sit in front of the whole picture.
@@ -1541,7 +1886,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         // $anim (one frame of a looping version) is only honoured by themes
         // that animate — see ig_theme_animates(); the rest ignore it.
         case 'marquee':   return ig_build_list_page_marquee($films, $date, $moreCount, $anim);
-        case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount);
+        case 'zine':      return ig_build_list_page_zine($films, $date, $moreCount, $anim);
         case 'newsprint': return ig_build_list_page_newsprint($films, $date, $moreCount, $anim);
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount, $anim);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
@@ -2512,7 +2857,7 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
 // real Riso print physically has to — it can't lay down full-color
 // photography — but posters are meant to read at a glance, and the wash
 // worked against that). Row geometry matches paper/marquee.
-function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_zine(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -2541,8 +2886,29 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     imagefilledrectangle($im, $margin, 70, $margin + $chipW + 48, 114, $pink);
     imagettftext($im, 20, 0, $margin + 24, 100, $ink, IG_FONT_BODY, $chipText);
 
+    // October: "Today in Austin" as a ransom note, and blood running down
+    // from the masthead bar (short runs over the chip and the headline, long
+    // ones to the right of them).
+    //
+    // Animated (one 8s loop, on twos like stop-motion): the ransom tiles are
+    // re-posed every other frame, each blood run swells and lets a bead go that
+    // falls down the right of the page, and a poster wobbles on its tape —
+    // until, two-thirds through each 8s cycle, a gust: the tape peels, the card
+    // tears free and sails off to the right with its tape, the next of three
+    // posters is slapped on, and the blood leans and the ransom tiles flutter
+    // while the wind blows. Three cycles make the video, one gust and one new
+    // poster each, and the last hands back the poster the first began with.
+    $season = ig_halloween_season($date);
+    $zf = null; $zph = null; $zwind = 0.0; $bloodRuns = [];
+    $zc = 0;
+    if ($anim !== null && $season) { $zf = $anim['frame'] % IG_ANIM_FRAMES; $zph = $zf / IG_ANIM_FRAMES; $zwind = ig_zine_wind($zf); $zc = intdiv($anim['frame'], IG_ANIM_FRAMES) % 3; }
     $y = 180;
-    imagettftext($im, 28, 0, $margin, $y, $pink, IG_FONT_BODY, strtoupper('Today in Austin'));
+    if ($season) {
+        ig_zine_ransom($im, $margin, $y - 6, 'TODAY IN AUSTIN', 30, 21, $zf, 1.0 + 1.4 * $zwind);
+        $bloodRuns = ig_zine_blood($im, 0, $w, 20, 5, 700, 38, 78, $zph, $zwind);
+    } else {
+        imagettftext($im, 28, 0, $margin, $y, $pink, IG_FONT_BODY, strtoupper('Today in Austin'));
+    }
     $y += 66;
     imagettftext($im, 50, 0, $margin, $y, $ink, IG_FONT_ZINE_TITLE, date('l, F j', $date));
     $y += 50;
@@ -2623,6 +2989,17 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0) {
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    // October: the xerox skull, taped down in the bottom-right corner (small
+    // enough to clear the last row of a ten-film page).
+    if ($season) {
+        if ($zf === null) ig_zine_skull_card($im, 910, 1252, 0.66, 5.0);
+        else {
+            ig_zine_flier_anim($im, 910, 1252, 0.66, $zf, $zc);
+            ig_zine_whoosh($im, $zf);
+            ig_zine_blood_drops($im, $bloodRuns, 20, $zph, 820, $zwind);
+        }
+    }
 
     return $im;
 }
