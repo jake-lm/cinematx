@@ -1010,20 +1010,12 @@ function ig_dr_tools($S, $ox, $oy, $a, $k = 1.0, $fx = 54, $fy = 58) {
     ];
 }
 
-// ── The film reel in the footer ──────────────────────────────────────────────
-// A strip of 103 frames that plays a short film as it runs through the
-// projector's gate. A four-frame countdown leader (4, 3, 2, 1) and a blank, then
-// a 96-frame story in seven shots:
-//    A  0-11   the house under the moon, a slow push in
-//    B  12-23  the hallway, the door at the far end opening
-//    C  24-55  the ghost comes down the hall, bigger every frame, eyes lighting
-//    D  56-63  a reaction shot: a skull, jaw dropping
-//    E  64-79  the ghost right up at the lens, the lights failing, the camera shaking
-//    F  80-83  strobing white-out
-//    G  84-95  the empty hall again, and a pumpkin rolling through it
-// then a blank and THE END.
-const IG_REEL_FRAMES = 103;
-const IG_REEL_STORY  = 96;
+// ── The film in the footer ───────────────────────────────────────────────────
+// A loop of film eight frames long: a four-frame countdown leader (4, 3, 2, 1),
+// then a hallway with a ghost coming down it, bigger in each of the next four
+// frames — and then, the film being a loop, the countdown again. The strip
+// shows whichever four are in view.
+const IG_REEL_FRAMES = 8;
 
 // The hallway, in one-point perspective, in an 88 x 52 frame at ($ox, $fy):
 // $flicker (0..1) is how bright the lights are, $o (0..1) how far the door at the
@@ -1054,7 +1046,6 @@ function ig_reel_frame($im, $fx, $fy, $W, $H, $idx, $clipX1, $clipX2) {
     if ($x2 <= $x1) return;
     imagesetclip($im, $x1, $fy, $x2, $fy + $H - 1);
     imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + $H - 1, $col(0x0A, 0x07, 0x05));
-    $story0 = 5; $end = $story0 + IG_REEL_STORY + 1;
     $cream = $col(0xF0, 0xE6, 0xD8);
     if ($idx >= 0 && $idx <= 3) {
         // The countdown leader: a ring, crosshairs and a big numeral.
@@ -1066,85 +1057,16 @@ function ig_reel_frame($im, $fx, $fy, $W, $H, $idx, $clipX1, $clipX2) {
         $n = (string) (4 - $idx);
         $b = imagettfbbox(26, 0, IG_FONT_DARKROOM_TITLE, $n);
         imagettftext($im, 26, 0, (int) round($cx - ($b[2] - $b[0]) / 2 - $b[0]), (int) round($cy + ($b[1] - $b[7]) / 2 - $b[1]), $cream, IG_FONT_DARKROOM_TITLE, $n);
-    } elseif ($idx >= $story0 && $idx < $story0 + IG_REEL_STORY) {
-        $j = $idx - $story0;
-        $dips = in_array($j, [30, 39, 47, 66, 71, 76], true);
-        $flicker = $dips ? 0.3 : 0.78 + 0.22 * sin($j * 2.3);
-        $ghostEyes = fn($glow) => $glow ? $col(0xFF, 0xC2, 0x4A) : $col(0x1B, 0x12, 0x0C);
-        if ($j < 12) {
-            // A: the house under the moon, pushing in. Everything is drawn about the
-            // door, scaled by $z.
-            $z = 1 + 0.55 * ($j / 11);
-            $M = fn($x, $y) => [$fx + 44 + ($x - 44) * $z, $fy + 46 + ($y - 46) * $z];
-            $P = function (array $pts, $c) use ($im, $M) { $q = []; foreach ($pts as [$x, $y]) { [$X, $Y] = $M($x, $y); $q[] = (int) round($X); $q[] = (int) round($Y); } imagefilledpolygon($im, $q, $c); };
-            imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + 30, $col(0x1E, 0x13, 0x0B));
-            imagefilledrectangle($im, $fx, $fy + 30, $fx + $W - 1, $fy + 46, $col(0x34, 0x20, 0x10));
-            imagefilledellipse($im, $fx + 20, $fy + 12, (int) round(18 * $z), (int) round(18 * $z), $col(0xF6, 0xE6, 0xB8, 40));
-            imagefilledellipse($im, $fx + 20, $fy + 12, (int) round(13 * $z), (int) round(13 * $z), $col(0xF6, 0xE6, 0xB8));
-            $blk = $col(0x0A, 0x07, 0x05);
-            $P([[-20, 46], [20, 42], [44, 40], [70, 42], [108, 45], [108, 70], [-20, 70]], $blk);
-            $P([[30, 24], [58, 24], [58, 46], [30, 46]], $blk);
-            $P([[27, 24], [31, 16], [57, 16], [61, 24]], $blk);
-            $P([[38, 24], [44, 8], [50, 24]], $blk);
-            $P([[55, 10], [58, 10], [58, 18], [55, 18]], $blk);
-            $lit = $col(0xFF, 0xD8, 0x62);
-            $P([[33, 28], [36, 28], [36, 34], [33, 34]], $lit); $P([[52, 28], [55, 28], [55, 34], [52, 34]], $lit);
-            $P([[42, 38], [46, 38], [46, 46], [42, 46]], $lit);
-            if ($j % 3 !== 1) $P([[42, 16], [46, 16], [46, 22], [42, 22]], $lit);
-        } elseif ($j < 24) {
-            // B: the hall, and the door at the far end opening.
-            ig_reel_hall($im, $fx, $fy, $flicker, max(0.0, min(1.0, ($j - 12 - 5) / 6)));
-        } elseif ($j < 56) {
-            // C: the ghost comes down the hall.
-            $k = $j - 24;
-            ig_reel_hall($im, $fx, $fy, $flicker, 1.0);
-            $sc = 0.10 * pow(1.089, $k);
-            $by = $sc <= 1.0 ? 30 + 22 * $sc : 52 + ($sc - 1) * 30;
-            $gx = $W / 2 + 3 * sin($k * 0.9) * min(1.0, $sc);
-            $glow = $k >= 14;
-            if ($glow) imagefilledellipse($im, (int) round($fx + $gx), (int) round($fy + $by - 20 * $sc), (int) round(34 * $sc + 14), (int) round(44 * $sc + 14), $col(0xFF, 0xB8, 0x40, 118));
-            ig_ghost_shape($im, $fx + $gx, $fy + $by, $sc, $cream, $ghostEyes($glow));
-        } elseif ($j < 64) {
-            // D: a reaction shot — a skull, its jaw dropping and its eyes widening.
-            $k = $j - 56; $open = $k / 7; $ox = $fx;
-            imagefilledellipse($im, $fx + 44, $fy + 26, 80, 60, $col(0xFF, 0xB8, 0x40, 118));
-            $blk = $col(0x0A, 0x07, 0x05); $bone = $col(0xF0, 0xE6, 0xD0); $sh = $col(0xB8, 0xAC, 0x92);
-            imagefilledellipse($im, $fx + 44, $fy + 22, 50, 46, $bone);
-            imagefilledrectangle($im, $fx + 30, $fy + 34, $fx + 58, $fy + 38, $bone);
-            $ew = (int) round(13 + 4 * $open); $eh = (int) round(14 + 6 * $open);
-            imagefilledellipse($im, $fx + 35, $fy + 20, $ew, $eh, $blk); imagefilledellipse($im, $fx + 53, $fy + 20, $ew, $eh, $blk);
-            imagefilledpolygon($im, [$fx + 44, $fy + 27, $fx + 41, $fy + 33, $fx + 47, $fy + 33], $blk);
-            $dj = (int) round($open * 12);
-            imagefilledrectangle($im, $fx + 33, $fy + 38, $fx + 55, $fy + 39 + $dj, $blk);
-            imagefilledrectangle($im, $fx + 33, $fy + 40 + $dj, $fx + 55, $fy + 50 + $dj, $bone);
-            foreach ([34, 38, 42, 46, 50, 54] as $tx) { imageline($im, $fx + $tx, $fy + 34, $fx + $tx, $fy + 38, $sh); imageline($im, $fx + $tx, $fy + 40 + $dj, $fx + $tx, $fy + 44 + $dj, $sh); }
-        } elseif ($j < 80) {
-            // E: the ghost at the lens, the lights failing, the camera shaking.
-            $k = $j - 64; $sh = ($k % 2) ? 2 : -2;
-            ig_reel_hall($im, $fx + $sh, $fy, $flicker, 1.0);
-            $sc = 1.5 * pow(1.075, $k);
-            $by = 52 + ($sc - 1) * 30;
-            imagefilledellipse($im, (int) round($fx + $sh + $W / 2), (int) round($fy + $by - 20 * $sc), (int) round(34 * $sc + 14), (int) round(44 * $sc + 14), $col(0xFF, 0xB8, 0x40, 118));
-            ig_ghost_shape($im, $fx + $sh + $W / 2, $fy + $by, $sc, $cream, $ghostEyes(true));
-        } elseif ($j < 84) {
-            // F: strobing white-out.
-            $white = [true, false, true, false][$j - 80];
-            if ($white) imagefilledrectangle($im, $fx, $fy, $fx + $W - 1, $fy + $H - 1, $col(0xFF, 0xF4, 0xE0));
-        } else {
-            // G: the empty hall, and a pumpkin rolling through it.
-            $k = $j - 84; $u = $k / 11;
-            ig_reel_hall($im, $fx, $fy, 0.85, 0.0);
-            $px = $fx + $W + 8 - ($W + 16) * $u; $py = $fy + 42 - abs(sin($u * M_PI * 5)) * 5;
-            $or = $col(0xE0, 0x7A, 0x22); $orD = $col(0xB8, 0x5A, 0x14);
-            imagefilledellipse($im, (int) round($px - 3), (int) round($py), 9, 12, $orD); imagefilledellipse($im, (int) round($px + 3), (int) round($py), 9, 12, $orD);
-            imagefilledellipse($im, (int) round($px), (int) round($py), 10, 13, $or);
-            imagefilledrectangle($im, (int) round($px) - 1, (int) round($py) - 8, (int) round($px) + 1, (int) round($py) - 6, $col(0x5E, 0x6B, 0x2A));
-        }
-    } elseif ($idx === $end) {
-        $b = imagettfbbox(9, 0, IG_FONT_BODY, 'THE END');
-        imagettftext($im, 9, 0, (int) round($fx + ($W - ($b[2] - $b[0])) / 2), $fy + (int) ($H / 2) + 4, $cream, IG_FONT_BODY, 'THE END');
-        imageline($im, $fx + 14, $fy + (int) ($H / 2) - 9, $fx + $W - 15, $fy + (int) ($H / 2) - 9, $col(0x7A, 0x4E, 0x26));
-        imageline($im, $fx + 14, $fy + (int) ($H / 2) + 10, $fx + $W - 15, $fy + (int) ($H / 2) + 10, $col(0x7A, 0x4E, 0x26));
+    } elseif ($idx >= 4 && $idx <= 7) {
+        // The ghost, coming down the hall: small and far, then closer, then
+        // right up at the lens with its eyes lit.
+        $k = $idx - 4;
+        ig_reel_hall($im, $fx, $fy, 0.85, 1.0);
+        $sc = [0.22, 0.5, 1.05, 2.4][$k];
+        $by = $sc <= 1.0 ? 30 + 22 * $sc : 52 + ($sc - 1) * 30;
+        $glow = $k >= 2;
+        if ($glow) imagefilledellipse($im, (int) round($fx + $W / 2), (int) round($fy + $by - 20 * $sc), (int) round(34 * $sc + 14), (int) round(44 * $sc + 14), $col(0xFF, 0xB8, 0x40, 118));
+        ig_ghost_shape($im, $fx + $W / 2, $fy + $by, $sc, $cream, $glow ? $col(0xFF, 0xC2, 0x4A) : $col(0x1B, 0x12, 0x0C));
     }
     imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
 }
@@ -1152,9 +1074,10 @@ function ig_reel_frame($im, $fx, $fy, $W, $H, $idx, $clipX1, $clipX2) {
 // The strip itself: four frames visible, the film running through. $p is the
 // (fractional) index of the film frame sitting in the gate — the second slot,
 // outlined in amber, the other three dimmed — so the countdown reads as
-// 4, 3, 2, 1 passing through it. The sprocket holes travel with the film.
-// The still shows the film caught partway down the hall.
-function ig_darkroom_reel($im, $x1, $y1, $x2, $y2, $p = 45.0) {
+// 4, 3, 2, 1 passing through it. The film is a loop, so $p and $p + 8 look
+// the same. The sprocket holes travel with the film.
+// The still shows the film caught with the ghost close.
+function ig_darkroom_reel($im, $x1, $y1, $x2, $y2, $p = 6.0) {
     $bar = imagecolorallocate($im, 0x1D, 0x16, 0x11); $hole = imagecolorallocate($im, 0x12, 0x0D, 0x0A);
     imagefilledrectangle($im, $x1, $y1, $x2, $y2, $bar);
     $fw = ($x2 - $x1 - 10) / 4; $sp = $fw / 6;
@@ -1169,7 +1092,7 @@ function ig_darkroom_reel($im, $x1, $y1, $x2, $y2, $p = 45.0) {
     $fy1 = $y1 + 13; $fy2 = $y2 - 13; $W = (int) round($fw - 4); $H = $fy2 - $fy1 + 1;
     for ($m = (int) floor($p) - 2; $m <= (int) floor($p) + 3; $m++) {
         $X = $x1 + 5 + ($m - $p + 1) * $fw;
-        ig_reel_frame($im, (int) round($X + 2), $fy1, $W, $H, $m, $x1 + 4, $x2 - 4);
+        ig_reel_frame($im, (int) round($X + 2), $fy1, $W, $H, (($m % IG_REEL_FRAMES) + IG_REEL_FRAMES) % IG_REEL_FRAMES, $x1 + 4, $x2 - 4);
     }
     imagesetclip($im, $x1, $y1, $x2, $y2);
     $dim = imagecolorallocatealpha($im, 0x0A, 0x07, 0x05, 70);
@@ -3184,60 +3107,70 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 
     ig_leader_mark($im, $w - $margin - 30, 70, 28, $amber);
 
-    // October: spirit photography. A print with a ghost developing in it sits
-    // in the header's empty right side, and slit-eyed pairs watch from a few
-    // of the film edges' sprocket holes. Animated (one 8s loop, whole cycles):
-    // the print comes up in the developer, holds, and fades back to blank;
-    // each pair of eyes opens out of the dark for a stretch, blinks and looks
-    // about; and the film in the footer plays one long film over the whole
-    // video — a 4-3-2-1 countdown, then a seven-shot haunted-house movie —
-    // its speed building and easing off again. (The leader mark in the corner
-    // stays still.)
+    // October: spirit photography. Prints pile up in the header's empty right
+    // side, each landing on the last at its own angle, and slit-eyed pairs watch
+    // from a few of the film edges' sprocket holes. Animated (four 8s cycles,
+    // one print each): a white flash, the new print dropping onto the pile and
+    // coming up in the developer; each pair of eyes opens out of the dark for a
+    // stretch, blinks and looks about; and the loop of film in the footer —
+    // 4-3-2-1, then a ghost coming down a hall — goes once around every two
+    // prints, its speed building and easing off, with no relation to the flashes.
+    // (The leader mark stays still.) The video ends on the finished pile of
+    // four, which the first flash clears.
     $season = ig_halloween_season($date);
-    $dv = 1.0; $milk = 0.0; $flash = 0.0; $eyeSt = []; $reelP = 45.0; $stripFlash = 0.0;
+    $eyeSt = []; $reelP = 6.0; $flash = 0.0;
     $eyeSpots = [[28, 224, 6, 40, 22], [28, 608, 28, 70, 50], [28, 992, 52, 90, 74], [1052, 416, 14, 56, 38], [1052, 864, 40, 84, 62]];
     foreach ($eyeSpots as $k => $_) $eyeSt[$k] = ['level' => 1.0, 'open' => 1.0, 'look' => 0];
-    $subject = 'scream'; $caption = 'booooo';
+    // The four pictures, in the order they are printed — each a famous picture
+    // with an October character in the lead — and where each one lands on the
+    // pile: [dx, dy, degrees].
+    $pics = [['scream', 'booooo'], ['sonofman', 'son of pumpkin'], ['psycho', 'vacancy'], ['gothic', 'american ghoulish']];
+    $pile = [[-5, 7, -9], [6, -3, 5], [-3, -7, -4], [5, 4, 7]];
+    // What is on the pile, bottom to top: [picture, develop, milk, lift, tilt].
+    // The still shows all four, finished.
+    $stack = [[0, 1.0, 0.0, 0, 0], [1, 1.0, 0.0, 0, 0], [2, 1.0, 0.0, 0, 0], [3, 1.0, 0.0, 0, 0]];
     if ($anim !== null && $season) {
-        // The video is four 8-second cycles (see ig_anim_frames()): everything
-        // repeats each cycle except the print, which is a famous picture with
-        // an October character in the lead: the ghost in The Scream's setting,
-        // the pumpkin as Magritte's Son of Man, the haunted house as Psycho,
-        // and a skeleton and a zombie as American Gothic.
         $f = $anim['frame'] % IG_ANIM_FRAMES; $t = $f / IG_ANIM_FRAMES;
         $cyc = intdiv($anim['frame'], IG_ANIM_FRAMES) % 4;
-        // The new picture (and its caption) arrives with the flash at frame 5;
-        // until then the previous cycle's finished picture is still showing,
-        // so the loop's wrap does not pop: the video ends on the finished
-        // couple, and the first flash erases them.
-        $pic = $f >= 5 ? $cyc : ($cyc + 3) % 4;
-        [$subject, $caption] = [['scream', 'booooo'], ['sonofman', 'son of pumpkin'], ['psycho', 'vacancy'], ['gothic', 'american ghoulish']][$pic];
-        // The print, as an instant photo develops: the last picture sits
-        // finished until a flash of white at frame 5, which erases it; the new
-        // picture is a milky cloud for a second, then the cloud clears and the
-        // picture comes up through it (outlines first) and stays until the next
-        // flash.
         $flash = $f === 5 ? 1.0 : ($f === 4 ? 0.4 : ($f === 6 ? 0.5 : 0.0));
-        $milk  = $f < 4 ? 0.0 : ($f === 4 ? 0.55 : ($f === 5 ? 1.0 : ($f < 20 ? 0.92 : ($f <= 60 ? 0.92 * (1 - ig_ease(($f - 20) / 40)) : 0.0))));
-        $dv    = $f < 5 ? 1.0 : ($f < 26 ? 0.0 : ($f <= 60 ? ig_ease(($f - 26) / 34) : 1.0));
+        // Until the flash at frame 5 the pile is what the last cycle left —
+        // and at the start of the video that is all four finished prints, so
+        // the wrap does not pop. At the flash the new print drops onto the pile
+        // (the first one of the video replaces the whole pile, behind the
+        // glare), a little above and askew and settling over four frames.
+        $stack = [];
+        if ($f < 5 && $cyc === 0) $stack = [[0, 1.0, 0.0, 0, 0], [1, 1.0, 0.0, 0, 0], [2, 1.0, 0.0, 0, 0], [3, 1.0, 0.0, 0, 0]];
+        else for ($i = 0; $i < $cyc; $i++) $stack[] = [$i, 1.0, 0.0, 0, 0];
+        // The flash glares across the whole pile as it goes off, fading.
+        $glare = $f === 4 ? 0.55 : ($f === 5 ? 0.35 : ($f === 6 ? 0.15 : 0.0));
+        foreach ($stack as &$pr) $pr[2] = $glare;
+        unset($pr);
+        if ($f >= 5) {
+            // The print itself, as an instant photo develops: a milky cloud
+            // for a second, then the cloud clears and the picture comes up
+            // through it, outlines first.
+            $milk = $f === 5 ? 1.0 : ($f < 20 ? 0.92 : ($f <= 60 ? 0.92 * (1 - ig_ease(($f - 20) / 40)) : 0.0));
+            $dv   = $f < 26 ? 0.0 : ($f <= 60 ? ig_ease(($f - 26) / 34) : 1.0);
+            $e    = ig_ease(min(1.0, ($f - 5) / 4));
+            $stack[] = [$cyc, $dv, $milk, -24 * (1 - $e), 6 * (1 - $e)];
+        }
         foreach ($eyeSpots as $k => [$ex, $ey, $a0, $a1, $blink]) {
             $lv = $f < $a0 || $f > $a1 ? 0.0 : min(1.0, ($f - $a0) / 4, ($a1 - $f) / 4);
             $eyeSt[$k] = ['level' => $lv, 'open' => in_array($f, [$blink, $blink + 1], true) ? 0.1 : 1.0, 'look' => (int) round(2 * sin(2 * M_PI * 2 * $t + $k * 1.3))];
         }
-        // The film runs once through the video: slowly through the countdown
-        // (about 0.7 frames a second), a rush through the story (peaking near
-        // 5.7), and a slow settle onto THE END. The speed is a constant under a
-        // sin^2 hump, which has no sharp edges to it. The
-        // first five frames of the video still show the end (so the wrap is
-        // exact); the first flash — a white burst across the strip too —
-        // cuts back to the start of the film.
-        $fv = $anim['frame']; $nv = $anim['frames'];
-        if ($fv < 5) $reelP = IG_REEL_FRAMES - 1.0;
-        else { $uu = ($fv - 5) / ($nv - 6); $reelP = (IG_REEL_FRAMES - 1) * (0.22 * $uu + 0.78 * ($uu - sin(2 * M_PI * $uu) / (2 * M_PI))); }
-        $stripFlash = $fv === 4 ? 0.4 : ($fv === 5 ? 1.0 : ($fv === 6 ? 0.5 : 0.0));
+        // The film goes once around its eight frames every two cycles (16s),
+        // slowest at the turn of the loop and quickest in the middle of the
+        // go-round: speed 0.35 + 0.65 * (1 - cos 2 pi u) / 2, so there is no
+        // jerk where one go-round meets the next, and since the film is a loop
+        // eight frames on looks like none.
+        $ur = fmod($anim['frame'], 2 * IG_ANIM_FRAMES) / (2 * IG_ANIM_FRAMES);
+        $reelP = IG_REEL_FRAMES * (0.35 * $ur + 0.65 * ($ur - sin(2 * M_PI * $ur) / (2 * M_PI)));
     }
     if ($season) {
-        ig_darkroom_print($im, 845, 163, -5, $dv, $milk, $flash, $subject, $caption);
+        foreach ($stack as $si => [$pi, $pdv, $pmilk, $plift, $ptilt]) {
+            [$jx, $jy, $ja] = $pile[$pi];
+            ig_darkroom_print($im, 840 + $jx, 165 + $jy + $plift, $ja + $ptilt, $pdv, $pmilk, $si === count($stack) - 1 ? $flash : 0.0, $pics[$pi][0], $pics[$pi][1]);
+        }
         foreach ($eyeSpots as $k => [$ex, $ey]) ig_sprocket_eyes($im, $ex, $ey, $eyeSt[$k]['level'], $eyeSt[$k]['open'], $eyeSt[$k]['look']);
     }
 
@@ -3328,7 +3261,6 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 
     if ($season) {
         ig_darkroom_reel($im, 600, 1226, 980, 1304, $reelP);
-        if ($stripFlash > 0) imagefilledrectangle($im, 600, 1226, 980, 1304, imagecolorallocatealpha($im, 0xFF, 0xF4, 0xE0, 127 - (int) round(127 * $stripFlash)));
     }
 
     return $im;
@@ -4473,10 +4405,10 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     // October: the little film in the footer's empty right side, caught on a
-    // different frame for each film (house, hall, ghost, skull, pumpkin) — so
-    // swiping through a carousel is, a little, running the reel.
+    // different frame for each film (the countdown, the ghost far off or close)
+    // — so swiping through a carousel is, a little, running the reel.
     if ($season) {
-        $frames = [8, 24, 45, 55, 65, 75, 95];
+        $frames = [1, 2, 3, 4, 5, 6, 7];
         ig_darkroom_reel($im, 600, 1226, 980, 1304, (float) $frames[crc32((string) ($film['title'] ?? '')) % count($frames)]);
     }
 
