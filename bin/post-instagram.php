@@ -2,7 +2,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  Daily Instagram poster — run from cron, never from the web
 //
-//    0 16 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/www/cinematx/uploads/social/cinematx-ig.log 2>&1
+//    0 15 * * *  /usr/bin/php /var/www/cinematx/bin/post-instagram.php >> /var/www/cinematx/uploads/social/cinematx-ig.log 2>&1
 //
 //  Installed in www-data's own crontab (`crontab -u www-data -e`), not
 //  root's — this writes into uploads/social/ alongside the admin panel's
@@ -12,16 +12,16 @@
 //  uploads/social/ is already where every other runtime state file
 //  (.posted-<date>, compose-<date>.json, ...) lives.
 //
-//  11am Central, not the 7:30am it used to be — research on daily/
-//  time-sensitive content pointed at late-morning as the window with more
-//  actual (not just passive-scroll) engagement, and it matches what manual
-//  overrides to 10-noon had already been showing anecdotally.
+//  10am Central (11am until 2026-10-05, 7:30am before that) — research on
+//  daily/time-sensitive content pointed at late-morning as the window with
+//  more actual (not just passive-scroll) engagement, and it matches what
+//  manual overrides to 10-noon had already been showing anecdotally.
 //
-//  The hour above is 16, not 11 — production's system clock is UTC, and
+//  The hour above is 15, not 10 — production's system clock is UTC, and
 //  this box's cron doesn't honor a TZ=/CRON_TZ= line for schedule matching
 //  (tested 2026-08-20: it only reaches the job's own environment, never the
-//  scheduler). 0 16 UTC is 11am only while Central is on CDT (Mar-Nov); it
-//  needs to become 0 17 for CST (Nov-Mar) and back again each changeover —
+//  scheduler). 0 15 UTC is 10am only while Central is on CDT (Mar-Nov); it
+//  needs to become 0 16 for CST (Nov-Mar) and back again each changeover —
 //  there's no way to make this self-adjusting without either changing the
 //  box's system timezone (shared with venuetx, out of scope here) or a
 //  systemd timer, so for now this is a standing manual chore twice a year.
