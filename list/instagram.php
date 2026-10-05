@@ -560,15 +560,30 @@ function ig_neon_ghost($im, $cx, $cy, $r, $level = 1.0) {
 
 // ── October's newsprint accents ──────────────────────────────────────────────
 // Kept to the page's own two inks (black and the brick red) and its own
-// vocabulary: a masthead "ear", a halftone engraving, a classifieds box.
+// vocabulary: a halftone moon, engraved clouds, a classifieds box.
 
-// The boxed note newspapers put beside their title — here a forecast.
-function ig_news_ear($im, $x1, $y1, $x2, $y2, $ink, $red, array $lines) {
-    imagerectangle($im, $x1, $y1, $x2, $y2, $ink);
-    imagerectangle($im, $x1 + 3, $y1 + 3, $x2 - 3, $y2 - 3, $ink);
-    imagettftext($im, 11, 0, $x1 + 14, $y1 + 21, $red, IG_FONT_BODY, 'FORECAST');
-    $y = $y1 + 39;
-    foreach ($lines as $l) { imagettftext($im, 15, 0, $x1 + 14, $y, $ink, IG_FONT_BODY, $l); $y += 19; }
+// An engraved cloud: a puffy outline in ink, painted opaque so it covers
+// whatever it floats in front of, with ink hatching across its underside that
+// gets closer together toward the bottom. ($cx, $cy) is its centre, $s its
+// scale (1 is about 100 px wide).
+function ig_news_cloud($im, $cx, $cy, $s, $ink, $paper) {
+    $puffs = [[-34, 9, 15], [-15, -2, 21], [12, -6, 23], [36, 6, 17], [2, 10, 20]];
+    foreach ($puffs as [$dx, $dy, $r]) imagefilledellipse($im, (int) round($cx + $dx * $s), (int) round($cy + $dy * $s), (int) round(2 * ($r * $s + 2)), (int) round(2 * ($r * $s + 2)), $ink);
+    foreach ($puffs as [$dx, $dy, $r]) imagefilledellipse($im, (int) round($cx + $dx * $s), (int) round($cy + $dy * $s), (int) round(2 * $r * $s), (int) round(2 * $r * $s), $paper);
+    $inside = function ($x, $y) use ($puffs, $cx, $cy, $s) {
+        foreach ($puffs as [$dx, $dy, $r]) if (hypot($x - ($cx + $dx * $s), $y - ($cy + $dy * $s)) < $r * $s - 3) return true;
+        return false;
+    };
+    $y = $cy + 8 * $s; $gap = 6 * $s;
+    while ($y < $cy + 30 * $s) {
+        $runStart = null;
+        for ($x = (int) round($cx - 60 * $s); $x <= (int) round($cx + 60 * $s); $x++) {
+            $in = $inside($x, $y);
+            if ($in && $runStart === null) $runStart = $x;
+            if ((!$in || $x === (int) round($cx + 60 * $s)) && $runStart !== null) { imageline($im, $runStart + 2, (int) round($y), $x - 3, (int) round($y), $ink); $runStart = null; }
+        }
+        $y += $gap; $gap = max(2.5 * $s, $gap - 1.1 * $s);
+    }
 }
 
 // A halftone-engraved moon: a staggered grid of dots whose size follows the
@@ -2049,6 +2064,36 @@ function ig_bat_silhouette($im, $x, $y, $size, $color, $flap = 0.0) {
     imagefilledellipse($im, (int) $x, (int) $y, (int) round(0.26 * $size), (int) round(0.46 * $size), $color);
 }
 
+// A point a fraction $u (0..1) of the way, by distance, along the smooth
+// (Catmull-Rom) curve through the waypoints $pts, with the unit normal there
+// (to the right of the direction of travel) — so a flyer can be wobbled
+// sideways. Constant speed, which a bat's flight is not far from.
+function ig_path_point(array $pts, $u) {
+    $n = count($pts);
+    $at = fn($i) => $pts[max(0, min($n - 1, $i))];
+    $samples = [];
+    for ($i = 0; $i < $n - 1; $i++) {
+        [$p0, $p1, $p2, $p3] = [$at($i - 1), $at($i), $at($i + 1), $at($i + 2)];
+        for ($k = 0; $k < 24; $k++) {
+            $t = $k / 24; $t2 = $t * $t; $t3 = $t2 * $t;
+            $samples[] = [
+                0.5 * (2 * $p1[0] + (-$p0[0] + $p2[0]) * $t + (2 * $p0[0] - 5 * $p1[0] + 4 * $p2[0] - $p3[0]) * $t2 + (-$p0[0] + 3 * $p1[0] - 3 * $p2[0] + $p3[0]) * $t3),
+                0.5 * (2 * $p1[1] + (-$p0[1] + $p2[1]) * $t + (2 * $p0[1] - 5 * $p1[1] + 4 * $p2[1] - $p3[1]) * $t2 + (-$p0[1] + 3 * $p1[1] - 3 * $p2[1] + $p3[1]) * $t3),
+            ];
+        }
+    }
+    $samples[] = $pts[$n - 1];
+    $cum = [0.0];
+    for ($i = 1; $i < count($samples); $i++) $cum[] = $cum[$i - 1] + hypot($samples[$i][0] - $samples[$i - 1][0], $samples[$i][1] - $samples[$i - 1][1]);
+    $d = $u * $cum[count($cum) - 1];
+    $i = 1; while ($i < count($cum) - 1 && $cum[$i] < $d) $i++;
+    $f = ($d - $cum[$i - 1]) / max(1e-9, $cum[$i] - $cum[$i - 1]);
+    $x = $samples[$i - 1][0] + ($samples[$i][0] - $samples[$i - 1][0]) * $f;
+    $y = $samples[$i - 1][1] + ($samples[$i][1] - $samples[$i - 1][1]) * $f;
+    $dx = $samples[$i][0] - $samples[$i - 1][0]; $dy = $samples[$i][1] - $samples[$i - 1][1]; $l = max(1e-9, hypot($dx, $dy));
+    return [$x, $y, -$dy / $l, $dx / $l];
+}
+
 function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
@@ -2614,14 +2659,17 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
     imagefilledrectangle($im, $margin, 126, $w - $margin, 130, $ink);
     imagefilledrectangle($im, $margin, 136, $w - $margin, 137, $ink);
 
-    // October: the masthead's right-hand ear carries a forecast, and a
-    // halftone moon with a bat across it sits in the header's empty right
-    // side. The bat is still a bat on the moon; animated it flies across.
+    // October: a halftone moon in the header's empty right side with two
+    // engraved clouds by it (one across its lower right, a small one at its
+    // upper left), and three bats over it. Animated, the clouds drift slowly
+    // to and fro and the bats fly across.
     $season = ig_halloween_season($date);
     $moonCx = 905; $moonCy = 201; $moonR = 56;
     if ($season) {
-        ig_news_ear($im, 660, 52, $w - $margin, 120, $ink, $red, ['Fog, then screams after dusk.', 'Chance of fright: 90%.']);
         ig_halftone_moon($im, $moonCx, $moonCy, $moonR, $ink);
+        $ph = $anim !== null ? 2 * M_PI * $anim['frame'] / $anim['frames'] : 0.0;
+        ig_news_cloud($im, 948 + 14 * sin($ph), 224 + 2 * sin(2 * $ph), 1.0, $ink, $paper);
+        ig_news_cloud($im, 818 - 8 * sin($ph + 1.2), 158 + 2 * sin(2 * $ph + 0.7), 0.6, $ink, $paper);
     }
 
     $y = 188;
@@ -2709,29 +2757,39 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
     if ($season) {
-        // The bat: perched across the moon in the still. Animated it makes
-        // one crossing of the header per loop — in from the left of the moon,
-        // over it, and off the right edge of the card — flapping, bobbing,
-        // and fading in so it does not simply appear. It is off the card at
-        // the loop's wrap.
-        $bx = $moonCx - 37; $by = $moonCy - 23; $bs = 46; $flap = 0.0; $batColor = $ink;
+        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, ig_news_ads(), $anim);
+
+        // The bats: three of them, over the moon in the still. Animated, the
+        // three fly together, once per cycle (three flights a video), drawn last
+        // so they sweep over the screenings. They come up from low on the page —
+        // in from the left edge or the bottom, a different place each flight —
+        // on a curving path across the rows, over the middle of the moon and
+        // away off the right side of the card. Each follows the same path a
+        // little behind the last, at its own size, offset and wing beat. They
+        // are all off the page at the wrap, so the next flight starts with
+        // nothing to explain.
+        $flock = [[$moonCx - 33, $moonCy - 20, 42, 0.0], [$moonCx + 60, $moonCy - 38, 28, 0.45], [$moonCx - 72, $moonCy + 24, 30, -0.35]];
         if ($anim !== null) {
-            $cycle = $anim['frames'] / 3;   // three crossings per video (see ig_anim_frames())
-            $t = fmod($anim['frame'], $cycle) / $cycle;
-            $u = ($t - 0.06) / 0.88;
-            if ($u >= 0 && $u <= 1) {
-                $bx = 560 + 560 * $u;
-                $by = $moonCy - 8 + 12 * sin(2 * M_PI * 1.5 * $u) - 8 * sin(M_PI * $u);
-                $flap = 0.7 * sin(2 * M_PI * 13 * $t);
-                $a = min(1.0, $u / 0.08);
-                $batColor = imagecolorallocatealpha($im, 0x1C, 0x1B, 0x19, (int) round(127 * (1 - $a)));
-            } else {
-                $bs = 0;
+            $per = (int) ($anim['frames'] / 3);                      // three flights per video (see ig_anim_frames())
+            $fl  = intdiv($anim['frame'], $per) % 3;
+            $t   = ($anim['frame'] % $per) / $per;
+            [$sx, $sy] = [[-80, 1250], [260, 1430], [-80, 760]][$fl];
+            // Waypoints: the start, a belly out to the lower right, a point
+            // short of the moon at a shallow angle, the middle of the moon, and
+            // out of the right side below the forecast box.
+            $wx = $moonCx - 150; $wy = $moonCy + 125;
+            $dx = $wx - $sx; $dy = $wy - $sy; $L = hypot($dx, $dy);
+            $path = [[$sx, $sy], [($sx + $wx) / 2 - $dy / $L * 110, ($sy + $wy) / 2 + $dx / $L * 110], [$wx, $wy], [$moonCx, $moonCy + 6], [$moonCx + 110, $moonCy - 8], [1240, $moonCy - 28]];
+            $flock = [];
+            foreach ([[0.0, 0, 0, 44, 0.0], [0.06, -34, 26, 38, 1.9], [0.11, 30, 38, 34, 3.7]] as [$dl, $ox, $oy, $sz, $ph]) {
+                $u = ($t - $dl) / 0.84;
+                if ($u <= 0 || $u >= 1) continue;
+                [$bx, $by, $nx, $ny] = ig_path_point($path, $u);
+                $wob = 12 * sin(2 * M_PI * 6 * $u + $ph);
+                $flock[] = [$bx + $nx * $wob + $ox, $by + $ny * $wob + $oy, $sz, 0.7 * sin(2 * M_PI * (22 * $t + $ph))];
             }
         }
-        if ($bs > 0) ig_bat_silhouette($im, $bx, $by, $bs, $batColor, $flap);
-
-        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, ig_news_ads(), $anim);
+        foreach ($flock as [$bx, $by, $bs, $flap]) ig_bat_silhouette($im, $bx, $by, $bs, $ink, $flap);
     }
 
     return $im;
