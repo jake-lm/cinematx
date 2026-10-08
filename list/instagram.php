@@ -3720,9 +3720,10 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 // stroll on and haul it down the page into a trap. Every motion is a function of the frame number alone, so the
 // loop joins up, and a still is the same scene at frame 48.
 const IG_AUSTIN_LOOP = 528;
-// Where the second half of the loop begins: the first 336 frames are the tumbleweed and
-// the ghost capture, the last 192 the Big Wheel and the twins.
-const IG_AUSTIN_TWINS_AT = 336;
+// The loop is two plays back to back: the Big Wheel and the twins (frames 0-191), then
+// the tumbleweed and the ghost capture (frames 192-527).
+const IG_AUSTIN_TWINS_AT = 0;
+const IG_AUSTIN_CAPTURE_AT = 192;
 const IG_AUSTIN_STILL_FRAME = 48;
 
 // Top of the hills at column $x — the rolling skyline everything stands on.
@@ -3917,7 +3918,7 @@ function ig_austin_lamps($f) {
         $lv = 0.9 + 0.1 * ((crc32("lj$k:$t") % 100) / 100);
         // Twice a loop they stutter and go dark: once in the middle of the ghost
         // capture, and again as the twins appear.
-        foreach ([190, IG_AUSTIN_TWINS_AT + 112] as $w) {
+        foreach ([IG_AUSTIN_CAPTURE_AT + 190, IG_AUSTIN_TWINS_AT + 112] as $w) {
             if ($f >= $w && $f < $w + 32) {
                 if ($f >= $w + 12 && $f < $w + 20) $lv = (crc32("ld$k:$t") % 100) < 10 ? 0.5 : 0.0;
                 else $lv = (crc32("lf$k:$t") % 100) < 50 ? 1.0 : 0.12;
@@ -4193,8 +4194,8 @@ function ig_austin_trap($im, $x, $gy, $open, $f) {
 }
 
 /**
- * The whole capture, over the 336-frame loop (28s; the tumbleweed has the
- * first 100). The ghost drifts in over the listings at frame 12 and floats
+ * The whole capture, over its own 336 frames (28s; the loop starts it at frame 192,
+ * and $f here counts from that start; the tumbleweed has the first 100). The ghost drifts in over the listings at frame 12 and floats
  * about; at 56 the two hunters stroll on together from the left and plant
  * themselves by 134; the trap is slid out at 140; the beams strike at 150 and
  * for four seconds the ghost fights them — surging away, yanking the hunters
@@ -4316,7 +4317,7 @@ function ig_austin_capture($im, $w, $gyFn, $f, $ink) {
 }
 
 // ── The Big Wheel and the twins ──────────────────────────────────────────
-// The second half of the loop: the ground becomes the Overlook's hexagon carpet, a
+// The first play of the loop: the ground becomes the Overlook's hexagon carpet, a
 // boy rides a Big Wheel along it, stops, and two little girls in matching dresses
 // flicker into place at the end of the corridor, holding hands.
 
@@ -4416,7 +4417,7 @@ function ig_austin_twin($im, $cx, $gy, $ink, $reachX) {
 }
 
 /**
- * The second half of the loop, $g = 0..191 (frames 336-527). The carpet slides up over
+ * The first play of the loop, $g = 0..191. The carpet slides up over
  * the hills (0-10); the boy rolls in from the left, slowing to a stop (14-112); the
  * twins flicker into place at the far end of the corridor (112-124), stand holding
  * hands (to 160) and flicker out (160-170); the boy rides off right (150-190); and
@@ -4454,18 +4455,22 @@ function ig_austin_foreground($im, $w, $h, $f, $weed) {
         ig_austin_pear($im, $px, $gy($px) + 3, $sc, $pear);
     }
     if ($weed) {
-        // The tumbleweed rolls left to right (frames 0-99); the ghost-hunters
-        // take over until frame 335 (see ig_austin_capture()), then the Big Wheel
-        // and the twins (see ig_austin_twins()). Everything starts and ends fully
-        // off the card, so the loop joins up.
-        if ($f < 100) {
-            $r  = 34;
-            $cx = -80 + ($w + 160) * $f / 100;
-            $cy = $gy($cx) - $r + 6 - 30 * abs(sin($cx / 110));
-            ig_austin_tumbleweed($im, (int) round($cx), (int) round($cy), $r, $cx / $r, ig_hex($im, '#3A1D2C'));
+        // Two plays: the Big Wheel and the twins first (see ig_austin_twins()), then a
+        // tumbleweed rolls left to right and the ghost-hunters take over (see
+        // ig_austin_capture()). Everything starts and ends fully off the card, so the
+        // loop joins up.
+        if ($f < IG_AUSTIN_CAPTURE_AT) {
+            ig_austin_twins($im, $w, $h, $f - IG_AUSTIN_TWINS_AT, $ink);
+        } else {
+            $g = $f - IG_AUSTIN_CAPTURE_AT;
+            if ($g < 100) {
+                $r  = 34;
+                $cx = -80 + ($w + 160) * $g / 100;
+                $cy = $gy($cx) - $r + 6 - 30 * abs(sin($cx / 110));
+                ig_austin_tumbleweed($im, (int) round($cx), (int) round($cy), $r, $cx / $r, ig_hex($im, '#3A1D2C'));
+            }
+            ig_austin_capture($im, $w, $gy, $g, $ink);
         }
-        ig_austin_capture($im, $w, $gy, $f, $ink);
-        if ($f >= IG_AUSTIN_TWINS_AT) ig_austin_twins($im, $w, $h, $f - IG_AUSTIN_TWINS_AT, $ink);
     }
 }
 

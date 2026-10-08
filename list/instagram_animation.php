@@ -46,7 +46,7 @@ function ig_anim_frames($theme) {
     if ($theme === 'newsprint') return 3 * 82;
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
-    if ($theme === 'austin') return 11 * IG_ANIM_FRAMES / 2; // a ghost captured down a full page (28s), then the Big Wheel and the twins (16s): 44s
+    if ($theme === 'austin') return 11 * IG_ANIM_FRAMES / 2; // the Big Wheel and the twins (16s), then a ghost captured down a full page (28s): 44s
     return ($theme === 'neon' ? 6 : 1) * IG_ANIM_FRAMES;
 }
 
