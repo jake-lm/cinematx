@@ -332,6 +332,59 @@ function ig_pill($im, $x1, $y1, $x2, $y2, $color) {
     imagefilledellipse($im, $x2 - $r, $y1 + $r, $r * 2, $r * 2, $color);
 }
 
+// The print format worth calling out — a real 16mm, 35mm or 70mm print — as "35MM"
+// etc., or null. The scrapers only ever record a format when there is something to
+// say (DCP, the ordinary digital case, is deliberately never captured), so anything
+// here is a print.
+function ig_print_format(array $film) {
+    $f = strtolower(str_replace(' ', '', (string) ($film['format'] ?? '')));
+    return preg_match('/^(16|35|70)mm$/', $f) ? strtoupper($f) : null;
+}
+
+// A small tag with no drop shadow (ig_pill()'s shadow is too heavy at this size).
+// $style: 'solid' fills it with $accent and picks whichever of near-black or white
+// reads on that; 'ring' is a dark pill inside an $accent ring with $accent text, which
+// holds up over poster art; 'box' is the ring style with square corners and white
+// text, for the themes that avoid rounded shapes. Returns the tag's right edge.
+function ig_format_tag($im, $x, $yTop, $h, $text, $accent, $style = 'solid', $font = IG_FONT_BODY) {
+    $size = max(10, (int) round($h * 0.5));
+    $box  = imagettfbbox($size, 0, $font, $text);
+    $padX = (int) round($h * 0.42);
+    $x2   = (int) round($x + ($box[2] - $box[0]) + 2 * $padX);
+    $y2   = (int) round($yTop + $h);
+    $x    = (int) round($x);
+    $yTop = (int) round($yTop);
+    $shape = function ($a, $b, $c, $d, $color) use ($im, $style) {
+        if ($style === 'box') { imagefilledrectangle($im, $a, $b, $c, $d, $color); return; }
+        $r = (int) round(($d - $b) / 2);
+        imagefilledrectangle($im, $a + $r, $b, $c - $r, $d, $color);
+        imagefilledellipse($im, $a + $r, $b + $r, $r * 2, $r * 2, $color);
+        imagefilledellipse($im, $c - $r, $b + $r, $r * 2, $r * 2, $color);
+    };
+    $dark = imagecolorallocate($im, 0x14, 0x12, 0x0F);
+    $shape($x, $yTop, $x2, $y2, $accent);
+    if ($style === 'solid') {
+        $c = imagecolorsforindex($im, $accent);
+        $textColor = (0.299 * $c['red'] + 0.587 * $c['green'] + 0.114 * $c['blue']) / 255 > 0.6 ? $dark : imagecolorallocate($im, 255, 255, 255);
+    } else {
+        $ring = max(2, (int) round($h * 0.08));
+        $shape($x + $ring, $yTop + $ring, $x2 - $ring, $y2 - $ring, $dark);
+        $textColor = $style === 'box' ? imagecolorallocate($im, 255, 255, 255) : $accent;
+    }
+    imagettftext($im, $size, 0, (int) round($x + $padX - $box[0]), (int) round($yTop + $h / 2 + $size * 0.36), $textColor, $font, $text);
+    return $x2;
+}
+
+// The tag for a list row, sitting just after the row's time line ($base is that line's
+// baseline, $time the text already drawn there).
+function ig_format_tag_row($im, array $film, $textX, $base, $metaSize, $time, $accent) {
+    $fmt = ig_print_format($film);
+    if (!$fmt) return;
+    $box = imagettfbbox($metaSize, 0, IG_FONT_BODY, $time);
+    $h   = (int) round($metaSize * 1.2);
+    ig_format_tag($im, $textX + ($box[2] - $box[0]) + 14, $base - $metaSize * 0.36 - $h / 2, $h, $fmt, $accent);
+}
+
 // A drawn arrow — shaft plus a filled triangular head — rather than a "→"
 // glyph, since nothing guarantees an arrow character is in either font, so
 // it's drawn instead of trusted to render. Runs from $x1 to $x2 at height $y.
@@ -2603,6 +2656,7 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $red);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -2829,6 +2883,7 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $gold, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $gold);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -2972,6 +3027,7 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0, $anim = nu
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $pink);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3114,6 +3170,7 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $red);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3331,6 +3388,7 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0, $anim = nu
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $pink);
 
         $y += $rowHeight;
     }
@@ -3485,7 +3543,7 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
         $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, $venueSize, $venueMaxWidth);
         imagettftext($im, $venueSize, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
 
-        imagettftext($im, $statusSize, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, $statusSize, $statusMaxWidth));
+        imagettftext($im, $statusSize, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text(ig_print_format($film) ? 'ON ' . ig_print_format($film) : 'ON TIME', IG_FONT_TERMINAL, $statusSize, $statusMaxWidth));
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3675,6 +3733,7 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $rust, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $rust);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -4656,6 +4715,7 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0, $anim = 
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $terracotta, IG_FONT_BODY, $time);
+        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time, $terracotta);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -4869,6 +4929,10 @@ function ig_build_feature_page_paper(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $red);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $paper, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag, $red, 'ring');
+        }
         $py += $pillH + 14;
     }
 
@@ -4999,6 +5063,10 @@ function ig_build_feature_page_marquee(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag, $gold, 'ring');
+        }
         $py += $pillH + 14;
     }
 
@@ -5115,6 +5183,10 @@ function ig_build_feature_page_zine(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $pink);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $ink, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag, $pink, 'ring');
+        }
         $py += $pillH + 14;
     }
 
@@ -5236,6 +5308,10 @@ function ig_build_feature_page_newsprint(array $film, $date) {
         $tw    = $box[2] - $box[0];
         imagefilledrectangle($im, $margin, $py, $margin + $tw + $labelPadX * 2, $py + $labelH, $red);
         imagettftext($im, $labelFont, 0, $margin + $labelPadX, $py + $labelH - 16, $paper, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $labelPadX * 2 + 16, $py, $labelH, $fmtTag, $red, 'box');
+        }
         $py += $labelH + 12;
     }
 
@@ -5360,6 +5436,10 @@ function ig_build_feature_page_neon(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $cyan);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $dark, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag, $cyan, 'ring');
+        }
         $py += $pillH + 14;
     }
 
@@ -5554,6 +5634,13 @@ function ig_build_feature_page_terminal(array $film, $date) {
         $bx += $bw + 18;
     }
 
+    if ($fmtTag = ig_print_format($film)) {
+        $box = imagettfbbox(26, 0, IG_FONT_TERMINAL, $fmtTag);
+        $bw  = max(140, ($box[2] - $box[0]) + 32);
+        $drawBlock($im, $bx, $y, $bw, $blockH, 'FORMAT', $fmtTag, $ink);
+        $bx += $bw + 18;
+    }
+
     $statusValue = 'ON TIME';
     $box = imagettfbbox(26, 0, IG_FONT_TERMINAL, $statusValue);
     $bw  = ($box[2] - $box[0]) + 40;
@@ -5656,6 +5743,12 @@ function ig_build_feature_page_darkroom(array $film, $date) {
         $box   = imagettfbbox(24, 0, IG_FONT_BODY, $label);
         $bw    = ($box[2] - $box[0]) + 36;
         $drawStamp($im, $sx, $sy, $bw, $stampH, $label, $amber);
+        $sx += $bw + 16;
+    }
+    if ($fmtTag = ig_print_format($film)) {
+        $box = imagettfbbox(24, 0, IG_FONT_BODY, $fmtTag);
+        $bw  = ($box[2] - $box[0]) + 36;
+        $drawStamp($im, $sx, $sy, $bw, $stampH, $fmtTag, $amber);
         $sx += $bw + 16;
     }
 
@@ -5775,6 +5868,10 @@ function ig_build_feature_page_austin(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $terracotta);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 16, $dark, IG_FONT_BODY, $label);
+        if (empty($fmtDone)) {   // the print tag, beside the first showtime
+            $fmtDone = true;
+            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag, $terracotta, 'ring');
+        }
         $py += $pillH + 12;
     }
 
