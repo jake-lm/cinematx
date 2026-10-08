@@ -1896,7 +1896,7 @@ function ig_build_list_page(array $films, $date, $theme = 'paper', $moreCount = 
         case 'neon':      return ig_build_list_page_neon($films, $date, $moreCount, $anim);
         case 'terminal':  return ig_build_list_page_terminal($films, $date, $moreCount);
         case 'darkroom':  return ig_build_list_page_darkroom($films, $date, $moreCount, $anim);
-        case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount);
+        case 'austin':    return ig_build_list_page_austin($films, $date, $moreCount, $anim);
         default:          return ig_build_list_page_paper($films, $date, $moreCount, $anim);
     }
 }
@@ -3705,6 +3705,469 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
     return $im;
 }
 
+// ── Evening in Austin, October ───────────────────────────────────────────
+//
+// The golden-hour sky becomes an October dusk: a blood moon rising behind the
+// hills, a live oak and one of Austin's Moonlight Towers in silhouette, the
+// stars coming out, and bats leaving the bridge. The one shared scene is used
+// by the list page (tall, animated) and the spotlight pages (a thin band).
+//
+// Animated, it is a 16s loop (192 frames, 12 fps on twos): the stars twinkle,
+// the moon's glow slowly breathes, a stream of bats crosses the sky, a
+// tumbleweed rolls and hops across the hills, and the tower's lamps buzz and
+// flicker out for a moment — the Moonlight Towers are the most haunted-looking
+// thing in town. Every motion is a function of the frame number alone, so the
+// loop joins up, and a still is the same scene at frame 48.
+const IG_AUSTIN_LOOP = 192;
+const IG_AUSTIN_STILL_FRAME = 48;
+
+// Top of the hills at column $x — the rolling skyline everything stands on.
+function ig_austin_ground_y($x, $y0, $sh) {
+    $s = $sh / 170;
+    return $y0 + $sh - (int) round((12 + 5 * sin($x / 150) + 3 * sin($x / 47 + 1)) * $s);
+}
+
+// Stars that come and go, each on its own period (all divide the loop).
+function ig_austin_stars($im, $w, $y0, $maxH, $count, $f) {
+    $periods = [24, 32, 48, 96];
+    for ($i = 0; $i < $count; $i++) {
+        $x  = crc32("asx$i") % $w;
+        $y  = $y0 + 6 + crc32("asy$i") % max(1, $maxH);
+        $p  = $periods[$i % 4];
+        $ph = crc32("asp$i") % $p;
+        $lv = 0.5 + 0.5 * cos(2 * M_PI * (intdiv($f, 2) * 2 + $ph) / $p);
+        $lv = round($lv * 4) / 4;
+        $c  = imagecolorallocatealpha($im, 0xFF, 0xF1, 0xD6, 127 - (int) round(105 * $lv));
+        imagefilledrectangle($im, $x, $y, $x + 1, $y + 1, $c);
+        if ($i % 5 === 0 && $lv >= 0.75) {
+            imageline($im, $x - 3, $y, $x + 4, $y, $c);
+            imageline($im, $x, $y - 3, $x, $y + 4, $c);
+        }
+    }
+}
+
+// The zodiac constellation for the post's date (Oct 1-22 Libra, 23-31 Scorpio),
+// as stars in a 0..1 box and the lines joining them. [x, y, size, red?]
+function ig_austin_sign($date) {
+    return (int) date('j', $date) >= 23 ? 'scorpio' : 'libra';
+}
+
+function ig_austin_constellation($im, $sign, $x0, $y0, $w, $h, $s, $f) {
+    if ($sign === 'scorpio') {
+        $stars = [[0.04, 0.00, 2], [0.14, 0.14, 2], [0.06, 0.32, 1], [0.26, 0.30, 1], [0.34, 0.40, 3], [0.42, 0.58, 1], [0.52, 0.74, 2], [0.64, 0.88, 2],
+                  [0.80, 0.96, 2], [0.94, 0.88, 2], [1.00, 0.72, 2], [0.95, 0.58, 1], [0.86, 0.54, 2]];
+        $lines = [[0, 1], [1, 2], [1, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 10], [10, 11], [11, 12]];
+        $red = 4;
+    } else {
+        $stars = [[0.00, 0.30, 1], [0.18, 0.62, 3], [0.60, 0.08, 3], [0.92, 0.50, 2], [0.34, 0.98, 1], [0.80, 0.98, 1]];
+        $lines = [[0, 1], [1, 2], [2, 3], [1, 3], [1, 4], [3, 5]];
+        $red = -1;
+    }
+    $px = fn($st) => [(int) round($x0 + $st[0] * $w), (int) round($y0 + $st[1] * $h)];
+    $line = imagecolorallocatealpha($im, 0xFF, 0xF1, 0xD6, 96);
+    foreach ($lines as [$a, $b]) {
+        [$ax, $ay] = $px($stars[$a]); [$bx, $by] = $px($stars[$b]);
+        imageline($im, $ax, $ay, $bx, $by, $line);
+    }
+    foreach ($stars as $i => $st) {
+        [$cx, $cy] = $px($st);
+        $period = [48, 96, 32][$i % 3];
+        $lv = round((0.8 + 0.2 * cos(2 * M_PI * (intdiv($f, 2) * 2 + $i * 11) / $period)) * 8) / 8;
+        $rgb = $i === $red ? [0xFF, 0x8A, 0x6A] : [0xFF, 0xF1, 0xD6];
+        $r = max(2, (int) round((1 + $st[2]) * 1.6 * $s));
+        imagefilledellipse($im, $cx, $cy, $r * 4, $r * 4, imagecolorallocatealpha($im, $rgb[0], $rgb[1], $rgb[2], 124 - (int) round(10 * $lv)));
+        imagefilledellipse($im, $cx, $cy, $r * 2 + 2, $r * 2 + 2, imagecolorallocatealpha($im, $rgb[0], $rgb[1], $rgb[2], 110 - (int) round(30 * $lv)));
+        imagefilledellipse($im, $cx, $cy, $r, $r, imagecolorallocatealpha($im, $rgb[0], $rgb[1], $rgb[2], (int) round(24 * (1 - $lv))));
+    }
+}
+
+// The blood moon: a deep red disc with a lighter limb, a few maria, and a halo.
+function ig_austin_moon($im, $cx, $cy, $r, $f) {
+    $breath = 1 + 0.04 * sin(2 * M_PI * $f / 96);
+    for ($i = 18; $i >= 1; $i--) {
+        $rr = (int) round($r * (1 + $i * 0.075) * $breath);
+        $c  = imagecolorallocatealpha($im, 0xD6, 0x3C, 0x2A, 126 - (int) round((19 - $i) * 1.9));
+        imagefilledellipse($im, $cx, $cy, $rr * 2, $rr * 2, $c);
+    }
+    imagefilledellipse($im, $cx, $cy, $r * 2, $r * 2, imagecolorallocate($im, 0xB0, 0x2E, 0x22));
+    imagefilledellipse($im, $cx - (int) round($r * 0.14), $cy - (int) round($r * 0.14), (int) round($r * 1.55), (int) round($r * 1.55),
+        imagecolorallocatealpha($im, 0xE0, 0x5A, 0x34, 62));
+    $maria = imagecolorallocatealpha($im, 0x7A, 0x1B, 0x1A, 92);
+    foreach ([[-0.28, -0.20, 0.34], [0.26, 0.10, 0.26], [-0.06, 0.38, 0.16], [0.30, -0.40, 0.14]] as [$dx, $dy, $dr]) {
+        imagefilledellipse($im, $cx + (int) round($dx * $r), $cy + (int) round($dy * $r), (int) round($dr * $r * 2), (int) round($dr * $r * 2), $maria);
+    }
+}
+
+// A bat in flight with real wings. $pose (-1 down … 1 up) is the flap.
+function ig_austin_bat($im, $x, $y, $size, $pose, $col) {
+    $s = $size;
+    $tipY = -0.5 * $s * $pose;
+    $midY = -0.22 * $s * $pose;
+    foreach ([1, -1] as $m) {
+        $pts = [
+            0, 0,
+            0.30 * $s, $midY - 0.16 * $s,
+            0.70 * $s, $tipY - 0.12 * $s,
+            1.05 * $s, $tipY,
+            0.90 * $s, $tipY + 0.26 * $s,
+            0.72 * $s, $midY + 0.30 * $s,
+            0.52 * $s, $midY + 0.40 * $s,
+            0.34 * $s, $midY + 0.46 * $s,
+            0.14 * $s, 0.30 * $s,
+        ];
+        $poly = [];
+        foreach ($pts as $k => $v) $poly[] = (int) round($k % 2 === 0 ? $x + $m * $v : $y + $v);
+        imagefilledpolygon($im, $poly, $col);
+    }
+    imagefilledellipse($im, (int) $x, (int) round($y + 0.12 * $s), (int) round(0.34 * $s), (int) round(0.56 * $s), $col);
+    imagefilledpolygon($im, [
+        (int) round($x - 0.14 * $s), (int) round($y - 0.10 * $s), (int) round($x - 0.10 * $s), (int) round($y - 0.34 * $s), (int) round($x - 0.02 * $s), (int) round($y - 0.14 * $s),
+    ], $col);
+    imagefilledpolygon($im, [
+        (int) round($x + 0.14 * $s), (int) round($y - 0.10 * $s), (int) round($x + 0.10 * $s), (int) round($y - 0.34 * $s), (int) round($x + 0.02 * $s), (int) round($y - 0.14 * $s),
+    ], $col);
+}
+
+// A live oak, drawn the plain way: one sturdy trunk, a few limbs reaching up
+// into a single broad, rounded crown with a bumpy outline.
+function ig_austin_oak($im, $x, $gy, $s, $col) {
+    $P = fn(array $v) => array_map(fn($k) => (int) round(($k % 2 === 0 ? $x : $gy) + $v[$k] * $s), array_keys($v));
+    // Trunk, flared at the root.
+    imagefilledpolygon($im, $P([-17, 5, -8, -12, -7, -48, 7, -48, 8, -12, 17, 5]), $col);
+    // A tapering limb from ($x1,$y1) to ($x2,$y2), $t wide at the start, half that at the end.
+    $limb = function ($x1, $y1, $x2, $y2, $t) use ($im, $col, $P) {
+        $len = max(1.0, hypot($x2 - $x1, $y2 - $y1));
+        $nx = -($y2 - $y1) / $len * $t / 2; $ny = ($x2 - $x1) / $len * $t / 2;
+        imagefilledpolygon($im, $P([$x1 + $nx, $y1 + $ny, $x2 + $nx * 0.5, $y2 + $ny * 0.5, $x2 - $nx * 0.5, $y2 - $ny * 0.5, $x1 - $nx, $y1 - $ny]), $col);
+    };
+    // Limbs forking off the trunk below the crown and sweeping out and up into
+    // it, each with a smaller branch off it.
+    foreach ([
+        [-5, -30, -42, -42, 11], [-42, -42, -80, -54, 8], [-42, -42, -64, -70, 6],
+        [5, -30, 42, -42, 11],   [42, -42, 80, -54, 8],   [42, -42, 64, -70, 6],
+        [0, -40, 0, -76, 9],
+    ] as [$x1, $y1, $x2, $y2, $t]) {
+        $limb($x1, $y1, $x2, $y2, $t);
+    }
+    // Crown: a solid core and a ring of overlapping leaf-masses for the edge.
+    $cy = -92; $rx = 104; $ry = 36;
+    imagefilledellipse($im, $x, (int) round($gy + $cy * $s), (int) round($rx * 1.7 * $s), (int) round($ry * 1.6 * $s), $col);
+    $n = 24;
+    for ($k = 0; $k < $n; $k++) {
+        $a  = 2 * M_PI * $k / $n;
+        $jr = 0.9 + (crc32("oakj$k") % 100) / 100 * 0.2;
+        $r  = (12 + crc32("oakr$k") % 9) * $s;
+        $ex = $x + cos($a) * $rx * 0.9 * $jr * $s;
+        $ey = $gy + ($cy + sin($a) * $ry * 0.88 * $jr) * $s;
+        if (sin($a) > 0.55) $ey -= 4 * $s;   // a flatter underside
+        imagefilledellipse($im, (int) round($ex), (int) round($ey), (int) round($r * 2), (int) round($r * 1.8), $col);
+    }
+}
+
+// A Moonlight Tower: a tapering steel lattice with a crown of lamps on top.
+// $lamps is a 0..1 brightness for each of the five.
+function ig_austin_tower($im, $x, $baseY, $ht, $col, array $lamps, $s) {
+    $topY = $baseY - $ht;
+    $bw = 20 * $s;
+    $tw = 3 * $s;
+    $at = fn($t) => $bw + ($tw - $bw) * $t;
+    imagesetthickness($im, max(2, (int) round(3 * $s)));
+    imageline($im, (int) round($x - $bw), $baseY, (int) round($x - $tw), $topY, $col);
+    imageline($im, (int) round($x + $bw), $baseY, (int) round($x + $tw), $topY, $col);
+    imagesetthickness($im, 1);
+    $n = 7;
+    for ($i = 0; $i < $n; $i++) {
+        $t1 = $i / $n; $t2 = ($i + 1) / $n;
+        $y1 = (int) round($baseY - $ht * $t1); $y2 = (int) round($baseY - $ht * $t2);
+        imageline($im, (int) round($x - $at($t1)), $y1, (int) round($x + $at($t2)), $y2, $col);
+        imageline($im, (int) round($x + $at($t1)), $y1, (int) round($x - $at($t2)), $y2, $col);
+        imageline($im, (int) round($x - $at($t2)), $y2, (int) round($x + $at($t2)), $y2, $col);
+    }
+    imagefilledrectangle($im, (int) round($x - $tw - 7 * $s), $topY - 2, (int) round($x + $tw + 7 * $s), $topY + 3, $col);
+    foreach ($lamps as $k => $lv) {
+        $ang = M_PI * (0.12 + 0.76 * $k / 4);
+        $lx = (int) round($x - cos($ang) * 15 * $s);
+        $ly = (int) round($topY - sin($ang) * 14 * $s - 3);
+        imageline($im, $x, $topY, $lx, $ly, $col);
+        if ($lv > 0.05) {
+            foreach ([[15, 118], [9, 100], [5, 70]] as [$gr, $ga]) {
+                $c = imagecolorallocatealpha($im, 0xFF, 0xE0, 0x96, 127 - (int) round((127 - $ga) * $lv));
+                imagefilledellipse($im, $lx, $ly, (int) round($gr * $s * 2 * (0.6 + 0.4 * $lv)), (int) round($gr * $s * 2 * (0.6 + 0.4 * $lv)), $c);
+            }
+        }
+        $bulb = $lv > 0.5 ? imagecolorallocate($im, 0xFF, 0xF4, 0xD0) : imagecolorallocate($im, 0x6B, 0x4A, 0x35);
+        imagefilledellipse($im, $lx, $ly, max(4, (int) round(7 * $s)), max(4, (int) round(7 * $s)), $bulb);
+    }
+}
+
+// How bright each tower lamp is on frame $f: a faint buzz, and once a loop
+// they stutter, go dark for a beat, stutter again and come back.
+function ig_austin_lamps($f) {
+    $t = intdiv($f, 2);
+    $out = [];
+    for ($k = 0; $k < 5; $k++) {
+        $lv = 0.9 + 0.1 * ((crc32("lj$k:$t") % 100) / 100);
+        if ($f >= 120 && $f < 152) {
+            if ($f >= 132 && $f < 140) $lv = (crc32("ld$k:$t") % 100) < 10 ? 0.5 : 0.0;
+            else $lv = (crc32("lf$k:$t") % 100) < 50 ? 1.0 : 0.12;
+        }
+        $out[] = $lv;
+    }
+    return $out;
+}
+
+// A tumbleweed: a tangle of rotated loops, spinning as it rolls.
+function ig_austin_tumbleweed($im, $cx, $cy, $r, $rot, $col) {
+    imagesetthickness($im, max(1, (int) round($r / 11)));
+    for ($k = 0; $k < 7; $k++) {
+        $a = $rot + $k * M_PI / 7;
+        $b = $r * (0.30 + 0.45 * abs(cos($rot * 0.6 + $k * 1.3)));
+        $px = $py = null;
+        for ($j = 0; $j <= 20; $j++) {
+            $t = $j / 20 * 2 * M_PI;
+            $ex = $r * cos($t); $ey = $b * sin($t);
+            $x = (int) round($cx + $ex * cos($a) - $ey * sin($a));
+            $y = (int) round($cy + $ex * sin($a) + $ey * cos($a));
+            if ($px !== null) imageline($im, $px, $py, $x, $y, $col);
+            $px = $x; $py = $y;
+        }
+    }
+    imagesetthickness($im, 1);
+}
+
+// A prickly pear: a few stacked paddles, with a little red fruit on top.
+function ig_austin_pear($im, $x, $gy, $sc, $col) {
+    foreach ([[0, -16, 26, 32], [-15, -38, 22, 28], [15, -34, 20, 26], [-12, -58, 17, 22], [20, -54, 15, 19]] as [$dx, $dy, $ew, $eh]) {
+        imagefilledellipse($im, (int) round($x + $dx * $sc), (int) round($gy + $dy * $sc), (int) round($ew * $sc), (int) round($eh * $sc), $col);
+    }
+    $fruit = imagecolorallocate($im, 0x9A, 0x2A, 0x3A);
+    foreach ([[-12, -70], [20, -64], [-2, -42]] as [$dx, $dy]) {
+        imagefilledellipse($im, (int) round($x + $dx * $sc), (int) round($gy + $dy * $sc), max(3, (int) round(7 * $sc)), max(3, (int) round(8 * $sc)), $fruit);
+    }
+}
+
+// The Headless Horseman at a gallop, in silhouette: a horse on a six-pose
+// gallop (shown on twos, so a stride is 12 frames) that rocks and leaves the
+// ground at the top of each stride, a mane and tail streaming, dust kicked up
+// behind; the rider leaning forward in a tattered cloak, no head, and a lit
+// jack-o'-lantern held high in one hand. Drawn facing right with $dir = 1,
+// mirrored for $dir = -1; ($cx, $gy) is the ground under the horse's middle
+// and $sc scales the whole figure.
+function ig_austin_horseman($im, $cx, $gy, $sc, $dir, $f, $col) {
+    $t    = intdiv($f, 2);
+    $ph   = 2 * M_PI * $t / 6;
+    $lift = -9 * max(0.0, sin(2 * $ph + 0.4));           // off the ground at the top of the stride
+    $pitch = 0.07 * sin($ph + 0.8);                      // the whole body rocks
+    $T = fn($lx, $ly) => [(int) round($cx + $dir * $lx * $sc), (int) round($gy + ($ly + $lift) * $sc)];
+    // Rotate about the middle of the horse's body, then place.
+    $R = function ($lx, $ly) use ($pitch) {
+        $dx = $lx; $dy = $ly + 50;
+        return [$dx * cos($pitch) - $dy * sin($pitch), $dx * sin($pitch) + $dy * cos($pitch) - 50];
+    };
+    $polyG = function (array $pts) use ($im, $col, $T) {      // points already in figure space
+        $flat = [];
+        foreach ($pts as [$x, $y]) { [$a, $b] = $T($x, $y); $flat[] = $a; $flat[] = $b; }
+        imagefilledpolygon($im, $flat, $col);
+    };
+    $poly = function (array $pts) use ($polyG, $R) {          // points in body space (rocked)
+        $polyG(array_map(fn($p) => $R($p[0], $p[1]), $pts));
+    };
+    $limbG = function ($x1, $y1, $x2, $y2, $w1, $w2) use ($polyG) {
+        $len = max(1.0, hypot($x2 - $x1, $y2 - $y1));
+        $nx = -($y2 - $y1) / $len; $ny = ($x2 - $x1) / $len;
+        $polyG([[$x1 + $nx * $w1 / 2, $y1 + $ny * $w1 / 2], [$x2 + $nx * $w2 / 2, $y2 + $ny * $w2 / 2],
+                [$x2 - $nx * $w2 / 2, $y2 - $ny * $w2 / 2], [$x1 - $nx * $w1 / 2, $y1 - $ny * $w1 / 2]]);
+    };
+    $limb = function ($x1, $y1, $x2, $y2, $w1, $w2) use ($limbG, $R) {
+        [$a, $b] = $R($x1, $y1); [$c, $d] = $R($x2, $y2);
+        $limbG($a, $b, $c, $d, $w1, $w2);
+    };
+    $ell = function ($lx, $ly, $w, $h) use ($im, $col, $T, $R, $sc) {
+        [$a, $b] = $R($lx, $ly); [$a, $b] = $T($a, $b);
+        imagefilledellipse($im, $a, $b, (int) round($w * $sc), (int) round($h * $sc), $col);
+    };
+
+    // Where the lantern is held (the hand), and its glow, drawn first so it sits
+    // behind the figure rather than tinting it.
+    $hx = 60 + 2 * sin($ph + 1); $hy = -130 + 3 * sin($ph);
+    [$lx, $ly] = $T(...$R($hx, $hy - 13));
+    $flick = 0.8 + 0.2 * ((crc32("hl$t") % 100) / 100);
+    foreach ([[40, 116], [29, 102], [20, 86]] as [$gr, $ga]) {
+        imagefilledellipse($im, $lx, $ly, (int) round($gr * $sc * 2 * $flick), (int) round($gr * $sc * 2 * $flick), imagecolorallocatealpha($im, 0xFF, 0x9A, 0x2A, $ga));
+    }
+
+    // Dust kicked up behind the hooves, drifting back and fading as it grows.
+    for ($i = 0; $i < 4; $i++) {
+        $age = (($t + $i * 3 / 2) % 6) / 6;
+        [$dx, $dy] = $T(-52 - $age * 90, -4 - $age * 16);
+        $dr = (int) round((7 + 17 * $age) * $sc);
+        imagefilledellipse($im, $dx, $dy, $dr * 2, (int) round($dr * 1.3), imagecolorallocatealpha($im, 0x9C, 0x86, 0x6A, 88 + (int) round(34 * $age)));
+    }
+
+    // Legs: long upper and lower segments; the lower folds up as the leg
+    // comes forward. Hips ride the rocking body.
+    $leg = function ($hx, $hy, $phi, $mid, $amp) use ($limbG, $polyG, $R) {
+        [$hx, $hy] = $R($hx, $hy);
+        $a1 = $mid + $amp * sin($phi);
+        $kx = $hx + 29 * sin($a1); $ky = $hy + 29 * cos($a1);
+        $a2 = $a1 - 1.35 * max(0.0, cos($phi));
+        $fx = $kx + 29 * sin($a2); $fy = $ky + 29 * cos($a2);
+        $limbG($hx, $hy, $kx, $ky, 14, 8);
+        $limbG($kx, $ky, $fx, $fy, 8, 5);
+        $polyG([[$fx - 3, $fy - 3], [$fx + 5, $fy - 3], [$fx + 7, $fy + 3], [$fx - 3, $fy + 3]]);
+    };
+    $leg(-32, -46, $ph + M_PI + 0.8, -0.05, 0.85);
+    $leg(28, -44, $ph + 0.8, 0.10, 0.95);
+    $leg(-32, -46, $ph + M_PI, -0.05, 0.85);
+    $leg(28, -44, $ph, 0.10, 0.95);
+
+    // Body, arched neck, head and ears.
+    $ell(0, -52, 88, 36);
+    $ell(-32, -54, 46, 40);
+    $ell(28, -54, 40, 42);
+    $limb(20, -60, 38, -88, 32, 20);
+    $limb(38, -88, 52, -100, 20, 15);
+    $limb(52, -100, 82, -86, 15, 9);
+    $poly([[50, -104], [45, -120], [57, -108]]);
+    $poly([[54, -104], [54, -119], [63, -105]]);
+    // Mane and tail streaming back on the wind.
+    $mane = [[24, -66], [50, -104]];
+    for ($i = 0; $i <= 4; $i++) {
+        $u = $i / 4;
+        $mane[] = [50 - 30 * $u - 12 * (1 + sin($ph + 1.2 * $i)) * $u, -104 + 36 * $u + 5 * sin($ph + $i)];
+    }
+    $poly($mane);
+    foreach ([[0, 0], [5, 9]] as [$ox, $oy]) {
+        $p0 = [-46, -62 + $oy];
+        $p1 = [-66 - $ox, -62 + $oy + 7 * sin($ph)];
+        $p2 = [-90 - $ox, -54 + $oy + 11 * sin($ph + 1)];
+        $p3 = [-112 - $ox, -60 + $oy + 13 * sin($ph + 2)];
+        $limb($p0[0], $p0[1], $p1[0], $p1[1], 11, 8);
+        $limb($p1[0], $p1[1], $p2[0], $p2[1], 8, 5);
+        $limb($p2[0], $p2[1], $p3[0], $p3[1], 5, 1);
+    }
+
+    // The rider, leaning forward into the ride: torso, a ragged neck stump in a
+    // high collar and no head, reins in one hand and the lantern held up high.
+    $limb(-4, -64, 17, -100, 18, 15);
+    $limb(17, -100, 20, -110, 11, 10);
+    $poly([[8, -98], [29, -98], [27, -109], [10, -109]]);
+    $poly([[11, -109], [14, -113], [17, -109], [20, -114], [23, -109]]);
+    $limb(10, -62, 22, -46, 12, 9);
+    $limb(22, -46, 12, -33, 9, 6);
+    $limb(-4, -64, 10, -48, 13, 10);
+    $limb(10, -48, 2, -34, 10, 6);
+    $limb(20, -92, 38, -78, 8, 5);
+    $ell(0, -62, 26, 24);
+    $limb(20, -99, 40, -118, 10, 8);
+    $limb(40, -118, $hx, $hy + 4, 8, 6);
+    // The cloak, tattered and whipping out behind in a long wave.
+    $top = []; $bot = [];
+    for ($i = 0; $i <= 8; $i++) {
+        $u = $i / 8;
+        $wy = 9 * $u * sin($ph - 3.2 * $u);
+        $top[] = [14 - 96 * $u, -100 + 5 * $u + $wy];
+        $bot[] = [14 - 96 * $u - ($i % 2 ? 7 : 0), -86 + 22 * $u + $wy + ($i % 2 ? 10 * $u : -3 * $u)];
+    }
+    $poly(array_merge($top, array_reverse($bot)));
+
+    // The lantern itself: the pumpkin, a stem and a bright carved face.
+    $rp = max(6, (int) round(15 * $sc));
+    imagefilledellipse($im, $lx, $ly, $rp * 2, (int) round($rp * 1.8), imagecolorallocate($im, 0xE8, 0x7A, 0x1C));
+    imagefilledrectangle($im, $lx - 1, $ly - (int) round($rp * 0.95) - 3, $lx + 1, $ly - (int) round($rp * 0.8), $col);
+    $glow = imagecolorallocate($im, 0xFF, 0xEC, 0xA0);
+    $e = max(2, (int) round(4 * $sc));
+    imagefilledpolygon($im, [$lx - (int) round(7 * $sc), $ly - 1, $lx - 2, $ly - 1, $lx - (int) round(4.5 * $sc), $ly - 1 - $e], $glow);
+    imagefilledpolygon($im, [$lx + 2, $ly - 1, $lx + (int) round(7 * $sc), $ly - 1, $lx + (int) round(4.5 * $sc), $ly - 1 - $e], $glow);
+    imagefilledrectangle($im, $lx - (int) round(6 * $sc), $ly + (int) round(4 * $sc), $lx + (int) round(6 * $sc), $ly + (int) round(6 * $sc), $glow);
+}
+
+// The ground along the bottom of the card, to match the hills in the sky
+// strip: prickly pears on it and, on request, the two things that cross the
+// whole width of the page — the tumbleweed and the Headless Horseman — in
+// front of the footer line, the last thing drawn so they cross everything.
+function ig_austin_foreground($im, $w, $h, $f, $weed) {
+    $ink = ig_hex($im, '#1E0F24');
+    $pear = ig_hex($im, '#5E3C55');
+    $gy  = fn($x) => (int) round($h - 26 - 5 * sin($x / 130) - 3 * sin($x / 41 + 2));
+    $pts = [];
+    for ($x = 0; $x <= $w + 20; $x += 20) { $pts[] = $x; $pts[] = $gy($x); }
+    array_push($pts, $w + 20, $h, 0, $h);
+    imagefilledpolygon($im, $pts, $ink);
+    foreach ([[770, 1.0], [815, 0.7], [955, 1.15], [1010, 0.8]] as [$px, $sc]) {
+        // Lighter than the ground and the figures, so what crosses in front of them reads.
+        ig_austin_pear($im, $px, $gy($px) + 3, $sc, $pear);
+    }
+    if ($weed) {
+        // Two crossings a loop: the tumbleweed rolls left to right (frames
+        // 0-99) and the Headless Horseman gallops right to left (frames
+        // 68-147) — he catches the tumbleweed on the way. Both start and end
+        // fully off the card, so the loop joins up.
+        if ($f < 100) {
+            $r  = 34;
+            $cx = -80 + ($w + 160) * $f / 100;
+            $cy = $gy($cx) - $r + 6 - 30 * abs(sin($cx / 110));
+            ig_austin_tumbleweed($im, (int) round($cx), (int) round($cy), $r, $cx / $r, ig_hex($im, '#3A1D2C'));
+        }
+        if ($f >= 68 && $f < 148) {
+            $cx = ($w + 110) - ($w + 220) * ($f - 68) / 80;
+            ig_austin_horseman($im, (int) round($cx), $gy($cx) + 3, 0.9, -1, $f, $ink);
+        }
+    }
+}
+
+/**
+ * The whole October dusk strip, from $y0 down $sh pixels: sky, stars, moon,
+ * hills, oak, tower, bats and (on request) the tumbleweed. $f is the frame in
+ * the 192-frame loop, the still's frame when not animating. The caller owns
+ * everything below $y0 + $sh.
+ */
+function ig_austin_dusk($im, $w, $y0, $sh, $f, array $o) {
+    $s = $sh / 170;
+    $sky = $o['sky'];
+    $top = ig_hex($im, $sky[0]); $mid = ig_hex($im, $sky[1]); $low = ig_hex($im, $sky[2]);
+    $m = (int) round($sh * 0.55);
+    ig_gradient_fill($im, 0, $y0, $w - 1, $y0 + $m, $top, $mid);
+    ig_gradient_fill($im, 0, $y0 + $m, $w - 1, $y0 + $sh, $mid, $low);
+
+    ig_austin_stars($im, $w, $y0, (int) round($sh * 0.5), $o['stars'], $f);
+    ig_austin_constellation($im, $o['sign'], $o['signX'], $y0 + (int) round(20 * $s), (int) round(190 * $s), (int) round(84 * $s), $s, $f);
+
+    $moonR = (int) round(68 * $s);
+    ig_austin_moon($im, $o['moonX'], $y0 + $sh - (int) round(30 * $s), $moonR, $f);
+
+    $ink = ig_hex($im, '#1E0F24');
+    $pts = [];
+    for ($x = 0; $x <= $w + 20; $x += 20) { $pts[] = $x; $pts[] = ig_austin_ground_y($x, $y0, $sh); }
+    $pts[] = $w + 20; $pts[] = $y0 + $sh;
+    $pts[] = 0;       $pts[] = $y0 + $sh;
+    imagefilledpolygon($im, $pts, $ink);
+
+    ig_austin_oak($im, $o['oakX'], ig_austin_ground_y($o['oakX'], $y0, $sh) + 2, $s, $ink);
+    $tx = $o['towerX'];
+    ig_austin_tower($im, $tx, ig_austin_ground_y($tx, $y0, $sh) + 3, (int) round(122 * $s), $ink, ig_austin_lamps($f), $s);
+
+    // The bat stream: each bat crosses the whole sky once per 192 frames,
+    // right to left, staggered so the line never bunches or empties.
+    $lanes = [0.30, 0.50, 0.38, 0.62, 0.26, 0.45];
+    $n = $o['bats'];
+    for ($k = 0; $k < $n; $k++) {
+        $u = fmod($f / IG_AUSTIN_LOOP + $k / $n, 1.0);
+        $bx = ($w + 80) - ($w + 160) * $u;
+        $by = $y0 + $sh * $lanes[$k % 6] + 9 * $s * sin(2 * M_PI * (1.5 * $u + $k * 0.37));
+        $pose = [1, 0, -1, 0][(intdiv($f, 2) + $k) % 4];
+        ig_austin_bat($im, $bx, $by, (14 + ($k % 3) * 4) * $s * 1.15, $pose, $ink);
+    }
+
+    if (!empty($o['tumble'])) {
+        $u  = fmod($f / IG_AUSTIN_LOOP + 0.1, 1.0);
+        $r  = 24 * $s;
+        $cx = -70 + ($w + 140) * $u;
+        $cy = ig_austin_ground_y($cx, $y0, $sh) - $r + 3 * $s - 20 * $s * abs(sin($cx / 90));
+        ig_austin_tumbleweed($im, (int) round($cx), (int) round($cy), $r, $cx / $r, ig_hex($im, '#3A1D2C'));
+    }
+}
+
 // Evening in Austin, golden-hour half — the only theme where the list page
 // and the spotlight page intentionally use different palettes rather than
 // one shared one: this is the light end of a sunset that the spotlight
@@ -3714,7 +4177,7 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 // it; everything below sits on solid warm card stock for guaranteed
 // legibility, the same reason Darkroom's spotlight page stopped putting
 // its wordmark over the hero.
-function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
+function ig_build_list_page_austin(array $films, $date, $moreCount = 0, $anim = null) {
     $w = 1080;
     $h = 1350;
     $im = imagecreatetruecolor($w, $h);
@@ -3734,13 +4197,23 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     imagefill($im, 0, 0, $cream);
 
     $margin = 80;
-    $skyH   = 110;
+    $season = ig_halloween_season($date);
+    $skyH   = $season ? 170 : 110;
 
-    ig_gradient_fill($im, 0, 0, $w - 1, $skyH, $skyTop, $skyBottom);
-    ig_glow_sun($im, $w - $margin - 110, $skyH - 20, 20, ig_hex($im, '#FFF3D6'), $skyBottom);
-    ig_bat_mark($im, $margin + 60, 34, 18, $plum);
-    ig_bat_mark($im, $margin + 130, 22, 15, $plum);
-    ig_bat_mark($im, $margin + 100, 56, 13, $plum);
+    if ($season) {
+        // October: the sunset has gone on to dusk — see ig_austin_dusk().
+        $af = $anim !== null ? $anim['frame'] % IG_AUSTIN_LOOP : IG_AUSTIN_STILL_FRAME;
+        ig_austin_dusk($im, $w, 0, $skyH, $af, [
+            'sky' => ['#1B1030', '#6E2A55', '#E8834E'], 'stars' => 34, 'bats' => 6, 'tumble' => false,
+            'moonX' => 690, 'towerX' => 940, 'oakX' => 150, 'sign' => ig_austin_sign($date), 'signX' => 340,
+        ]);
+    } else {
+        ig_gradient_fill($im, 0, 0, $w - 1, $skyH, $skyTop, $skyBottom);
+        ig_glow_sun($im, $w - $margin - 110, $skyH - 20, 20, ig_hex($im, '#FFF3D6'), $skyBottom);
+        ig_bat_mark($im, $margin + 60, 34, 18, $plum);
+        ig_bat_mark($im, $margin + 130, 22, 15, $plum);
+        ig_bat_mark($im, $margin + 100, 56, 13, $plum);
+    }
 
     // The horizon has to occlude the sun, not sit in front of it — the sun
     // is drawn into the sky first, then the ground redrawn on top so
@@ -3839,6 +4312,8 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0) {
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if ($season) ig_austin_foreground($im, $w, $h, $af, $anim !== null);
 
     return $im;
 }
@@ -4945,6 +5420,13 @@ function ig_build_feature_page_austin(array $film, $date) {
     $bandY1 = $heroH;
     $bandY2 = $heroH + 110;
     $midY   = $bandY1 + 75;
+    if (ig_halloween_season($date)) {
+        // October: the same dusk as the list page, as a thin band under the poster.
+        ig_austin_dusk($im, $w, $bandY1, 110, IG_AUSTIN_STILL_FRAME, [
+            'sky' => ['#160F24', '#5A2350', '#E0803F'], 'stars' => 16, 'bats' => 3, 'tumble' => false,
+            'moonX' => 330, 'towerX' => 880, 'oakX' => 120, 'sign' => ig_austin_sign($date), 'signX' => 560,
+        ]);
+    } else {
     ig_gradient_fill($im, 0, $bandY1, $w - 1, $midY, $nightTop, $nightMid);
     ig_gradient_fill($im, 0, $midY, $w - 1, $bandY2, $nightMid, $horizonGlow);
 
@@ -4953,6 +5435,7 @@ function ig_build_feature_page_austin(array $film, $date) {
     ig_bat_mark($im, (int) ($w / 2) - 120, $bandY1 + 40, 22, $silhouette);
     ig_bat_mark($im, (int) ($w / 2) + 95, $bandY1 + 55, 18, $silhouette);
     ig_bat_mark($im, (int) ($w / 2) - 35, $bandY1 + 24, 15, $silhouette);
+    }
 
     imagefilledrectangle($im, 0, $bandY2, $w, $h, $nightGround);
 
@@ -5008,6 +5491,8 @@ function ig_build_feature_page_austin(array $film, $date) {
         imagettftext($im, 22, 0, $margin, $footerY - 34, $muted, IG_FONT_BODY, 'dir. ' . $film['director']);
     }
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if (ig_halloween_season($date)) ig_austin_foreground($im, $w, $h, IG_AUSTIN_STILL_FRAME, false);
 
     return $im;
 }

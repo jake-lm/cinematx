@@ -46,12 +46,13 @@ function ig_anim_frames($theme) {
     if ($theme === 'newsprint') return 3 * 82;
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
+    if ($theme === 'austin') return 2 * IG_ANIM_FRAMES;     // one slow sweep of bats and a tumbleweed, and one flicker of the tower: 16s
     return ($theme === 'neon' ? 6 : 1) * IG_ANIM_FRAMES;
 }
 
 // Which themes have an animated list page, for a post on $date.
 function ig_theme_animates($theme, $date) {
-    return in_array($theme, ['marquee', 'paper', 'neon', 'newsprint', 'darkroom', 'zine'], true) && ig_halloween_season($date);
+    return in_array($theme, ['marquee', 'paper', 'neon', 'newsprint', 'darkroom', 'zine', 'austin'], true) && ig_halloween_season($date);
 }
 
 // Whether a planned page (see ig_plan_pages()) gets a video.
