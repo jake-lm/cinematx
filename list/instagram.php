@@ -381,13 +381,21 @@ function ig_print_tag_reserve(array $film, $titleSize) {
 }
 
 // Draws the tag after $text (the title line just drawn at $x, with its baseline at
-// $baseline). Returns the tag's right edge, or null if the film is not on a print.
-function ig_format_tag_title($im, array $film, $x, $baseline, $titleSize, $text, $font) {
+// $baseline). $align 'middle' centres it on the capitals (list rows); 'top' hangs it from
+// their top edge (spotlights, where the title is large). Returns the tag's right edge, or
+// null if the film is not on a print.
+function ig_format_tag_title($im, array $film, $x, $baseline, $titleSize, $text, $font, $align = 'middle') {
     $fmt = ig_print_format($film);
     if (!$fmt) return null;
     $box = imagettfbbox($titleSize, 0, $font, $text);
     $h   = ig_print_tag_h($titleSize);
-    return ig_format_tag($im, $x + ($box[2] - $box[0]) + 16, $baseline - $titleSize * 0.36 - $h / 2, $h, $fmt);
+    if ($align === 'top') {
+        $cap  = imagettfbbox($titleSize, 0, $font, 'H');
+        $yTop = $baseline + $cap[7];          // $cap[7] is the (negative) height of a capital
+    } else {
+        $yTop = $baseline - $titleSize * 0.36 - $h / 2;
+    }
+    return ig_format_tag($im, $x + ($box[2] - $box[0]) + 16, $yTop, $h, $fmt);
 }
 
 // A drawn arrow — shaft plus a filled triangular head — rather than a "→"
@@ -4965,7 +4973,7 @@ function ig_build_feature_page_paper(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 72);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5095,7 +5103,7 @@ function ig_build_feature_page_marquee(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 86);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_MARQUEE_TITLE, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_MARQUEE_TITLE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_MARQUEE_TITLE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5214,7 +5222,7 @@ function ig_build_feature_page_zine(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 72);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_ZINE_TITLE, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_ZINE_TITLE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_ZINE_TITLE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5330,7 +5338,7 @@ function ig_build_feature_page_newsprint(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 76);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_NEWSPRINT_TITLE, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEWSPRINT_TITLE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEWSPRINT_TITLE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5458,7 +5466,7 @@ function ig_build_feature_page_neon(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth - ig_print_tag_reserve($film, 46), 2, 60);
     foreach ($titleFit['lines'] as $i => $line) {
         ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEON_TITLE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEON_TITLE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5593,7 +5601,7 @@ function ig_build_feature_page_terminal(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth - ig_print_tag_reserve($film, 54), 2, 66);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_TERMINAL);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_TERMINAL, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5753,7 +5761,7 @@ function ig_build_feature_page_darkroom(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth - ig_print_tag_reserve($film, 50), 2, 62);
     foreach ($titleFit['lines'] as $i => $line) {
         ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_DARKROOM_TITLE, $line, $ink, $amberGlow);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_DARKROOM_TITLE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_DARKROOM_TITLE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
@@ -5900,7 +5908,7 @@ function ig_build_feature_page_austin(array $film, $date) {
     $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth - ig_print_tag_reserve($film, 52), 2, 58);
     foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
-        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE, 'top');
         $y += $titleFit['lineHeight'];
     }
 
