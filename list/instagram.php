@@ -363,14 +363,31 @@ function ig_format_tag($im, $x, $yTop, $h, $text, $font = IG_FONT_BODY) {
     return $x2;
 }
 
-// The tag for a list row, sitting just after the row's time line ($base is that line's
-// baseline, $time the text already drawn there).
-function ig_format_tag_row($im, array $film, $textX, $base, $metaSize, $time) {
+// The width ig_format_tag() will draw $text at, for a tag $h tall.
+function ig_format_tag_width($h, $text, $font = IG_FONT_BODY) {
+    $box = imagettfbbox(max(10, (int) round($h * 0.5)), 0, $font, $text);
+    return ($box[2] - $box[0]) + 2 * (int) round($h * 0.42);
+}
+
+// The tag sits just after a film's title, and is sized to it: $titleSize is the title's
+// font size, so a small list-row title gets a small tag and a spotlight's large one a big one.
+function ig_print_tag_h($titleSize) { return max(22, (int) round($titleSize * 0.8)); }
+
+// How much width to take off a title's allowance to leave room for its tag (0 if the
+// film is not on a print).
+function ig_print_tag_reserve(array $film, $titleSize) {
     $fmt = ig_print_format($film);
-    if (!$fmt) return;
-    $box = imagettfbbox($metaSize, 0, IG_FONT_BODY, $time);
-    $h   = (int) round($metaSize * 1.2);
-    ig_format_tag($im, $textX + ($box[2] - $box[0]) + 14, $base - $metaSize * 0.36 - $h / 2, $h, $fmt);
+    return $fmt ? ig_format_tag_width(ig_print_tag_h($titleSize), $fmt) + 16 : 0;
+}
+
+// Draws the tag after $text (the title line just drawn at $x, with its baseline at
+// $baseline). Returns the tag's right edge, or null if the film is not on a print.
+function ig_format_tag_title($im, array $film, $x, $baseline, $titleSize, $text, $font) {
+    $fmt = ig_print_format($film);
+    if (!$fmt) return null;
+    $box = imagettfbbox($titleSize, 0, $font, $text);
+    $h   = ig_print_tag_h($titleSize);
+    return ig_format_tag($im, $x + ($box[2] - $box[0]) + 16, $baseline - $titleSize * 0.36 - $h / 2, $h, $fmt);
 }
 
 // A drawn arrow — shaft plus a filled triangular head — rather than a "→"
@@ -2627,8 +2644,9 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_HEADLINE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_HEADLINE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -2644,7 +2662,6 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -2854,8 +2871,9 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $gold, IG_FONT_MARQUEE_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_MARQUEE_TITLE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_MARQUEE_TITLE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -2871,7 +2889,6 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $gold, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -2998,8 +3015,9 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0, $anim = nu
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_ZINE_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_ZINE_TITLE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_ZINE_TITLE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -3015,7 +3033,6 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0, $anim = nu
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3141,8 +3158,9 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_NEWSPRINT_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $ink, IG_FONT_NEWSPRINT_TITLE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_NEWSPRINT_TITLE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -3158,7 +3176,6 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3353,13 +3370,20 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0, $anim = nu
             $tagW    = $tagBox[2] - $tagBox[0];
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, $geo['titleSize'], $textMaxWidth - ($tagText ? $tagW + 14 : 0));
+        $printReserve = ig_print_tag_reserve($film, $geo['titleSize']);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, $geo['titleSize'], $textMaxWidth - ($tagText ? $tagW + 14 : 0) - $printReserve);
         ig_neon_text($im, $geo['titleSize'], $textX, $y + $geo['titleOffsetY'], IG_FONT_NEON_TITLE, $title, $cyan, $cyanGlow);
 
+        $titleBox = imagettfbbox($geo['titleSize'], 0, IG_FONT_NEON_TITLE, $title);
+        $afterTitle = $textX + ($titleBox[2] - $titleBox[0]);
         if ($tagText) {
-            $titleBox = imagettfbbox($geo['titleSize'], 0, IG_FONT_NEON_TITLE, $title);
-            $titleW   = $titleBox[2] - $titleBox[0];
-            imagettftext($im, $tagSize, 0, $textX + $titleW + 14, $y + $geo['titleOffsetY'], $muted, IG_FONT_BODY, $tagText);
+            imagettftext($im, $tagSize, 0, $afterTitle + 14, $y + $geo['titleOffsetY'], $muted, IG_FONT_BODY, $tagText);
+            $afterTitle += 14 + $tagW;
+        }
+        // The print tag follows the title (and its "presented with" note, if it has one).
+        if ($fmtTag = ig_print_format($film)) {
+            $tagH = ig_print_tag_h($geo['titleSize']);
+            ig_format_tag($im, $afterTitle + 16, $y + $geo['titleOffsetY'] - $geo['titleSize'] * 0.36 - $tagH / 2, $tagH, $fmtTag);
         }
 
         // Flick Clique names the monthly series, not a place — same reasoning
@@ -3376,7 +3400,6 @@ function ig_build_list_page_neon(array $films, $date, $moreCount = 0, $anim = nu
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $pink, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
     }
@@ -3525,19 +3548,14 @@ function ig_build_list_page_terminal(array $films, $date, $moreCount = 0) {
             $iw = $ibox[2] - $ibox[0];
             imagettftext($im, $initSize, 0, (int) ($colPoster + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_TERMINAL, $initial);
         }
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, $titleSize, $titleMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_TERMINAL, $titleSize, $titleMaxWidth - ig_print_tag_reserve($film, $titleSize));
         imagettftext($im, $titleSize, 0, $colTitle, $textY, $ink, IG_FONT_TERMINAL, $title);
+        ig_format_tag_title($im, $film, $colTitle, $textY, $titleSize, $title, IG_FONT_TERMINAL);
 
         $venue = ig_fit_text(mb_strtoupper($film['venue']), IG_FONT_TERMINAL, $venueSize, $venueMaxWidth);
         imagettftext($im, $venueSize, 0, $colVenue, $textY, $muted, IG_FONT_TERMINAL, $venue);
 
-        if ($fmtTag = ig_print_format($film)) {
-            // A print is the status worth showing: the tag stands in for ON TIME.
-            $tagH = (int) round($statusSize * 1.5);
-            ig_format_tag($im, $colStatus, (int) round($textY - $statusSize * 0.36 - $tagH / 2), $tagH, $fmtTag);
-        } else {
-            imagettftext($im, $statusSize, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, $statusSize, $statusMaxWidth));
-        }
+        imagettftext($im, $statusSize, 0, $colStatus, $textY, $green, IG_FONT_TERMINAL, ig_fit_text('ON TIME', IG_FONT_TERMINAL, $statusSize, $statusMaxWidth));
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -3710,8 +3728,9 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_DARKROOM_TITLE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $amber, IG_FONT_DARKROOM_TITLE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_DARKROOM_TITLE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -3727,7 +3746,6 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $rust, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -4692,8 +4710,9 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0, $anim = 
             imagettftext($im, $initSize, 0, (int) ($margin + ($thumbW - $iw) / 2), $y + (int) ($thumbH / 2) + (int) round($initSize / 3), $muted, IG_FONT_HEADLINE, $initial);
         }
 
-        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth);
+        $title = ig_fit_text(mb_strtoupper($film['title']), IG_FONT_HEADLINE, $geo['titleSize'], $textMaxWidth - ig_print_tag_reserve($film, $geo['titleSize']));
         imagettftext($im, $geo['titleSize'], 0, $textX, $y + $geo['titleOffsetY'], $plum, IG_FONT_HEADLINE, $title);
+        ig_format_tag_title($im, $film, $textX, $y + $geo['titleOffsetY'], $geo['titleSize'], $title, IG_FONT_HEADLINE);
 
         // Flick Clique names the monthly series, not a place — same reasoning
         // as the website's own poster card (list/index.php): the location is
@@ -4709,7 +4728,6 @@ function ig_build_list_page_austin(array $films, $date, $moreCount = 0, $anim = 
 
         $time = ig_fit_text(ig_format_times($film['timestamps'] ?? [$film['timestamp']]), IG_FONT_BODY, $geo['metaSize'], $textMaxWidth);
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $terracotta, IG_FONT_BODY, $time);
-        ig_format_tag_row($im, $film, $textX, $y + $geo['timeOffsetY'], $geo['metaSize'], $time);
 
         $y += $rowHeight;
         if ($i < $lastIndex) {
@@ -4923,10 +4941,6 @@ function ig_build_feature_page_paper(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $red);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $paper, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag);
-        }
         $py += $pillH + 14;
     }
 
@@ -4948,9 +4962,10 @@ function ig_build_feature_page_paper(array $film, $date) {
         $y += 68;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth, 2, 72);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 72);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5057,10 +5072,6 @@ function ig_build_feature_page_marquee(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $gold);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $bg, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag);
-        }
         $py += $pillH + 14;
     }
 
@@ -5081,9 +5092,10 @@ function ig_build_feature_page_marquee(array $film, $date) {
         $y += 84;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth, 2, 86);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_MARQUEE_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 86);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_MARQUEE_TITLE, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_MARQUEE_TITLE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5177,10 +5189,6 @@ function ig_build_feature_page_zine(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $pink);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $ink, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag);
-        }
         $py += $pillH + 14;
     }
 
@@ -5203,9 +5211,10 @@ function ig_build_feature_page_zine(array $film, $date) {
         $y += 68;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 56, $textMaxWidth, 2, 72);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_ZINE_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 72);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_ZINE_TITLE, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_ZINE_TITLE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5302,10 +5311,6 @@ function ig_build_feature_page_newsprint(array $film, $date) {
         $tw    = $box[2] - $box[0];
         imagefilledrectangle($im, $margin, $py, $margin + $tw + $labelPadX * 2, $py + $labelH, $red);
         imagettftext($im, $labelFont, 0, $margin + $labelPadX, $py + $labelH - 16, $paper, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $labelPadX * 2 + 16, $py, $labelH, $fmtTag);
-        }
         $py += $labelH + 12;
     }
 
@@ -5322,9 +5327,10 @@ function ig_build_feature_page_newsprint(array $film, $date) {
         $y += 68;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth, 2, 76);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEWSPRINT_TITLE, 56, $textMaxWidth - ig_print_tag_reserve($film, 56), 2, 76);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_NEWSPRINT_TITLE, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEWSPRINT_TITLE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5430,10 +5436,6 @@ function ig_build_feature_page_neon(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $cyan);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 18, $dark, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag);
-        }
         $py += $pillH + 14;
     }
 
@@ -5453,9 +5455,10 @@ function ig_build_feature_page_neon(array $film, $date) {
         $y += 60;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth, 2, 60);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_NEON_TITLE, 46, $textMaxWidth - ig_print_tag_reserve($film, 46), 2, 60);
+    foreach ($titleFit['lines'] as $i => $line) {
         ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_NEON_TITLE, $line, $cyan, $cyanGlow);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_NEON_TITLE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5587,9 +5590,10 @@ function ig_build_feature_page_terminal(array $film, $date) {
         $y += 56;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth, 2, 66);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_TERMINAL, 54, $textMaxWidth - ig_print_tag_reserve($film, 54), 2, 66);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_TERMINAL, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_TERMINAL);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5626,11 +5630,6 @@ function ig_build_feature_page_terminal(array $film, $date) {
         $bw    = max(140, ($box[2] - $box[0]) + 32);
         $drawBlock($im, $bx, $y, $bw, $blockH, 'TIME', $value, $ink);
         $bx += $bw + 18;
-    }
-
-    if ($fmtTag = ig_print_format($film)) {
-        $tagH = 44;
-        $bx = ig_format_tag($im, $bx, $y + (int) round(($blockH - $tagH) / 2), $tagH, $fmtTag) + 18;
     }
 
     $statusValue = 'ON TIME';
@@ -5737,9 +5736,6 @@ function ig_build_feature_page_darkroom(array $film, $date) {
         $drawStamp($im, $sx, $sy, $bw, $stampH, $label, $amber);
         $sx += $bw + 16;
     }
-    if ($fmtTag = ig_print_format($film)) {
-        $sx = ig_format_tag($im, $sx, $sy, $stampH, $fmtTag) + 16;
-    }
 
     $textMaxWidth = $w - $margin * 2;
     $y = $sy + $stampH + 46;
@@ -5754,9 +5750,10 @@ function ig_build_feature_page_darkroom(array $film, $date) {
         $y += 66;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth, 2, 62);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_DARKROOM_TITLE, 50, $textMaxWidth - ig_print_tag_reserve($film, 50), 2, 62);
+    foreach ($titleFit['lines'] as $i => $line) {
         ig_neon_text($im, $titleFit['size'], $margin, $y, IG_FONT_DARKROOM_TITLE, $line, $ink, $amberGlow);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_DARKROOM_TITLE);
         $y += $titleFit['lineHeight'];
     }
 
@@ -5857,10 +5854,6 @@ function ig_build_feature_page_austin(array $film, $date) {
         $tw    = $box[2] - $box[0];
         ig_pill($im, $margin, $py, $margin + $tw + $pillPadX * 2, $py + $pillH, $terracotta);
         imagettftext($im, $pillFont, 0, $margin + $pillPadX, $py + $pillH - 16, $dark, IG_FONT_BODY, $label);
-        if (empty($fmtDone)) {   // the print tag, beside the first showtime
-            $fmtDone = true;
-            if ($fmtTag = ig_print_format($film)) ig_format_tag($im, $margin + $tw + $pillPadX * 2 + 16, $py, $pillH, $fmtTag);
-        }
         $py += $pillH + 12;
     }
 
@@ -5904,9 +5897,10 @@ function ig_build_feature_page_austin(array $film, $date) {
         $y += 66;
     }
 
-    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth, 2, 58);
-    foreach ($titleFit['lines'] as $line) {
+    $titleFit = ig_fit_title_wrapped(mb_strtoupper($film['title']), IG_FONT_HEADLINE, 52, $textMaxWidth - ig_print_tag_reserve($film, 52), 2, 58);
+    foreach ($titleFit['lines'] as $i => $line) {
         imagettftext($im, $titleFit['size'], 0, $margin, $y, $ink, IG_FONT_HEADLINE, $line);
+        if ($i === count($titleFit['lines']) - 1) ig_format_tag_title($im, $film, $margin, $y, $titleFit['size'], $line, IG_FONT_HEADLINE);
         $y += $titleFit['lineHeight'];
     }
 
