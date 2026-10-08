@@ -3712,13 +3712,17 @@ function ig_build_list_page_darkroom(array $films, $date, $moreCount = 0, $anim 
 // stars coming out, and bats leaving the bridge. The one shared scene is used
 // by the list page (tall, animated) and the spotlight pages (a thin band).
 //
-// Animated, it is a 16s loop (192 frames, 12 fps on twos): the stars twinkle,
+// Animated, it is a 44s loop (528 frames, 12 fps on twos): the stars twinkle,
 // the moon's glow slowly breathes, a stream of bats crosses the sky, a
 // tumbleweed rolls and hops across the hills, and the tower's lamps buzz and
 // flicker out for a moment — the Moonlight Towers are the most haunted-looking
-// thing in town. Every motion is a function of the frame number alone, so the
+// thing in town — while a ghost floats over the listings until two ghost-hunters
+// stroll on and haul it down the page into a trap. Every motion is a function of the frame number alone, so the
 // loop joins up, and a still is the same scene at frame 48.
-const IG_AUSTIN_LOOP = 192;
+const IG_AUSTIN_LOOP = 528;
+// Where the second half of the loop begins: the first 336 frames are the tumbleweed and
+// the ghost capture, the last 192 the Big Wheel and the twins.
+const IG_AUSTIN_TWINS_AT = 336;
 const IG_AUSTIN_STILL_FRAME = 48;
 
 // Top of the hills at column $x — the rolling skyline everything stands on.
@@ -3727,9 +3731,9 @@ function ig_austin_ground_y($x, $y0, $sh) {
     return $y0 + $sh - (int) round((12 + 5 * sin($x / 150) + 3 * sin($x / 47 + 1)) * $s);
 }
 
-// Stars that come and go, each on its own period (all divide the loop).
+// Stars that come and go, each on its own period (all divide the 528-frame loop).
 function ig_austin_stars($im, $w, $y0, $maxH, $count, $f) {
-    $periods = [24, 32, 48, 96];
+    $periods = [24, 44, 48, 66];
     for ($i = 0; $i < $count; $i++) {
         $x  = crc32("asx$i") % $w;
         $y  = $y0 + 6 + crc32("asy$i") % max(1, $maxH);
@@ -3771,7 +3775,7 @@ function ig_austin_constellation($im, $sign, $x0, $y0, $w, $h, $s, $f) {
     }
     foreach ($stars as $i => $st) {
         [$cx, $cy] = $px($st);
-        $period = [48, 96, 32][$i % 3];
+        $period = [48, 132, 44][$i % 3];
         $lv = round((0.8 + 0.2 * cos(2 * M_PI * (intdiv($f, 2) * 2 + $i * 11) / $period)) * 8) / 8;
         $rgb = $i === $red ? [0xFF, 0x8A, 0x6A] : [0xFF, 0xF1, 0xD6];
         $r = max(2, (int) round((1 + $st[2]) * 1.6 * $s));
@@ -3782,10 +3786,14 @@ function ig_austin_constellation($im, $sign, $x0, $y0, $w, $h, $s, $f) {
 }
 
 // The blood moon: a deep red disc with a lighter limb, a few maria, and a halo.
-function ig_austin_moon($im, $cx, $cy, $r, $f) {
-    $breath = 1 + 0.04 * sin(2 * M_PI * $f / 96);
+function ig_austin_moon($im, $cx, $cy, $r, $f, $room = null) {
+    $breath = 1 + 0.04 * sin(2 * M_PI * $f / 132);
+    // $room is how far the sky extends above the moon's centre: the glow is
+    // squeezed to fade out within it, so it never meets the edge of the strip
+    // and gets cut off in a flat line.
+    $spread = $room === null ? 0.075 : min(0.075, max(0.0, ($room / ($r * 1.04 * $breath) - 1) / 18));
     for ($i = 18; $i >= 1; $i--) {
-        $rr = (int) round($r * (1 + $i * 0.075) * $breath);
+        $rr = (int) round($r * (1 + $i * $spread) * $breath);
         $c  = imagecolorallocatealpha($im, 0xD6, 0x3C, 0x2A, 126 - (int) round((19 - $i) * 1.9));
         imagefilledellipse($im, $cx, $cy, $rr * 2, $rr * 2, $c);
     }
@@ -3907,9 +3915,13 @@ function ig_austin_lamps($f) {
     $out = [];
     for ($k = 0; $k < 5; $k++) {
         $lv = 0.9 + 0.1 * ((crc32("lj$k:$t") % 100) / 100);
-        if ($f >= 120 && $f < 152) {
-            if ($f >= 132 && $f < 140) $lv = (crc32("ld$k:$t") % 100) < 10 ? 0.5 : 0.0;
-            else $lv = (crc32("lf$k:$t") % 100) < 50 ? 1.0 : 0.12;
+        // Twice a loop they stutter and go dark: once in the middle of the ghost
+        // capture, and again as the twins appear.
+        foreach ([190, IG_AUSTIN_TWINS_AT + 112] as $w) {
+            if ($f >= $w && $f < $w + 32) {
+                if ($f >= $w + 12 && $f < $w + 20) $lv = (crc32("ld$k:$t") % 100) < 10 ? 0.5 : 0.0;
+                else $lv = (crc32("lf$k:$t") % 100) < 50 ? 1.0 : 0.12;
+            }
         }
         $out[] = $lv;
     }
@@ -3946,146 +3958,489 @@ function ig_austin_pear($im, $x, $gy, $sc, $col) {
     }
 }
 
-// The Headless Horseman at a gallop, in silhouette: a horse on a six-pose
-// gallop (shown on twos, so a stride is 12 frames) that rocks and leaves the
-// ground at the top of each stride, a mane and tail streaming, dust kicked up
-// behind; the rider leaning forward in a tattered cloak, no head, and a lit
-// jack-o'-lantern held high in one hand. Drawn facing right with $dir = 1,
-// mirrored for $dir = -1; ($cx, $gy) is the ground under the horse's middle
-// and $sc scales the whole figure.
-function ig_austin_horseman($im, $cx, $gy, $sc, $dir, $f, $col) {
-    $t    = intdiv($f, 2);
-    $ph   = 2 * M_PI * $t / 6;
-    $lift = -9 * max(0.0, sin(2 * $ph + 0.4));           // off the ground at the top of the stride
-    $pitch = 0.07 * sin($ph + 0.8);                      // the whole body rocks
-    $T = fn($lx, $ly) => [(int) round($cx + $dir * $lx * $sc), (int) round($gy + ($ly + $lift) * $sc)];
-    // Rotate about the middle of the horse's body, then place.
-    $R = function ($lx, $ly) use ($pitch) {
+// ── The capture ──────────────────────────────────────────────────────────
+// Two ghost-hunters in jumpsuits and backpack rigs run in, drop a trap, and
+// pull a ghost down out of the page — over the listings — on two crackling
+// beams until it is stretched into the trap. See ig_austin_capture() for the
+// timeline; the pieces are drawn here.
+
+// The ghost: the same little one as the other themes — a dome, straight sides, a
+// scalloped hem, two small oval eyes and a small oval mouth — but translucent,
+// so the listings show through it, and drawn into its own buffer first so
+// nothing doubles up. $sx/$sy stretch it (taffy, when it is pulled into the
+// trap), $shear leans it, and $thrash (0..1) is how startled it is: the eyes
+// and mouth open wider.
+function ig_austin_ghost($im, $cx, $cy, $sx, $sy, $shear, $f, $thrash) {
+    $t = intdiv($f, 2);
+    $R = 60; $H = 155; $u = 3.5;      // the original's proportions, at 3.5x
+    $B = imagecreatetruecolor(480, 520);
+    imagealphablending($B, false);
+    imagesavealpha($B, true);
+    imagefill($B, 0, 0, imagecolorallocatealpha($B, 0, 0, 0, 127));
+    $P = fn($ux, $uy) => [(int) round(240 + $ux * $sx + $shear * $uy * $sy), (int) round(260 + $uy * $sy)];
+    $fill = imagecolorallocatealpha($B, 0xF4, 0xFB, 0xFF, 34);
+    $edge = imagecolorallocatealpha($B, 0x5F, 0x92, 0xBE, 6);
+    $dark = imagecolorallocatealpha($B, 0x14, 0x23, 0x3C, 0);
+    $lite = imagecolorallocatealpha($B, 0xFF, 0xFF, 0xFF, 0);
+
+    $top = -$H / 2; $by = $H / 2;
+    $body = [];
+    for ($a = 180; $a <= 360; $a += 10) $body[] = $P($R * cos(deg2rad($a)), $top + $R + $R * sin(deg2rad($a)));
+    $body[] = $P($R, $by);
+    for ($i = 1; $i <= 8; $i++) $body[] = $P($R - 2 * $R * $i / 8, $by - ($i % 2 ? 0 : 5 * $u) + 3 * sin($t * 1.3 + $i));
+    $flat = [];
+    foreach ($body as [$x, $y]) { $flat[] = $x; $flat[] = $y; }
+    imagefilledpolygon($B, $flat, $fill);
+    imagesetthickness($B, 3);
+    imagepolygon($B, $flat, $edge);
+    imagesetthickness($B, 1);
+
+    // Face, as in the other themes: eyes at +-0.2 of the width, a mouth below.
+    foreach ([-0.2, 0.2] as $dx) {
+        [$x, $y] = $P($dx * 2 * $R, $top + $R + $u);
+        imagefilledellipse($B, $x, $y, (int) round((5 * $u + 1) * $sx * (1 + 0.25 * $thrash)), (int) round((8 * $u + 1) * $sy * (1 + 0.25 * $thrash)), $dark);
+        imagefilledellipse($B, $x + 2, $y - (int) round(6 * $sy), 5, 5, $lite);
+    }
+    [$mx, $my] = $P(0, $top + $R + 12 * $u);
+    imagefilledellipse($B, $mx, $my, (int) round((5 * $u + 1) * $sx * (1 + 0.7 * $thrash)), (int) round((7 * $u + 1) * $sy * (1 + 0.9 * $thrash)), $dark);
+
+    // A cold glow around it, then the buffer composited once.
+    $gw = (int) round(2 * ($R + 40) * $sx);
+    $gh = (int) round(2 * 108 * $sy);
+    for ($i = 5; $i >= 1; $i--) {
+        imagefilledellipse($im, (int) round($cx), (int) round($cy), (int) round($gw * (0.55 + $i * 0.12)), (int) round($gh * (0.55 + $i * 0.10)),
+            imagecolorallocatealpha($im, 0x8F, 0xD0, 0xF0, 122 - $i));
+    }
+    imagealphablending($im, true);
+    imagecopy($im, $B, (int) round($cx - 240), (int) round($cy - 260), 0, 0, 480, 520);
+    imagedestroy($B);
+}
+
+// A ghost-hunter in silhouette, facing right when $dir = 1 (mirrored for -1);
+// ($x, $gy) is the ground under his feet. $pose is 'run' (legs and arms
+// pumping), 'walk' (an easy stroll), 'fight' (braced and leaning back, wand aimed at ($tx, $ty), a pack
+// that flickers) or 'cheer' (both arms up). Returns the wand tip in page
+// coordinates for a 'fight', so the beam can start there. $tug (0..1) is how
+// hard the ghost is yanking: he leans back harder into it.
+function ig_austin_buster($im, $x, $gy, $sc, $dir, $pose, $f, $tx, $ty, $col, $tug = 0.0) {
+    $t = intdiv($f, 2);
+    $lean = $pose === 'fight' ? -0.30 - 0.12 * $tug + 0.05 * sin($t * 1.9 + $x) : ($pose === 'run' ? 0.14 : ($pose === 'walk' ? 0.03 : -0.06));
+    $T = fn($lx, $ly) => [(int) round($x + $dir * $lx * $sc), (int) round($gy + $ly * $sc)];
+    $R = function ($lx, $ly) use ($lean) {
         $dx = $lx; $dy = $ly + 50;
-        return [$dx * cos($pitch) - $dy * sin($pitch), $dx * sin($pitch) + $dy * cos($pitch) - 50];
+        return [$dx * cos($lean) - $dy * sin($lean), $dx * sin($lean) + $dy * cos($lean) - 50];
     };
-    $polyG = function (array $pts) use ($im, $col, $T) {      // points already in figure space
+    $polyG = function (array $pts, $c = null) use ($im, $col, $T) {
         $flat = [];
-        foreach ($pts as [$x, $y]) { [$a, $b] = $T($x, $y); $flat[] = $a; $flat[] = $b; }
-        imagefilledpolygon($im, $flat, $col);
+        foreach ($pts as [$px, $py]) { [$a, $b] = $T($px, $py); $flat[] = $a; $flat[] = $b; }
+        imagefilledpolygon($im, $flat, $c ?? $col);
     };
-    $poly = function (array $pts) use ($polyG, $R) {          // points in body space (rocked)
-        $polyG(array_map(fn($p) => $R($p[0], $p[1]), $pts));
-    };
-    $limbG = function ($x1, $y1, $x2, $y2, $w1, $w2) use ($polyG) {
+    $limbG = function ($x1, $y1, $x2, $y2, $w1, $w2, $c = null) use ($polyG) {
         $len = max(1.0, hypot($x2 - $x1, $y2 - $y1));
         $nx = -($y2 - $y1) / $len; $ny = ($x2 - $x1) / $len;
         $polyG([[$x1 + $nx * $w1 / 2, $y1 + $ny * $w1 / 2], [$x2 + $nx * $w2 / 2, $y2 + $ny * $w2 / 2],
-                [$x2 - $nx * $w2 / 2, $y2 - $ny * $w2 / 2], [$x1 - $nx * $w1 / 2, $y1 - $ny * $w1 / 2]]);
+                [$x2 - $nx * $w2 / 2, $y2 - $ny * $w2 / 2], [$x1 - $nx * $w1 / 2, $y1 - $ny * $w1 / 2]], $c);
     };
-    $limb = function ($x1, $y1, $x2, $y2, $w1, $w2) use ($limbG, $R) {
-        [$a, $b] = $R($x1, $y1); [$c, $d] = $R($x2, $y2);
-        $limbG($a, $b, $c, $d, $w1, $w2);
-    };
-    $ell = function ($lx, $ly, $w, $h) use ($im, $col, $T, $R, $sc) {
-        [$a, $b] = $R($lx, $ly); [$a, $b] = $T($a, $b);
-        imagefilledellipse($im, $a, $b, (int) round($w * $sc), (int) round($h * $sc), $col);
+    $ellG = function ($lx, $ly, $w, $h, $c = null) use ($im, $col, $T, $sc) {
+        [$a, $b] = $T($lx, $ly);
+        imagefilledellipse($im, $a, $b, max(1, (int) round($w * $sc)), max(1, (int) round($h * $sc)), $c ?? $col);
     };
 
-    // Where the lantern is held (the hand), and its glow, drawn first so it sits
-    // behind the figure rather than tinting it.
-    $hx = 60 + 2 * sin($ph + 1); $hy = -130 + 3 * sin($ph);
-    [$lx, $ly] = $T(...$R($hx, $hy - 13));
-    $flick = 0.8 + 0.2 * ((crc32("hl$t") % 100) / 100);
-    foreach ([[40, 116], [29, 102], [20, 86]] as [$gr, $ga]) {
-        imagefilledellipse($im, $lx, $ly, (int) round($gr * $sc * 2 * $flick), (int) round($gr * $sc * 2 * $flick), imagecolorallocatealpha($im, 0xFF, 0x9A, 0x2A, $ga));
+    // Legs: braced wide to take the pull, or swinging in a run or a stroll.
+    if ($pose === 'run' || $pose === 'walk') {
+        $walk = $pose === 'walk';
+        $phi = 2 * M_PI * $t / ($walk ? 6 : 4);
+        foreach ([0.0, M_PI] as $off) {
+            [$hx, $hy] = $R(0, -50);
+            $a1 = ($walk ? 0.55 : 0.95) * sin($phi + $off);
+            $kx = $hx + 25 * sin($a1); $ky = $hy + 25 * cos($a1);
+            $a2 = $a1 - ($walk ? 0.7 : 1.3) * max(0.0, cos($phi + $off));
+            $fx = $kx + 25 * sin($a2); $fy = $ky + 25 * cos($a2);
+            $limbG($hx, $hy, $kx, $ky, 13, 9);
+            $limbG($kx, $ky, $fx, $fy, 9, 7);
+            $polyG([[$fx - 4, $fy - 3], [$fx + 9, $fy - 3], [$fx + 9, $fy + 3], [$fx - 4, $fy + 3]]);
+        }
+    } else {
+        [$hx, $hy] = $R(0, -50);
+        foreach ([[18, -26, 20, 0], [-18, -24, -24, 0]] as [$kx, $ky, $fx, $fy]) {
+            $limbG($hx, $hy, $kx, $ky, 14, 10);
+            $limbG($kx, $ky, $fx, $fy, 10, 8);
+            $polyG([[$fx - 5, $fy - 3], [$fx + 9, $fy - 3], [$fx + 9, $fy + 3], [$fx - 5, $fy + 3]]);
+        }
     }
 
-    // Dust kicked up behind the hooves, drifting back and fading as it grows.
-    for ($i = 0; $i < 4; $i++) {
-        $age = (($t + $i * 3 / 2) % 6) / 6;
-        [$dx, $dy] = $T(-52 - $age * 90, -4 - $age * 16);
-        $dr = (int) round((7 + 17 * $age) * $sc);
-        imagefilledellipse($im, $dx, $dy, $dr * 2, (int) round($dr * 1.3), imagecolorallocatealpha($im, 0x9C, 0x86, 0x6A, 88 + (int) round(34 * $age)));
-    }
+    // Torso, pack, head and cap.
+    [$h1x, $h1y] = $R(0, -50); [$s1x, $s1y] = $R(-2, -90);
+    $limbG($h1x, $h1y, $s1x, $s1y, 24, 22);
+    $packCol = imagecolorallocate($im, 0x40, 0x2C, 0x4C);
+    $polyG([$R(-8, -92), $R(-34, -90), $R(-36, -56), $R(-10, -54)], $packCol);
+    [$hdx, $hdy] = $R(0, -106);
+    $ellG($hdx, $hdy, 21, 24);
+    $polyG([[$hdx + 2, $hdy - 10], [$hdx + 17, $hdy - 6], [$hdx + 2, $hdy - 3]]);
+    $ellG($hdx - 1, $hdy - 7, 23, 12);
+    // Pack lights: a cyclotron that flickers, and a red indicator.
+    $flick = (crc32("bp$t") % 100) > 35;
+    [$lpx, $lpy] = $R(-22, -82);
+    [$px1, $py1] = $T($lpx, $lpy);
+    imagefilledellipse($im, $px1, $py1, (int) round(15 * $sc), (int) round(15 * $sc), imagecolorallocatealpha($im, 0x6F, 0xD8, 0xFF, $flick ? 70 : 108));
+    imagefilledellipse($im, $px1, $py1, (int) round(7 * $sc), (int) round(7 * $sc), imagecolorallocate($im, $flick ? 0xE8 : 0x7A, $flick ? 0xFB : 0xB8, 0xFF));
+    [$rpx, $rpy] = $R(-22, -66);
+    [$px2, $py2] = $T($rpx, $rpy);
+    imagefilledellipse($im, $px2, $py2, max(3, (int) round(6 * $sc)), max(3, (int) round(6 * $sc)), imagecolorallocate($im, 0xFF, 0x4A, 0x3A));
 
-    // Legs: long upper and lower segments; the lower folds up as the leg
-    // comes forward. Hips ride the rocking body.
-    $leg = function ($hx, $hy, $phi, $mid, $amp) use ($limbG, $polyG, $R) {
-        [$hx, $hy] = $R($hx, $hy);
-        $a1 = $mid + $amp * sin($phi);
-        $kx = $hx + 29 * sin($a1); $ky = $hy + 29 * cos($a1);
-        $a2 = $a1 - 1.35 * max(0.0, cos($phi));
-        $fx = $kx + 29 * sin($a2); $fy = $ky + 29 * cos($a2);
-        $limbG($hx, $hy, $kx, $ky, 14, 8);
-        $limbG($kx, $ky, $fx, $fy, 8, 5);
-        $polyG([[$fx - 3, $fy - 3], [$fx + 5, $fy - 3], [$fx + 7, $fy + 3], [$fx - 3, $fy + 3]]);
+    // The plasma rifle: a boxy body with a grip, a coil housing on top, a barrel
+    // shroud with cooling fins and a flared emitter. Drawn along the unit vector
+    // ($ux, $uy), with "down" the way $n points; $o is its origin. Returns the
+    // muzzle (local coordinates).
+    $gun = function ($ox, $oy, $ux, $uy) use ($polyG, $im) {
+        $nx = -$uy; $ny = $ux;
+        $pt = fn($d, $q) => [$ox + ($ux * $d + $nx * $q) * 0.8, $oy + ($uy * $d + $ny * $q) * 0.8];
+        $body = imagecolorallocate($im, 0x58, 0x40, 0x68);
+        $dark = imagecolorallocate($im, 0x2A, 0x1B, 0x34);
+        $cyan = imagecolorallocate($im, 0x6F, 0xD8, 0xFF);
+        $polyG([$pt(-4, 8), $pt(9, 8), $pt(7, 27), $pt(-7, 25)], $dark);            // grip
+        $polyG([$pt(-12, -9), $pt(26, -9), $pt(26, 9), $pt(-12, 9)], $body);        // body
+        $polyG([$pt(-6, -9), $pt(22, -9), $pt(22, -16), $pt(-6, -16)], $dark);      // coil housing
+        $polyG([$pt(26, -6), $pt(48, -6), $pt(48, 6), $pt(26, 6)], $dark);          // barrel shroud
+        foreach ([30, 36, 42] as $d) $polyG([$pt($d, -10), $pt($d + 3, -10), $pt($d + 3, 10), $pt($d, 10)], $body);   // fins
+        $polyG([$pt(48, -5), $pt(61, -13), $pt(61, 13), $pt(48, 5)], $body);        // flared emitter
+        $polyG([$pt(58, -9), $pt(62, -9), $pt(62, 9), $pt(58, 9)], $dark);          // muzzle ring
+        $polyG([$pt(-2, -5), $pt(20, -5), $pt(20, -1), $pt(-2, -1)], $cyan);        // glowing coil
+        return $pt(62, 0);
     };
-    $leg(-32, -46, $ph + M_PI + 0.8, -0.05, 0.85);
-    $leg(28, -44, $ph + 0.8, 0.10, 0.95);
-    $leg(-32, -46, $ph + M_PI, -0.05, 0.85);
-    $leg(28, -44, $ph, 0.10, 0.95);
+    // Hold the rifle by its grip at ($hx, $hy), pointing along ($ux, $uy).
+    $hold = function ($hx, $hy, $ux, $uy) use ($gun) {
+        return $gun($hx - 1.6 * $ux - 12.8 * (-$uy), $hy - 1.6 * $uy - 12.8 * $ux, $ux, $uy);
+    };
 
-    // Body, arched neck, head and ears.
-    $ell(0, -52, 88, 36);
-    $ell(-32, -54, 46, 40);
-    $ell(28, -54, 40, 42);
-    $limb(20, -60, 38, -88, 32, 20);
-    $limb(38, -88, 52, -100, 20, 15);
-    $limb(52, -100, 82, -86, 15, 9);
-    $poly([[50, -104], [45, -120], [57, -108]]);
-    $poly([[54, -104], [54, -119], [63, -105]]);
-    // Mane and tail streaming back on the wind.
-    $mane = [[24, -66], [50, -104]];
-    for ($i = 0; $i <= 4; $i++) {
-        $u = $i / 4;
-        $mane[] = [50 - 30 * $u - 12 * (1 + sin($ph + 1.2 * $i)) * $u, -104 + 36 * $u + 5 * sin($ph + $i)];
+    $tip = null;
+    [$sx0, $sy0] = [$s1x, $s1y];
+    if ($pose === 'fight') {
+        [$swx, $swy] = $T($sx0, $sy0);
+        $dxl = $dir * ($tx - $swx) / $sc; $dyl = ($ty - $swy) / $sc;
+        $len = max(1.0, hypot($dxl, $dyl));
+        $ux = $dxl / $len; $uy = $dyl / $len;
+        $handx = $sx0 + 30 * $ux; $handy = $sy0 + 30 * $uy;
+        $elbx  = $sx0 + 15 * (cos(0.55) * $ux - sin(0.55) * $uy) + 2; $elby = $sy0 + 15 * (sin(0.55) * $ux + cos(0.55) * $uy) + 4;
+        $limbG($sx0, $sy0, $elbx, $elby, 10, 8);
+        $limbG($elbx, $elby, $handx, $handy, 8, 7);
+        $muz = $hold($handx, $handy, $ux, $uy);
+        // The other hand steadies the barrel.
+        $h2x = $handx + 30 * $ux - 4 * (-$uy) + 0; $h2y = $handy + 30 * $uy - 4 * $ux;
+        $limbG($sx0 + 2, $sy0 + 4, ($sx0 + $h2x) / 2, ($sy0 + $h2y) / 2 + 10, 9, 7);
+        $limbG(($sx0 + $h2x) / 2, ($sy0 + $h2y) / 2 + 10, $h2x, $h2y, 7, 6);
+        // The hose from the pack to the rifle, sagging.
+        [$hsx, $hsy] = $R(-30, -72);
+        $mx = ($hsx + $handx) / 2; $my = max($hsy, $handy) + 18;
+        $limbG($hsx, $hsy, $mx, $my, 4, 4);
+        $limbG($mx, $my, $handx - 14 * $ux, $handy - 14 * $uy, 4, 4);
+        $tip = $T($muz[0], $muz[1]);
+    } elseif ($pose === 'cheer') {
+        $limbG($sx0, $sy0, 16, -118, 10, 8);
+        $limbG($sx0, $sy0, -10, -124, 10, 8);
+        $ellG(-10, -128, 11, 11);
+        $hold(16, -118, 0.28, -0.96);
+    } else {
+        $sw = ($pose === 'walk' ? 8 : 14) * sin(2 * M_PI * $t / ($pose === 'walk' ? 6 : 4));
+        $limbG($sx0, $sy0, 12 + $sw, -76, 10, 8);
+        $limbG($sx0, $sy0, 10 - $sw, -76, 10, 8);
+        $limbG(12 + $sw, -76, 34, -70, 8, 7);
+        $hold(34, -70, 0.94, 0.34);     // carried low, pointing forward and down
     }
-    $poly($mane);
-    foreach ([[0, 0], [5, 9]] as [$ox, $oy]) {
-        $p0 = [-46, -62 + $oy];
-        $p1 = [-66 - $ox, -62 + $oy + 7 * sin($ph)];
-        $p2 = [-90 - $ox, -54 + $oy + 11 * sin($ph + 1)];
-        $p3 = [-112 - $ox, -60 + $oy + 13 * sin($ph + 2)];
-        $limb($p0[0], $p0[1], $p1[0], $p1[1], 11, 8);
-        $limb($p1[0], $p1[1], $p2[0], $p2[1], 8, 5);
-        $limb($p2[0], $p2[1], $p3[0], $p3[1], 5, 1);
+    return $tip;
+}
+
+// A braided pair of beams from each wand tip to the ghost: three passes (a wide
+// glow, a bright body, a white core) along a line that weaves and crackles.
+function ig_austin_beam($im, $x1, $y1, $x2, $y2, $f, $k, $strength) {
+    $t = intdiv($f, 2);
+    $len = max(1.0, hypot($x2 - $x1, $y2 - $y1));
+    $nx = -($y2 - $y1) / $len; $ny = ($x2 - $x1) / $len;
+    $N = max(8, (int) round($len / 28));
+    $pts = [];
+    for ($i = 0; $i <= $N; $i++) {
+        $u = $i / $N;
+        $amp = 11 * sin(M_PI * $u) * $strength;
+        $off = $amp * sin($u * 9 + $t * 1.9 + $k * M_PI) + ((crc32("bm$k:$t:$i") % 100) / 100 - 0.5) * 7 * sin(M_PI * $u);
+        $pts[] = [$x1 + ($x2 - $x1) * $u + $nx * $off, $y1 + ($y2 - $y1) * $u + $ny * $off];
+    }
+    foreach ([[15, imagecolorallocatealpha($im, 0xFF, 0x8A, 0x1F, 108)], [7, imagecolorallocatealpha($im, 0xFF, 0xC8, 0x3A, 40)], [3, imagecolorallocate($im, 0xFF, 0xFC, 0xE6)]] as [$th, $c]) {
+        imagesetthickness($im, $th);
+        for ($i = 0; $i < $N; $i++) imageline($im, (int) round($pts[$i][0]), (int) round($pts[$i][1]), (int) round($pts[$i + 1][0]), (int) round($pts[$i + 1][1]), $c);
+    }
+    imagesetthickness($im, 1);
+}
+
+// The trap: a flat box on the ground whose doors fly open ($open 0..1) on a
+// fan of light.
+function ig_austin_trap($im, $x, $gy, $open, $f) {
+    $box = imagecolorallocate($im, 0x2B, 0x1E, 0x33);
+    if ($open > 0.02) {
+        $flick = 0.85 + 0.15 * ((crc32('tf' . intdiv($f, 2)) % 100) / 100);
+        $h = (int) round(190 * $open * $flick);
+        imagefilledellipse($im, $x, $gy - 18, (int) round(210 * $open), (int) round(60 * $open), imagecolorallocatealpha($im, 0xFF, 0xE0, 0x7A, 92));
+        imagefilledpolygon($im, [$x - 34, $gy - 17, $x - 78, $gy - 17 - $h, $x + 78, $gy - 17 - $h, $x + 34, $gy - 17], imagecolorallocatealpha($im, 0xFF, 0xE8, 0x8A, 86));
+        imagefilledpolygon($im, [$x - 20, $gy - 17, $x - 40, $gy - 17 - $h, $x + 40, $gy - 17 - $h, $x + 20, $gy - 17], imagecolorallocatealpha($im, 0xFF, 0xFF, 0xE0, 78));
+    }
+    imagefilledrectangle($im, $x - 44, $gy - 14, $x + 44, $gy, $box);
+    imagefilledrectangle($im, $x - 44, $gy - 14, $x + 44, $gy - 10, imagecolorallocate($im, 0xE8, 0xB9, 0x23));
+    foreach ([-1, 1] as $side) {
+        $ang = deg2rad(8 + 62 * $open);
+        $hx = $x + $side * 40; $hy = $gy - 15;
+        imagefilledpolygon($im, [(int) $hx, (int) $hy, (int) round($hx - $side * 6 * cos($ang)), (int) round($hy - 6 * sin($ang)),
+            (int) round($hx - $side * (46 * cos($ang)) - $side * 0), (int) round($hy - 46 * sin($ang)), (int) round($hx - $side * 52 * cos($ang)), (int) round($hy - 48 * sin($ang) + 6)], $box);
+    }
+}
+
+/**
+ * The whole capture, over the 336-frame loop (28s; the tumbleweed has the
+ * first 100). The ghost drifts in over the listings at frame 12 and floats
+ * about; at 56 the two hunters stroll on together from the left and plant
+ * themselves by 134; the trap is slid out at 140; the beams strike at 150 and
+ * for four seconds the ghost fights them — surging away, yanking the hunters
+ * forward, being dragged back (150-200); it tires, and is hauled straight down
+ * the page over the screenings (200-252); stretched into the open trap
+ * (252-279); the doors slam, smoke, a cheer (279-293); and the hunters run off
+ * right (293-329) as the smoke fades. Everything is off the card at the loop's
+ * ends.
+ */
+function ig_austin_capture($im, $w, $gyFn, $f, $ink) {
+    if ($f < 12 || $f >= 330) return;
+    $prog = fn($a, $b) => max(0.0, min(1.0, ($f - $a) / ($b - $a)));
+    $ease = fn($u) => $u * $u * (3 - 2 * $u);
+    $S1 = 470; $S2 = 600; $TX = 830;      // the hunters' places, and the trap
+    $ground = (int) $gyFn($TX) + 2;
+    $wander = fn($g) => [700 + 280 * sin($g * 0.045), 470 + 130 * sin($g * 0.07 + 1)];
+    // The tug of war: a surge 0..1 (away from the hunters), once every 22 frames,
+    // that weakens as the ghost tires.
+    $surge = function ($g) {
+        $amp = 1 - 0.45 * max(0.0, min(1.0, ($g - 150) / 50));
+        return [0.5 - 0.5 * cos(2 * M_PI * ($g - 150) / 22) , $amp];
+    };
+    $tugPos = function ($g) use ($TX, $surge) {
+        [$sv, $amp] = $surge($g);
+        $k = $sv * $amp;
+        return [$TX + 100 * $k + 5 * sin($g * 2.3), 520 - 80 * $k, -0.15 * $k, $k];
+    };
+
+    // Where the ghost is.
+    $ghost = null; $tug = 0.0;
+    if ($f < 279) {
+        $thrash = 0.0; $sx = 1.0; $sy = 1.0; $shear = 0.0;
+        if ($f < 130) {
+            [$wx, $wy] = $wander($f);
+            if ($f < 40) {
+                $e = $ease($prog(12, 40));
+                [$ex, $ey] = $wander(40);
+                $gx = 1230 + ($ex - 1230) * $e; $gy = 280 + ($ey - 280) * $e;
+            } else {
+                $gx = $wx; $gy = $wy;
+            }
+            $shear = 0.05 * sin($f * 0.2);
+        } elseif ($f < 150) {
+            // Settle where the beams will find it, startled as the hunters arrive.
+            [$wx, $wy] = $wander(130);
+            $e = $ease($prog(130, 150));
+            $gx = $wx + ($TX - $wx) * $e; $gy = $wy + (520 - $wy) * $e;
+            $thrash = 0.5 * $prog(138, 152);
+        } elseif ($f < 200) {
+            [$gx, $gy, $shear, $tug] = $tugPos($f);
+            $thrash = 1.0;
+        } elseif ($f < 252) {
+            [$px, $py, $psh] = $tugPos(200);
+            $e = $ease($prog(200, 252));
+            $thrash = 1.0;
+            $gx = $px + ($TX - $px) * $e + 28 * sin(($f - 200) * 0.6) * (1 - $e);
+            $gy = $py + (1230 - $py) * $e - 24 * abs(sin(($f - 200) * 0.5)) * (1 - $e);
+            $shear = $psh * (1 - $e) + 0.10 * sin(($f - 200) * 0.6) * (1 - $e);
+            $tug = 0.25 * (1 - $e);
+        } else {
+            $q = $prog(252, 279);
+            $thrash = 1.0;
+            $gx = $TX + 26 * sin($q * 15) * (1 - $q);
+            $gy = 1230 + (1292 - 1230) * $q;
+            $sx = max(0.06, 1 - 0.9 * $q);
+            $sy = max(0.06, (1 - 0.55 * $q) * (1 + 0.55 * sin($q * M_PI)));
+        }
+        $ghost = [$gx, $gy, $sx, $sy, $shear, $thrash];
+        // Drawn only above the trap's slot, so the end of it disappears into the trap.
+        imagesetclip($im, 0, 0, $w - 1, $ground - 15);
+        ig_austin_ghost($im, $gx, $gy, $sx, $sy, $shear, $f, $thrash);
+        imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
     }
 
-    // The rider, leaning forward into the ride: torso, a ragged neck stump in a
-    // high collar and no head, reins in one hand and the lantern held up high.
-    $limb(-4, -64, 17, -100, 18, 15);
-    $limb(17, -100, 20, -110, 11, 10);
-    $poly([[8, -98], [29, -98], [27, -109], [10, -109]]);
-    $poly([[11, -109], [14, -113], [17, -109], [20, -114], [23, -109]]);
-    $limb(10, -62, 22, -46, 12, 9);
-    $limb(22, -46, 12, -33, 9, 6);
-    $limb(-4, -64, 10, -48, 13, 10);
-    $limb(10, -48, 2, -34, 10, 6);
-    $limb(20, -92, 38, -78, 8, 5);
-    $ell(0, -62, 26, 24);
-    $limb(20, -99, 40, -118, 10, 8);
-    $limb(40, -118, $hx, $hy + 4, 8, 6);
-    // The cloak, tattered and whipping out behind in a long wave.
-    $top = []; $bot = [];
-    for ($i = 0; $i <= 8; $i++) {
-        $u = $i / 8;
-        $wy = 9 * $u * sin($ph - 3.2 * $u);
-        $top[] = [14 - 96 * $u, -100 + 5 * $u + $wy];
-        $bot[] = [14 - 96 * $u - ($i % 2 ? 7 : 0), -86 + 22 * $u + $wy + ($i % 2 ? 10 * $u : -3 * $u)];
+    // The trap, slid across the ground, opening for the ghost, vanishing in the smoke.
+    if ($f >= 140 && $f < 302) {
+        $tx = $f < 146 ? $S2 + 110 + ($TX - $S2 - 110) * $ease($prog(140, 146)) : $TX;
+        $open = $f < 248 ? 0.0 : ($f < 258 ? $prog(248, 258) : ($f < 279 ? 1.0 : 1 - $prog(279, 282)));
+        ig_austin_trap($im, (int) round($tx), $ground, $open, $f);
     }
-    $poly(array_merge($top, array_reverse($bot)));
 
-    // The lantern itself: the pumpkin, a stem and a bright carved face.
-    $rp = max(6, (int) round(15 * $sc));
-    imagefilledellipse($im, $lx, $ly, $rp * 2, (int) round($rp * 1.8), imagecolorallocate($im, 0xE8, 0x7A, 0x1C));
-    imagefilledrectangle($im, $lx - 1, $ly - (int) round($rp * 0.95) - 3, $lx + 1, $ly - (int) round($rp * 0.8), $col);
-    $glow = imagecolorallocate($im, 0xFF, 0xEC, 0xA0);
-    $e = max(2, (int) round(4 * $sc));
-    imagefilledpolygon($im, [$lx - (int) round(7 * $sc), $ly - 1, $lx - 2, $ly - 1, $lx - (int) round(4.5 * $sc), $ly - 1 - $e], $glow);
-    imagefilledpolygon($im, [$lx + 2, $ly - 1, $lx + (int) round(7 * $sc), $ly - 1, $lx + (int) round(4.5 * $sc), $ly - 1 - $e], $glow);
-    imagefilledrectangle($im, $lx - (int) round(6 * $sc), $ly + (int) round(4 * $sc), $lx + (int) round(6 * $sc), $ly + (int) round(6 * $sc), $glow);
+    // The two hunters, side by side the whole way.
+    foreach ([[$S2, 0], [$S1, 1]] as [$stand, $n]) {
+        $tip = null;
+        if ($f < 134) {
+            if ($f < 56) continue;
+            $x = ($stand - 660) + 660 * $prog(56, 134);
+            ig_austin_buster($im, $x, $gyFn($x) + 3, 1.12, 1, 'walk', $f, 0, 0, $ink);
+        } elseif ($f < 279) {
+            $aim = $ghost ?? [$TX, 700];
+            // Yanked forward a few pixels at each surge.
+            $x = $stand + 14 * $tug;
+            $tip = ig_austin_buster($im, $x, $gyFn($x) + 3, 1.12, 1, 'fight', $f, $aim[0], $aim[1], $ink, $tug);
+            if ($f >= 150 && $ghost) {
+                $str = (1.0 - 0.6 * max(0, ($f - 252) / 27)) * (1 + 0.5 * $tug);
+                ig_austin_beam($im, $tip[0], $tip[1], $ghost[0], $ghost[1], $f, $n, $str);
+                imagefilledellipse($im, (int) round($tip[0]), (int) round($tip[1]), 26, 26, imagecolorallocatealpha($im, 0xFF, 0xE0, 0x7A, 60));
+            }
+        } elseif ($f < 293) {
+            ig_austin_buster($im, $stand, $gyFn($stand) + 3, 1.12, 1, 'cheer', $f, 0, 0, $ink);
+        } elseif ($f < 329) {
+            $x = $stand + (1260 - $stand) * $ease($prog(293, 329));
+            ig_austin_buster($im, $x, $gyFn($x) + 3, 1.12, 1, 'run', $f, 0, 0, $ink);
+        }
+    }
+
+    // Smoke from the trap once the doors have slammed.
+    if ($f >= 279) {
+        for ($i = 0; $i < 7; $i++) {
+            $birth = 280 + $i * 2;
+            $age = ($f - $birth) / (329 - $birth);     // every puff has faded by frame 329
+            if ($age < 0 || $age > 1) continue;
+            $px = $TX + ($i - 3) * 16 + 14 * sin($age * 5 + $i);
+            $py = $ground - 20 - $age * (90 + 14 * $i);
+            $pr = (int) round(20 + 46 * $age);
+            imagefilledellipse($im, (int) round($px), (int) round($py), $pr * 2, (int) round($pr * 1.5), imagecolorallocatealpha($im, 0x9A, 0x8E, 0x9C, 70 + (int) round(50 * $age)));
+        }
+    }
+}
+
+// ── The Big Wheel and the twins ──────────────────────────────────────────
+// The second half of the loop: the ground becomes the Overlook's hexagon carpet, a
+// boy rides a Big Wheel along it, stops, and two little girls in matching dresses
+// flicker into place at the end of the corridor, holding hands.
+
+function ig_austin_poly($im, array $pts, $c) {
+    $flat = [];
+    foreach ($pts as [$x, $y]) { $flat[] = (int) round($x); $flat[] = (int) round($y); }
+    imagefilledpolygon($im, $flat, $c);
+}
+
+function ig_austin_limb($im, $x1, $y1, $x2, $y2, $w1, $w2, $c) {
+    $len = max(1.0, hypot($x2 - $x1, $y2 - $y1));
+    $nx = -($y2 - $y1) / $len; $ny = ($x2 - $x1) / $len;
+    ig_austin_poly($im, [[$x1 + $nx * $w1 / 2, $y1 + $ny * $w1 / 2], [$x2 + $nx * $w2 / 2, $y2 + $ny * $w2 / 2],
+        [$x2 - $nx * $w2 / 2, $y2 - $ny * $w2 / 2], [$x1 - $nx * $w1 / 2, $y1 - $ny * $w1 / 2]], $c);
+}
+
+function ig_austin_ell($im, $x, $y, $w, $h, $c) {
+    imagefilledellipse($im, (int) round($x), (int) round($y), max(1, (int) round($w)), max(1, (int) round($h)), $c);
+}
+
+function ig_austin_prog($f, $a, $b) { return max(0.0, min(1.0, ($f - $a) / ($b - $a))); }
+
+// The carpet, a strip $y0 down to the bottom of the card: the Overlook's
+// interlocking hexagons in four rings, with a dark skirting board along the top.
+function ig_austin_carpet($im, $w, $h, $y0) {
+    imagefilledrectangle($im, 0, $y0, $w, $h, ig_hex($im, '#6E2A1E'));
+    $rx = 34; $ry = 13; $dx = $rx * 1.732; $dy = $ry * 1.5;
+    $hex = function ($cx, $cy, $sx, $sy, $c) use ($im) {
+        $pts = [];
+        for ($k = 0; $k < 6; $k++) { $a = deg2rad(30 + 60 * $k); $pts[] = [$cx + $sx * cos($a), $cy + $sy * sin($a)]; }
+        ig_austin_poly($im, $pts, $c);
+    };
+    $c1 = ig_hex($im, '#C9661C'); $c2 = ig_hex($im, '#2B1A17'); $c3 = ig_hex($im, '#7A2C1D'); $c4 = ig_hex($im, '#B8975A');
+    for ($row = 0; ; $row++) {
+        $y = $y0 + $ry * 0.6 + $row * $dy;
+        if ($y > $h + $ry) break;
+        for ($x = ($row % 2 ? $dx / 2 : 0) - $dx; $x < $w + $dx; $x += $dx) {
+            $hex($x, $y, $rx * 0.98, $ry * 0.98, $c1); $hex($x, $y, $rx * 0.78, $ry * 0.78, $c2);
+            $hex($x, $y, $rx * 0.52, $ry * 0.52, $c3); $hex($x, $y, $rx * 0.2, $ry * 0.2, $c4);
+        }
+    }
+    imagefilledrectangle($im, 0, $y0 - 10, $w, $y0, ig_hex($im, '#2A1A14'));
+    imagefilledrectangle($im, 0, $y0 - 12, $w, $y0 - 10, ig_hex($im, '#5A3A28'));
+}
+
+// A boy on a Big Wheel (a tricycle with a huge front wheel), pedalling; $x is the
+// middle of the back wheel, $gy the ground, and the front wheel turns as it rolls.
+function ig_austin_bigwheel($im, $x, $gy, $ink, $f) {
+    $a = $x / 26;
+    $gy += 1.5 * sin(intdiv($f, 2) * 1.9);
+    $red = ig_hex($im, '#E04A2B'); $yel = ig_hex($im, '#F0C020'); $grey = ig_hex($im, '#8A8A92'); $spoke = ig_hex($im, '#F4A88F');
+    ig_austin_ell($im, $x - 30, $gy - 9, 19, 19, $ink); ig_austin_ell($im, $x - 30, $gy - 9, 7, 7, $grey);
+    ig_austin_limb($im, $x - 8, $gy - 20, $x + 22, $gy - 26, 5, 5, $ink);
+    ig_austin_ell($im, $x + 22, $gy - 26, 54, 54, $ink);
+    ig_austin_ell($im, $x + 22, $gy - 26, 40, 40, $red);
+    imagesetthickness($im, 4);
+    foreach ([0, M_PI] as $o) imageline($im, (int) round($x + 22), (int) round($gy - 26), (int) round($x + 22 + 17 * cos($a + $o)), (int) round($gy - 26 + 17 * sin($a + $o)), $spoke);
+    imagesetthickness($im, 1);
+    ig_austin_ell($im, $x + 22, $gy - 26, 9, 9, $ink);
+    ig_austin_poly($im, [[$x - 44, $gy - 25], [$x - 8, $gy - 22], [$x - 6, $gy - 13], [$x - 42, $gy - 13]], $yel);
+    // the boy: body, head with a tuft of hair, legs on the pedals, arms on the bars
+    $hip = [$x - 22, $gy - 30]; $sh = [$x - 14, $gy - 58];
+    ig_austin_limb($im, $hip[0], $hip[1], $sh[0], $sh[1], 14, 12, $ink);
+    ig_austin_ell($im, $x - 12, $gy - 71, 21, 23, $ink);
+    ig_austin_poly($im, [[$x - 22, $gy - 74], [$x - 18, $gy - 84], [$x - 8, $gy - 82], [$x - 1, $gy - 75], [$x - 6, $gy - 70]], $ink);
+    foreach ([0, M_PI] as $o) {
+        $foot = [$x + 22 + 13 * cos($a + $o), $gy - 26 + 13 * sin($a + $o)];
+        $knee = [($hip[0] + $foot[0]) / 2 + 4, ($hip[1] + $foot[1]) / 2 - 12];
+        ig_austin_limb($im, $hip[0], $hip[1], $knee[0], $knee[1], 10, 8, $ink); ig_austin_limb($im, $knee[0], $knee[1], $foot[0], $foot[1], 8, 6, $ink);
+        ig_austin_ell($im, $foot[0] + 2, $foot[1], 11, 6, $ink);
+    }
+    ig_austin_limb($im, $x + 22, $gy - 26, $x + 14, $gy - 60, 5, 5, $ink);
+    ig_austin_limb($im, $x + 7, $gy - 60, $x + 26, $gy - 60, 5, 5, $ink);
+    ig_austin_limb($im, $sh[0], $sh[1], $x, $gy - 50, 8, 6, $ink); ig_austin_limb($im, $x, $gy - 50, $x + 17, $gy - 60, 6, 5, $ink);
+}
+
+// One of the twins: pale blue dress, white socks, dark hair, one hand reaching for
+// her sister's at $reachX.
+function ig_austin_twin($im, $cx, $gy, $ink, $reachX) {
+    $skin = ig_hex($im, '#EBD2C0'); $dress = ig_hex($im, '#9CC4E4'); $hair = ig_hex($im, '#2A1A22'); $sock = ig_hex($im, '#F6F2EA');
+    foreach ([-6, 6] as $dx) { ig_austin_limb($im, $cx + $dx, $gy - 38, $cx + $dx, $gy - 8, 7, 6, $sock); ig_austin_ell($im, $cx + $dx + 2, $gy - 5, 14, 8, $ink); }
+    $side = $reachX > $cx ? 1 : -1;
+    ig_austin_limb($im, $cx - $side * 13, $gy - 64, $cx - $side * 22, $gy - 40, 7, 6, $dress);
+    ig_austin_limb($im, $cx + $side * 13, $gy - 64, $reachX, $gy - 40, 7, 6, $dress);
+    ig_austin_ell($im, $reachX, $gy - 38, 7, 7, $skin);
+    $d = [[$cx - 14, $gy - 66], [$cx + 14, $gy - 66], [$cx + 25, $gy - 34], [$cx - 25, $gy - 34]];
+    ig_austin_poly($im, $d, $dress);
+    imagesetthickness($im, 2);
+    imagepolygon($im, array_merge(...array_map(fn($p) => [(int) $p[0], (int) $p[1]], $d)), $ink);
+    imagesetthickness($im, 1);
+    ig_austin_poly($im, [[$cx - 8, $gy - 66], [$cx + 8, $gy - 66], [$cx, $gy - 56]], $sock);
+    ig_austin_ell($im, $cx, $gy - 84, 27, 27, $hair);
+    ig_austin_limb($im, $cx - 12, $gy - 82, $cx - 12, $gy - 64, 6, 5, $hair); ig_austin_limb($im, $cx + 12, $gy - 82, $cx + 12, $gy - 64, 6, 5, $hair);
+    ig_austin_ell($im, $cx, $gy - 79, 22, 22, $skin);
+    ig_austin_ell($im, $cx - 4, $gy - 80, 3, 4, $ink); ig_austin_ell($im, $cx + 4, $gy - 80, 3, 4, $ink);
+    imageline($im, (int) $cx - 3, (int) $gy - 71, (int) $cx + 3, (int) $gy - 71, $ink);
+}
+
+/**
+ * The second half of the loop, $g = 0..191 (frames 336-527). The carpet slides up over
+ * the hills (0-10); the boy rolls in from the left, slowing to a stop (14-112); the
+ * twins flicker into place at the far end of the corridor (112-124), stand holding
+ * hands (to 160) and flicker out (160-170); the boy rides off right (150-190); and
+ * the carpet sinks away (182-191). Everything is gone by the loop's end.
+ */
+function ig_austin_twins($im, $w, $h, $g, $ink) {
+    $ease = fn($u) => $u * $u * (3 - 2 * $u);
+    $p = $ease(ig_austin_prog($g, 0, 10)) * (1 - $ease(ig_austin_prog($g, 182, 191)));
+    if ($p < 0.01) return;
+    ig_austin_carpet($im, $w, $h, (int) round($h + 12 - 56 * $p));
+    $gy = $h - 18;
+    $u = ig_austin_prog($g, 14, 112);
+    $x = -90 + 650 * (1 - (1 - $u) * (1 - $u));
+    if ($g >= 150) $x = 560 + 700 * pow($ease(ig_austin_prog($g, 150, 190)), 1.5);
+    if ($g < 190 && $g >= 14) ig_austin_bigwheel($im, $x, $gy, $ink, $g);
+    $hash = fn($k) => crc32($k) % 100;
+    $vis = $g < 112 ? false : ($g < 124 ? $hash("tw$g") < 55 : ($g < 160 ? true : ($g < 170 ? $hash("tw$g") < 45 : false)));
+    if ($vis) { ig_austin_twin($im, 760, $gy, $ink, 795); ig_austin_twin($im, 830, $gy, $ink, 795); }
 }
 
 // The ground along the bottom of the card, to match the hills in the sky
 // strip: prickly pears on it and, on request, the two things that cross the
-// whole width of the page — the tumbleweed and the Headless Horseman — in
-// front of the footer line, the last thing drawn so they cross everything.
+// whole page — the tumbleweed and the ghost capture — in front of the footer
+// line and the listings, the last thing drawn so they cross everything.
 function ig_austin_foreground($im, $w, $h, $f, $weed) {
     $ink = ig_hex($im, '#1E0F24');
     $pear = ig_hex($im, '#5E3C55');
@@ -4094,32 +4449,30 @@ function ig_austin_foreground($im, $w, $h, $f, $weed) {
     for ($x = 0; $x <= $w + 20; $x += 20) { $pts[] = $x; $pts[] = $gy($x); }
     array_push($pts, $w + 20, $h, 0, $h);
     imagefilledpolygon($im, $pts, $ink);
-    foreach ([[770, 1.0], [815, 0.7], [955, 1.15], [1010, 0.8]] as [$px, $sc]) {
+    foreach ([[945, 1.15], [1000, 0.8], [1045, 0.95]] as [$px, $sc]) {
         // Lighter than the ground and the figures, so what crosses in front of them reads.
         ig_austin_pear($im, $px, $gy($px) + 3, $sc, $pear);
     }
     if ($weed) {
-        // Two crossings a loop: the tumbleweed rolls left to right (frames
-        // 0-99) and the Headless Horseman gallops right to left (frames
-        // 68-147) — he catches the tumbleweed on the way. Both start and end
-        // fully off the card, so the loop joins up.
+        // The tumbleweed rolls left to right (frames 0-99); the ghost-hunters
+        // take over until frame 335 (see ig_austin_capture()), then the Big Wheel
+        // and the twins (see ig_austin_twins()). Everything starts and ends fully
+        // off the card, so the loop joins up.
         if ($f < 100) {
             $r  = 34;
             $cx = -80 + ($w + 160) * $f / 100;
             $cy = $gy($cx) - $r + 6 - 30 * abs(sin($cx / 110));
             ig_austin_tumbleweed($im, (int) round($cx), (int) round($cy), $r, $cx / $r, ig_hex($im, '#3A1D2C'));
         }
-        if ($f >= 68 && $f < 148) {
-            $cx = ($w + 110) - ($w + 220) * ($f - 68) / 80;
-            ig_austin_horseman($im, (int) round($cx), $gy($cx) + 3, 0.9, -1, $f, $ink);
-        }
+        ig_austin_capture($im, $w, $gy, $f, $ink);
+        if ($f >= IG_AUSTIN_TWINS_AT) ig_austin_twins($im, $w, $h, $f - IG_AUSTIN_TWINS_AT, $ink);
     }
 }
 
 /**
  * The whole October dusk strip, from $y0 down $sh pixels: sky, stars, moon,
  * hills, oak, tower, bats and (on request) the tumbleweed. $f is the frame in
- * the 192-frame loop, the still's frame when not animating. The caller owns
+ * the 528-frame loop, the still's frame when not animating. The caller owns
  * everything below $y0 + $sh.
  */
 function ig_austin_dusk($im, $w, $y0, $sh, $f, array $o) {
@@ -4133,8 +4486,16 @@ function ig_austin_dusk($im, $w, $y0, $sh, $f, array $o) {
     ig_austin_stars($im, $w, $y0, (int) round($sh * 0.5), $o['stars'], $f);
     ig_austin_constellation($im, $o['sign'], $o['signX'], $y0 + (int) round(20 * $s), (int) round(190 * $s), (int) round(84 * $s), $s, $f);
 
-    $moonR = (int) round(68 * $s);
-    ig_austin_moon($im, $o['moonX'], $y0 + $sh - (int) round(30 * $s), $moonR, $f);
+    // The moon hangs clear of the hills: its lowest point sits a little above
+    // the highest skyline under it, and its glow is clipped to the sky strip so
+    // it cannot spill onto the page above (the spotlight's poster) or below.
+    $moonR = (int) round(62 * $s);
+    $skyline = $y0 + $sh;
+    for ($mx = $o['moonX'] - $moonR; $mx <= $o['moonX'] + $moonR; $mx += 10) $skyline = min($skyline, ig_austin_ground_y($mx, $y0, $sh));
+    $moonY = max($y0 + $moonR + (int) round(8 * $s), $skyline - $moonR - (int) round(8 * $s));
+    imagesetclip($im, 0, $y0, $w - 1, $y0 + $sh);
+    ig_austin_moon($im, $o['moonX'], $moonY, $moonR, $f, $moonY - $y0);
+    imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
 
     $ink = ig_hex($im, '#1E0F24');
     $pts = [];
@@ -4147,12 +4508,12 @@ function ig_austin_dusk($im, $w, $y0, $sh, $f, array $o) {
     $tx = $o['towerX'];
     ig_austin_tower($im, $tx, ig_austin_ground_y($tx, $y0, $sh) + 3, (int) round(122 * $s), $ink, ig_austin_lamps($f), $s);
 
-    // The bat stream: each bat crosses the whole sky once per 192 frames,
-    // right to left, staggered so the line never bunches or empties.
+    // The bat stream: each bat crosses the whole sky three times per loop (every
+    // 176 frames), right to left, staggered so the line never bunches or empties.
     $lanes = [0.30, 0.50, 0.38, 0.62, 0.26, 0.45];
     $n = $o['bats'];
     for ($k = 0; $k < $n; $k++) {
-        $u = fmod($f / IG_AUSTIN_LOOP + $k / $n, 1.0);
+        $u = fmod(3 * $f / IG_AUSTIN_LOOP + $k / $n, 1.0);
         $bx = ($w + 80) - ($w + 160) * $u;
         $by = $y0 + $sh * $lanes[$k % 6] + 9 * $s * sin(2 * M_PI * (1.5 * $u + $k * 0.37));
         $pose = [1, 0, -1, 0][(intdiv($f, 2) + $k) % 4];
