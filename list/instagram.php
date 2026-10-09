@@ -2155,6 +2155,141 @@ function ig_cobweb($im, $cx, $cy, $len, $color, $sx = 1, $sy = 1, $wobble = 0.0)
     }
 }
 
+// A small, calm cloud — the storm cloud's palette without the rain or lightning — that
+// can sit across the edge of the moon. Slightly see-through, so the moon shows
+// at its rim. $s scales it (1 is about 100 px wide).
+function ig_moon_cloud($im, $cx, $cy, $s) {
+    $body  = imagecolorallocatealpha($im, 0x3B, 0x40, 0x52, 12);
+    $under = imagecolorallocatealpha($im, 0x2B, 0x2F, 0x3E, 12);
+    $rim   = imagecolorallocatealpha($im, 0x9A, 0xA2, 0xC4, 92);
+    $e = fn($dx, $dy, $w, $h, $c) => imagefilledellipse($im, (int) round($cx + $dx * $s), (int) round($cy + $dy * $s), max(2, (int) round($w * $s)), max(2, (int) round($h * $s)), $c);
+    $e(6, 12, 100, 26, $under);
+    foreach ([[-28, 6, 40], [-6, -6, 52], [22, -2, 44], [40, 8, 32]] as [$dx, $dy, $d]) $e($dx, $dy, $d, $d, $body);
+    $e(6, 10, 98, 22, $body);
+    foreach ([[-6, -6, 52], [22, -2, 44]] as [$dx, $dy, $d]) {
+        imagearc($im, (int) round($cx + $dx * $s), (int) round($cy + $dy * $s), max(2, (int) round($d * $s)), max(2, (int) round($d * $s)), 200, 340, $rim);
+    }
+}
+
+// One autumn leaf, $len px long, turned $rot, tipped over by $flip (0..1: edge-on to full
+// face) as if tumbling in the air.
+function ig_autumn_leaf($im, $x, $y, $len, $rot, $flip, $color, $vein) {
+    $pts = []; $back = [];
+    for ($i = 0; $i <= 8; $i++) {
+        $u = -1 + $i / 4;
+        $w = $len * 0.27 * pow(max(0.0, 1 - $u * $u), 0.75) * (0.25 + 0.75 * $flip) * (1 + 0.18 * $u);
+        $pts[]  = [$u * $len / 2, -$w];
+        $back[] = [$u * $len / 2, $w];
+    }
+    $poly = [];
+    foreach (array_merge($pts, array_reverse($back)) as [$lx, $ly]) {
+        $poly[] = (int) round($x + $lx * cos($rot) - $ly * sin($rot));
+        $poly[] = (int) round($y + $lx * sin($rot) + $ly * cos($rot));
+    }
+    imagefilledpolygon($im, $poly, $color);
+    imageline($im, (int) round($x - 0.62 * $len * cos($rot)), (int) round($y - 0.62 * $len * sin($rot)), (int) round($x + 0.4 * $len * cos($rot)), (int) round($y + 0.4 * $len * sin($rot)), $vein);
+}
+
+// How hard the wind is blowing on frame $f of a $T-frame loop, 0 (a faint drift) to 1 (the
+// peak of the big gust): one gust a third of the way in that builds, peaks and dies away, and
+// a smaller one near the end. Built as a table so it closes on the loop's seam.
+function ig_marquee_gust($f, $T) {
+    static $cache = [];
+    if (!isset($cache[$T])) {
+        $tab = [];
+        for ($i = 0; $i < $T; $i++) {
+            $g = 0.0;
+            foreach ([[0.333, 1.0, 0.09], [0.743, 0.55, 0.07]] as [$c, $a, $w]) {   // centre, strength, width (fractions of the loop)
+                $d = abs($i / $T - $c); $d = min($d, 1 - $d);
+                $g += $a * exp(-pow($d / $w, 2));
+            }
+            $tab[$i] = min(1.0, $g);
+        }
+        $cache[$T] = $tab;
+    }
+    return $cache[$T][((int) $f) % $T];
+}
+
+// One leaf's whole flight, worked out frame by frame from its own spawn: it falls on a slant
+// under its own weight, is pushed (and lifted) along by the gusts, flutters, and tumbles. It
+// starts fully off the card and the flight ends the moment it has left the card again — nothing
+// fades — so if it would not get out in time (a drifter that falls too slowly to reach the bottom
+// in one loop) it is sped up until it does. Sets $L['path'] (x, y, turn, flip per frame of its
+// life) and $L['exit'] (how many frames it is on screen).
+function ig_marquee_leaf_path(array &$L, $T, $w) {
+    for ($try = 0; $try < 18; $try++) {
+        $x = $L['x']; $y = $L['y']; $rot = $L['seed']; $ph = $L['seed']; $dir = $L['seed'] > 3.14 ? 1 : -1;
+        $path = []; $entered = false; $exit = null;
+        for ($n = 0; $n < $T; $n++) {
+            $g = ig_marquee_gust(($L['s'] + $n) % $T, $T);
+            $x += $L['vx'] + $L['push'] * pow($g, 1.1);
+            // Gravity keeps working while the wind blows — a gust leans a leaf over, it does not lift it
+            // out of the fall — and a leaf in the gust is tumbled down faster, so it goes right and down at once.
+            $y += $L['vy'] * (1 + 0.8 * $g);
+            $rot += $dir * (0.04 + 0.2 * $g);
+            $ph  += 0.10 + 0.12 * $g;
+            $px = $x + 14 * sin(0.11 * $n + $L['seed'] * 6) * (1 - 0.6 * $g);
+            $py = $y + 5 * sin(0.17 * $n + $L['seed'] * 3);
+            $path[$n] = [$px, $py, $rot, $ph];
+            $inside = $px > -45 && $px < $w + 45 && $py > -45 && $py < 1395;
+            if ($inside) $entered = true;
+            elseif ($entered) { $exit = $n; break; }
+        }
+        if ($exit !== null && $exit < $T - 4) { $L['exit'] = $exit; $L['path'] = $path; return; }
+        $L['vx'] *= 1.12; $L['vy'] *= 1.12;
+    }
+    $L['exit'] = 0; $L['path'] = [];
+}
+
+// The leaves in the breeze: drifters falling from the top all through the loop, and leaves the
+// gusts catch at the left edge and carry across the listings. Every leaf's flight is a function
+// of the frame, so the loop closes.
+function ig_marquee_leaves($im, $w, $anim) {
+    $T = $anim['frames']; $f = $anim['frame'] % $T;
+    static $leaves = null;
+    if ($leaves === null) {
+        $h = fn($k, $n = 100) => crc32($k) % $n;
+        $leaves = [];
+        for ($i = 0; $i < 4; $i++) {             // drifters, in from above
+            $leaves[] = ['s' => (int) round($i * 0.25 * $T) + $h("as$i", 12), 'x' => 50 + $h("ax$i", 900), 'y' => -70,
+                'vx' => 0.45 + $h("avx$i", 80) / 100, 'vy' => 2.2 + $h("avy$i", 150) / 100, 'push' => 9 + $h("ap$i", 6), 'lift' => 0,
+                'size' => 28 + $h("az$i", 12), 'col' => $i % 4, 'seed' => $h("ad$i", 628) / 100];
+        }
+        // Carried in on the gusts: the first wave catches the leaves in the air, and a second comes in
+        // right behind it as the wind drops, so the card never empties.
+        foreach ([[0.28, 6, 13], [0.365, 5, 11], [0.70, 3, 11], [0.80, 3, 9]] as $g => [$at, $n, $push]) {
+            for ($i = 0; $i < $n; $i++) {
+                $leaves[] = ['s' => (int) round(($at - 0.045) * $T) + $h("bs$g$i", 22), 'x' => -70, 'y' => 250 + (int) round($i * (880 / $n)) + $h("by$g$i", 50),
+                    'vx' => 0.9, 'vy' => 1.5 + $h("bvy$g$i", 60) / 100, 'push' => $push + $h("bp$g$i", 6), 'lift' => 0,
+                    'size' => 30 + $h("bz$g$i", 10), 'col' => ($i + $g) % 4, 'seed' => $h("bd$g$i", 628) / 100];
+            }
+        }
+        foreach ($leaves as $i => $L) { ig_marquee_leaf_path($L, $T, $w); $leaves[$i] = $L; }
+    }
+    $palette = [[0xB6, 0x48, 0x1A], [0xE0, 0x96, 0x2B], [0xCC, 0x6A, 0x1E], [0x8C, 0x4A, 0x1E]];
+
+    // a faint rush of wind lines across the page while a gust blows
+    $gust = ig_marquee_gust($f, $T);
+    if ($gust > 0.06) {
+        for ($j = 0; $j < 12; $j++) {
+            $x = fmod($f * 17 + $j * 211, $w + 420) - 210; $y = 150 + $j * 96 + (crc32("wl$j") % 40); $len = 80 + 170 * $gust;
+            $c = imagecolorallocatealpha($im, 0xB5, 0xAF, 0xA0, (int) round(127 - 56 * $gust));
+            imagesetthickness($im, 2);
+            imageline($im, (int) $x, (int) $y, (int) ($x + $len * 0.5), (int) ($y - 3), $c);
+            imageline($im, (int) ($x + $len * 0.5), (int) ($y - 3), (int) ($x + $len), (int) ($y + 2), $c);
+            imagesetthickness($im, 1);
+        }
+    }
+
+    foreach ($leaves as $L) {
+        $n = ($f - $L['s'] + $T) % $T;
+        if ($n >= $L['exit']) continue;
+        [$x, $y, $rot, $ph] = $L['path'][$n];
+        [$cr, $cg, $cb] = $palette[$L['col']];
+        ig_autumn_leaf($im, $x, $y, $L['size'], $rot, 0.45 + 0.55 * abs(cos($ph)), imagecolorallocate($im, $cr, $cg, $cb), imagecolorallocate($im, 0x3A, 0x1A, 0x08));
+    }
+}
+
 // A small storm cloud centred on ($cx,$cy), about 100px wide: rain streaks
 // under it and a lightning bolt. A still shows the cloud with one bolt
 // frozen mid-strike; an animation ($anim = ['frame', 'frames']) strikes
@@ -2755,10 +2890,12 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
     // moving part is a whole number of cycles over the loop so the last
     // frame leads straight back into the first.
     $t = $anim !== null ? $anim['frame'] / $anim['frames'] : 0.0;
-    // The bats, rain and moon move at the pace of a 4-second loop; on a
+    // The moon, its cloud and the cobwebs move at the pace of a 4-second loop; on a
     // longer one they simply repeat more cycles of it. $k stays a whole
     // number while the loop is a multiple of 4 seconds, so they still close.
     $k = $anim !== null ? ($anim['frames'] / $anim['fps']) / 4 : 1;
+    // How hard the breeze is blowing (see ig_marquee_gust()).
+    $gust = $anim !== null ? ig_marquee_gust($anim['frame'], $anim['frames']) : 0.0;
 
     // In October the marquee's gold bulbs and accents turn pumpkin orange
     // (the fall half of the seasonal look); the Halloween half is drawn
@@ -2784,7 +2921,7 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
 
     if ($season) {
         // A pale moon in the empty band right of the kicker (the date
-        // headline sits below it), bats crossing it, and cobwebs in the two
+        // headline sits below it), a small cloud across it, and cobwebs in the two
         // right-hand corners — the left ones would sit under the kicker and
         // the footer text.
         $mx = 770; $my = 98; $mr = 46;
@@ -2794,42 +2931,18 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
             imagefilledellipse($im, $mx, $my, ($mr + $grow) * 2, ($mr + $grow) * 2, imagecolorallocatealpha($im, $ar, $ag, $ab, 120 - $pulse));
         }
         imagefilledellipse($im, $mx, $my, $mr * 2, $mr * 2, ig_hex($im, '#EADFC2'));
-        // A little storm cloud over the moon's left edge, drawn before the
-        // bats so they fly in front of it.
-        ig_storm_cloud($im, $mx - 66, $my - 8, $anim);
-        $batDark = ig_hex($im, '#0B0A08');
-        $batDim  = ig_hex($im, '#6A3A16');
-        // Each bat: [base x, base y, size, colour, x-sway, y-sway, phase].
-        // Sways are one lap of a loop-closing figure-eight (x once, y twice
-        // per loop); wings flap eight times per loop at their own phase.
-        $bats = [
-            [$mx - 8,  $my + 6,  30, $batDark, 14,  8, 0.0],
-            [$mx + 30, $my - 20, 17, $batDark, -12, 7, 1.3],
-            [$mx + 92, $my + 14, 20, $batDim,  18, 12, 2.1],
-            [$mx - 96, $my - 8,  15, $batDim, -16, 10, 4.0],
-            [$mx + 124, $my - 34, 16, $batDim, -14, 9, 5.2],
-        ];
-        foreach ($bats as [$bx, $by, $bs, $bc, $sx, $sy, $ph]) {
-            if ($anim === null) {
-                ig_bat_silhouette($im, $bx, $by, $bs, $bc);
-                continue;
-            }
-            ig_bat_silhouette(
-                $im,
-                $bx + $sx * cos(2 * M_PI * $k * $t + $ph),
-                $by + $sy * sin(4 * M_PI * $k * $t + $ph),
-                $bs,
-                $bc,
-                sin(2 * M_PI * (8 * $k * $t + $ph / 6))
-            );
-        }
+        // One small, calm cloud across the moon's right edge. It sits still, and eases a little to
+        // the right while a gust blows, then back (still: parked a little over it).
+        ig_moon_cloud($im, $mx + 42 + 6 * $gust, $my + 14, 0.62);
         $web = imagecolorallocatealpha($im, 0xB5, 0xAF, 0xA0, 78);
         // Small webs in the two top corners — the left one is kept just
         // short of the kicker beneath it — and a big one in the bottom-right
         // with the pumpkins sitting over its left edge.
-        ig_cobweb($im, 46, 46, 80, $web, 1, 1);
-        ig_cobweb($im, $w - 46, 46, 80, $web, -1, 1);
-        ig_cobweb($im, $w - 46, $h - 46, 180, $web, -1, -1);
+        // The webs stir in the breeze (animated only).
+        $wob = $anim === null ? 0.0 : (0.08 + 0.3 * $gust) * sin(4 * M_PI * $k * $t * 2);
+        ig_cobweb($im, 46, 46, 80, $web, 1, 1, $wob);
+        ig_cobweb($im, $w - 46, 46, 80, $web, -1, 1, $wob);
+        ig_cobweb($im, $w - 46, $h - 46, 180, $web, -1, -1, $wob);
         ig_pumpkin($im, $w - 190, $h - 50, 44, true, $anim);
         ig_pumpkin($im, $w - 268, $h - 50, 28);
     }
@@ -2919,6 +3032,8 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if ($anim !== null && $season) ig_marquee_leaves($im, $w, $anim);
 
     return $im;
 }

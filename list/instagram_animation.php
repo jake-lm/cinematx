@@ -41,8 +41,9 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 // three cycles of 82 frames (6.8s). Instagram wants carousel videos under a
 // minute: 6 x 8s = 48s, 3 x 6.83s = 20.5s. Darkroom's print develops four
 // pictures, one per 8s cycle (The Scream, Son of Man, Psycho, American Gothic):
-// 4 x 8s = 32s.
+// 4 x 8s = 32s. Marquee's breeze has room for two gusts, and for leaves to fall the whole height of the card: 4 x 8s = 32s.
 function ig_anim_frames($theme) {
+    if ($theme === 'marquee') return 4 * IG_ANIM_FRAMES;       // a breeze with two gusts, and the time for its leaves to fall right across the page: 32s
     if ($theme === 'newsprint') return 3 * 82;
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
