@@ -42,7 +42,9 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 // minute: 6 x 8s = 48s, 3 x 6.83s = 20.5s. Darkroom's print develops four
 // pictures, one per 8s cycle (The Scream, Son of Man, Psycho, American Gothic):
 // 4 x 8s = 32s.
-function ig_anim_frames($theme) {
+function ig_anim_frames($theme, array $films = [], $date = null) {
+    // A Friday with a scene to play (see ig_marquee_scene()) runs long enough to tell it.
+    if ($theme === 'marquee' && $date !== null && ig_marquee_scene($films, $date)) return IG_FACULTY_FRAMES;
     if ($theme === 'newsprint') return 3 * 82;
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
@@ -80,7 +82,9 @@ function ig_anim_key(array $item, $date) {
     imagepng($im);
     $png = ob_get_clean();
     imagedestroy($im);
-    return md5($png) . ':v' . IG_ANIM_VERSION;
+    // A scene changes the video without changing the still, so it is part of the key.
+    $scene = $item['theme'] === 'marquee' ? ig_marquee_scene($item['films'], $date) : null;
+    return md5($png) . ':v' . IG_ANIM_VERSION . ($scene ? ':' . $scene : '');
 }
 
 function ig_anim_fresh(array $item, $date, $i) {
@@ -122,7 +126,7 @@ function ig_render_anim(array $item, $date, $i, $wait = true) {
         if ($found !== 0) throw new RuntimeException('ffmpeg is not installed');
 
         mkdir($frames, 0700);
-        $nFrames = ig_anim_frames($item['theme']);
+        $nFrames = ig_anim_frames($item['theme'], $item['films'], $date);
         for ($f = 0; $f < $nFrames; $f++) {
             $im = ig_build_list_page($item['films'], $date, $item['theme'], $item['moreCount'],
                 ['frame' => $f, 'frames' => $nFrames, 'fps' => IG_ANIM_FPS]);

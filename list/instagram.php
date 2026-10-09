@@ -2920,7 +2920,358 @@ function ig_build_list_page_marquee(array $films, $date, $moreCount = 0, $anim =
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
 
+    // A Friday with The Faculty on it: the hallway scene plays in the room under the
+    // listings (video only), and the pumpkins go back on top of it.
+    if ($anim !== null && $season && $totalMore === 0 && ig_marquee_scene($films, $date) && $footerY - 44 - ($y + 6) >= 120) {
+        ig_faculty_scene($im, 56, $y + 6, $w - 56, $footerY - 44, $anim['frame'] % IG_FACULTY_FRAMES);
+        ig_pumpkin($im, $w - 190, $h - 50, 44, true, $anim);
+        ig_pumpkin($im, $w - 268, $h - 50, 28);
+    }
+
     return $im;
+}
+
+// ── The Faculty (Friday's scene) ─────────────────────────────────────────
+// On a Friday when The Faculty is playing, Marquee's animated list page gets a scene
+// in the empty space under the listings: a school hallway where three people walk past,
+// and the one at the back turns into a tentacled thing and eats the other two. It plays
+// over the 28s loop (336 frames, 12 fps on twos); only the video has it — the still is
+// the ordinary page. 336 frames is 7 four-second cycles, so the moon, bats and bulbs
+// around it still close up.
+const IG_FACULTY_FRAMES = 336;
+
+// 'faculty' if today's lineup has The Faculty (October only), else null.
+function ig_marquee_scene(array $films, $date) {
+    if (!ig_halloween_season($date)) return null;
+    foreach ($films as $film) {
+        if (preg_match('/^\s*the faculty(\s*\(\d{4}\))?\s*$/i', (string) ($film['title'] ?? ''))) return 'faculty';
+    }
+    return null;
+}
+
+// Where a walker is: 7 px a frame from frame 8, easing to a halt over the 10 frames before $stop.
+function ig_fac_walk_x($base, $f, $stop) {
+    $v = 7.0; $ease = 10;
+    if ($f < $stop - $ease) return $base + $v * ($f - 8);
+    $d = min($ease, $f - ($stop - $ease));
+    return $base + $v * ($stop - $ease - 8) + $v * ($d - $d * $d / (2 * $ease));
+}
+
+// A person in silhouette, feet at ($x, $gy), design scale $S (a coach is about 112 px
+// tall at S = 1). $type 'coach' (cap, clipboard), 'student' (backpack, tufted hair) or
+// 'teacher' (bun, skirt, books). $o: pose 'walk'|'stand'|'scared'|'flail'|'attack', dir
+// 1 = facing right, lift (px off the floor), jit (shudder), lean, swing (0..1, the coach's
+// swing), hold (false to leave the carried item out). Returns the front hand's position.
+function ig_fac_person($im, $x, $gy, $S, $type, $f, array $o = []) {
+    $pose = $o['pose'] ?? 'walk'; $dir = $o['dir'] ?? 1; $lift = $o['lift'] ?? 0.0; $jit = $o['jit'] ?? 0.0;
+    $lean = $o['lean'] ?? 0.0; $swing = $o['swing'] ?? 0.0; $hold = $o['hold'] ?? true;
+    $H0 = ['coach' => 112, 'student' => 92, 'teacher' => 104][$type];
+    $ink = ig_hex($im, '#0B0A09');
+    $t = intdiv($f, 2); $phi = $t * 0.9;
+    $jx = $jit ? ((crc32("fj$type$t") % 100) / 100 - 0.5) * 2 * $jit : 0;
+    $jy = $jit ? ((crc32("fk$type$t") % 100) / 100 - 0.5) * 2 * $jit * 0.6 : 0;
+    $T = fn($lx, $ly) => [$x + ($dir * $lx * $S) + $jx * $S, $gy - $lift * $S + $ly * $S + $jy * $S];
+    $hipL = [0, -0.47 * $H0]; $shL = [$lean * $H0, -0.80 * $H0];
+    $legU = 0.235 * $H0; $armU = 0.17 * $H0;
+    $limb = function ($a, $b, $w1, $w2, $c = null) use ($im, $T, $ink) {
+        [$ax, $ay] = $T($a[0], $a[1]); [$bx, $by] = $T($b[0], $b[1]);
+        ig_austin_limb($im, $ax, $ay, $bx, $by, $w1, $w2, $c ?? $ink);
+    };
+    $ell = function ($c, $w, $h, $col = null) use ($im, $T, $ink, $S) { [$cx, $cy] = $T($c[0], $c[1]); ig_austin_ell($im, $cx, $cy, $w * $S, $h * $S, $col ?? $ink); };
+    $swingAng = fn($len, $ang) => [$len * sin($ang), $len * cos($ang)];
+
+    // legs: [angle of the thigh, angle of the shin], one per leg
+    $legs = [];
+    foreach ([0.0, M_PI] as $off) {
+        if ($pose === 'walk')        { $a1 = 0.5 * sin($phi + $off); $a2 = $a1 - 0.9 * max(0.0, cos($phi + $off)); }
+        elseif ($pose === 'scared')  { $a1 = ($off ? -0.3 : 0.28); $a2 = $a1; }
+        elseif ($pose === 'flail')   { $a1 = 0.8 * sin($phi * 1.9 + $off); $a2 = $a1 - 0.7 * max(0.0, sin($phi * 1.9 + $off)); }
+        else                         { $a1 = ($off ? -0.06 : 0.06); $a2 = $a1; }
+        $legs[] = [$a1, $a2];
+    }
+    $armsA = [];
+    foreach ([M_PI, 0.0] as $k => $off) {
+        if ($pose === 'walk')        { $b1 = -0.45 * sin($phi + $off); $b2 = $b1 + 0.35; }
+        elseif ($pose === 'scared')  { $b1 = 2.5 + 0.12 * sin($phi * 2 + $off); $b2 = $b1 + 0.5; }
+        elseif ($pose === 'flail')   { $b1 = 2.1 + 0.9 * sin($phi * 2.3 + $off); $b2 = $b1 + 0.6 * sin($phi * 3 + $off); }
+        elseif ($pose === 'attack')  { $b1 = $k ? 2.5 - 3.0 * $swing : 0.3; $b2 = $b1 + ($k ? 0.15 : 0.3); }
+        else                         { $b1 = 0.06; $b2 = 0.2; }
+        $armsA[] = [$b1, $b2];
+    }
+    // far limbs first
+    foreach ([0, 1] as $i) {
+        [$a1, $a2] = $legs[$i];
+        $kn = [$hipL[0] + $swingAng($legU, $a1)[0], $hipL[1] + $swingAng($legU, $a1)[1]];
+        $ft = [$kn[0] + $swingAng($legU, $a2)[0], $kn[1] + $swingAng($legU, $a2)[1]];
+        $limb($hipL, $kn, 0.075 * $H0, 0.055 * $H0); $limb($kn, $ft, 0.055 * $H0, 0.045 * $H0);
+        $ell([$ft[0] + 3, $ft[1]], 0.1 * $H0, 0.045 * $H0);
+    }
+    // torso
+    $tw = $type === 'coach' ? 0.24 : ($type === 'teacher' ? 0.19 : 0.20);
+    $limb($hipL, $shL, $tw * 0.8 * $H0, $tw * $H0);
+    $ell([$shL[0], $shL[1] + 0.02 * $H0], $tw * 1.05 * $H0, 0.07 * $H0);
+    if ($type === 'teacher') ig_austin_poly($im, array_map(fn($p) => $T($p[0], $p[1]), [[-0.1 * $H0, -0.5 * $H0], [0.1 * $H0, -0.5 * $H0], [0.17 * $H0, -0.2 * $H0], [-0.17 * $H0, -0.2 * $H0]]), $ink);
+    if ($type === 'student') { [$bx, $by] = $T(-0.17 * $H0, -0.64 * $H0); ig_austin_poly($im, [[$bx, $by - 0.14 * $H0 * $S], [$bx + 0.0, $by + 0.14 * $H0 * $S], [$bx - 0.16 * $H0 * $S * $dir * 1, $by + 0.16 * $H0 * $S], [$bx - 0.16 * $H0 * $S * $dir, $by - 0.12 * $H0 * $S]], ig_hex($im, '#27221C')); }
+    // head
+    $hd = [$shL[0] + 0.015 * $H0 + ($o['jerk'] ?? 0) * 0.03 * $H0, -0.915 * $H0];
+    $limb([$shL[0], $shL[1]], [$hd[0], $hd[1] + 0.05 * $H0], 0.06 * $H0, 0.055 * $H0);
+    $ell($hd, 0.15 * $H0, 0.175 * $H0);
+    if ($type === 'coach')   ig_austin_poly($im, array_map(fn($p) => $T($p[0], $p[1]), [[$hd[0] - 0.08 * $H0, $hd[1] - 0.03 * $H0], [$hd[0] + 0.08 * $H0, $hd[1] - 0.04 * $H0], [$hd[0] + 0.17 * $H0, $hd[1] - 0.01 * $H0], [$hd[0] + 0.08 * $H0, $hd[1] + 0.0], [$hd[0] - 0.08 * $H0, $hd[1] + 0.0]]), $ink);
+    if ($type === 'teacher') $ell([$hd[0] - 0.07 * $H0, $hd[1] - 0.095 * $H0], 0.1 * $H0, 0.1 * $H0);
+    if ($type === 'student') foreach ([[-0.04, -0.1], [0.04, -0.11], [0.0, -0.12]] as [$tx, $ty]) $ell([$hd[0] + $tx * $H0, $hd[1] + $ty * $H0], 0.05 * $H0, 0.07 * $H0);
+    // near arm last; hands for held items
+    $hands = [];
+    foreach ([0, 1] as $i) {
+        [$b1, $b2] = $armsA[$i];
+        $el = [$shL[0] + $swingAng($armU, $b1)[0], $shL[1] + $swingAng($armU, $b1)[1]];
+        $hn = [$el[0] + $swingAng($armU, $b2)[0], $el[1] + $swingAng($armU, $b2)[1]];
+        $limb($shL, $el, 0.06 * $H0, 0.05 * $H0); $limb($el, $hn, 0.05 * $H0, 0.04 * $H0);
+        $ell($hn, 0.06 * $H0, 0.06 * $H0);
+        $hands[] = $hn;
+    }
+    $hand = $hands[1];
+    // carried items (the light edge picks them out from the silhouette)
+    if ($hold && $type === 'coach') {
+        [$cx, $cy] = $T($hand[0], $hand[1]);
+        $ang = $pose === 'attack' ? -1.0 + 3.0 * $swing : 0.0;
+        $ig = ig_hex($im, '#D8CFA8');
+        $p = [[-3, -9], [11, -9], [11, 9], [-3, 9]];
+        $rot = array_map(fn($q) => [$cx + ($q[0] * cos($ang) - $q[1] * sin($ang)) * $S * $dir, $cy + ($q[0] * sin($ang) + $q[1] * cos($ang)) * $S], $p);
+        ig_austin_poly($im, $rot, $ig);
+    }
+    if ($hold && $type === 'teacher') {
+        [$cx, $cy] = $T($hand[0], $hand[1]);
+        ig_austin_poly($im, [[$cx - 6 * $S, $cy - 6 * $S], [$cx + 12 * $S * $dir, $cy - 6 * $S], [$cx + 12 * $S * $dir, $cy + 8 * $S], [$cx - 6 * $S, $cy + 8 * $S]], ig_hex($im, '#B9A77A'));
+    }
+    return $T($hand[0], $hand[1]);
+}
+
+// One tentacle: a quadratic curve from ($rx, $ry) to ($tx, $ty) bowed by $bulge, rippling,
+// tapering from $thick, a green glow under a near-black core.
+function ig_fac_tentacle($im, $rx, $ry, $tx, $ty, $bulge, $thick, $f, $seed) {
+    $dx = $tx - $rx; $dy = $ty - $ry; $len = max(1.0, hypot($dx, $dy));
+    $nx = -$dy / $len; $ny = $dx / $len;
+    $cx = ($rx + $tx) / 2 + $nx * $bulge; $cy = ($ry + $ty) / 2 + $ny * $bulge;
+    $N = 14; $pts = [];
+    for ($i = 0; $i <= $N; $i++) {
+        $u = $i / $N; $a = (1 - $u) * (1 - $u); $b = 2 * $u * (1 - $u); $c = $u * $u;
+        $w = 5 * sin($u * 7 - intdiv($f, 2) * 0.8 + $seed) * sin(M_PI * $u) * min(1.0, $len / 120);
+        $pts[] = [$a * $rx + $b * $cx + $c * $tx + $nx * $w, $a * $ry + $b * $cy + $c * $ty + $ny * $w, max(2.0, $thick * (1 - 0.82 * $u))];
+    }
+    $glow = imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, 96); $core = ig_hex($im, '#0A120D'); $vein = imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, 70);
+    foreach ([[1.9, $glow], [1.0, $core]] as [$k, $col]) {
+        for ($i = 0; $i < $N; $i++) {
+            ig_austin_limb($im, $pts[$i][0], $pts[$i][1], $pts[$i + 1][0], $pts[$i + 1][1], $pts[$i][2] * $k, $pts[$i + 1][2] * $k, $col);
+            ig_austin_ell($im, $pts[$i + 1][0], $pts[$i + 1][1], $pts[$i + 1][2] * $k, $pts[$i + 1][2] * $k, $col);
+        }
+    }
+    for ($i = 2; $i < $N; $i += 3) ig_austin_ell($im, $pts[$i][0], $pts[$i][1], 3, 3, $vein);
+    return [$pts[$N][0], $pts[$N][1]];
+}
+
+// The thing, centred $cx, standing on $gy. $o: g (0..1, how far it has grown), mouth (0..1),
+// swell (0..1, a full belly), scuttle (0..1), free (tentacles waving, 0..8), grabs
+// ([[tx, ty], ...] tentacles reaching for targets), eyes (glow). It faces right.
+function ig_fac_monster($im, $cx, $gy, $S, $f, array $o) {
+    $g = $o['g'] ?? 0.0; $mouth = $o['mouth'] ?? 0.0; $swell = $o['swell'] ?? 0.0; $scut = $o['scuttle'] ?? 0.0;
+    $t = intdiv($f, 2); $ph = $t * 0.7;
+    $by = $gy - (65 - 13 * $g - 4 * $scut) * $S;
+    $rx = (10 + 30 * $g + 6 * $swell) * $S; $ry = (22 + 20 * $g + 6 * $swell) * $S;
+    $green = imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, 108);
+    // legs: tentacle stilts, planted or scuttling
+    if ($g > 0.45) {
+        for ($i = 0; $i < 6; $i++) {
+            $side = $i < 3 ? -1 : 1; $k = $i % 3;
+            $root = [$cx + $side * $rx * (0.25 + 0.2 * $k), $by + $ry * 0.65];
+            $lift = $scut > 0 ? max(0.0, sin($ph + $i * 1.1)) * 12 * $S * $scut : 0;
+            $stride = $scut > 0 ? sin($ph + $i * 1.1 + 1.0) * 14 * $S * $scut : 0;
+            $tip = [$cx + $side * $rx * (0.9 + 0.5 * $k) + $stride, $gy - $lift];
+            ig_fac_tentacle($im, $root[0], $root[1], $tip[0], $tip[1], -$side * 10 * $S, 9 * $S, $f, $i);
+        }
+    }
+    // glow, then the body
+    foreach ([[1.7, 112], [1.4, 104], [1.18, 94]] as [$k, $a]) ig_austin_ell($im, $cx, $by, 2 * $rx * $k, 2 * $ry * $k, imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, $a));
+    ig_austin_ell($im, $cx, $by, 2 * $rx, 2 * $ry, ig_hex($im, '#0B120E'));
+    ig_austin_ell($im, $cx - $rx * 0.1, $by - $ry * 0.12, 1.5 * $rx, 1.4 * $ry, ig_hex($im, '#121F17'));
+    for ($i = 0; $i < 7; $i++) {          // glowing spots on the hide
+        $a = $i * 2.4 + 0.5; $r = 0.65 * (0.4 + (crc32("sp$i") % 60) / 100);
+        ig_austin_ell($im, $cx + cos($a) * $rx * $r, $by + sin($a) * $ry * $r, 5 * $S, 4 * $S, imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, 80));
+    }
+    // eyes
+    $ey = ($o['eyes'] ?? 1.0);
+    if ($g > 0.25 && $ey > 0) {
+        foreach ([[0.35, -0.5, 9], [0.0, -0.62, 11], [-0.35, -0.5, 8]] as [$ex, $eyy, $er]) {
+            ig_austin_ell($im, $cx + $ex * $rx + 0.2 * $rx, $by + $eyy * $ry, $er * 1.7 * $S, $er * $S * 1.3, imagecolorallocatealpha($im, 0x9C, 0xFF, 0x8A, 40));
+            ig_austin_ell($im, $cx + $ex * $rx + 0.2 * $rx + 2 * $S, $by + $eyy * $ry, 3 * $S, $er * $S * 1.2, ig_hex($im, '#06100A'));
+        }
+    }
+    // mouth, toward the right
+    $mx = $cx + 0.42 * $rx; $my = $by + 0.28 * $ry;
+    if ($mouth > 0.03 && $g > 0.45) {
+        $mw = 1.35 * $rx * (0.35 + 0.65 * $mouth); $mh = 1.15 * $ry * $mouth;
+        ig_austin_ell($im, $mx, $my, $mw, $mh, imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, 90));
+        ig_austin_ell($im, $mx, $my, $mw * 0.88, $mh * 0.85, ig_hex($im, '#040704'));
+        $tooth = ig_hex($im, '#DFF2D0');
+        for ($i = 0; $i < 7; $i++) {
+            $a = M_PI * (0.1 + 0.8 * $i / 6);
+            foreach ([-1, 1] as $s2) {
+                $px = $mx + cos($a) * $mw * 0.44; $py = $my + $s2 * sin($a) * $mh * 0.42;
+                ig_austin_poly($im, [[$px - 3 * $S, $py], [$px + 3 * $S, $py], [$px, $py - $s2 * 7 * $S * $mouth]], $tooth);
+            }
+        }
+    }
+    // free tentacles, from the top of the body
+    $n = (int) ($o['free'] ?? 0);
+    for ($i = 0; $i < $n; $i++) {
+        $a = -M_PI * (0.08 + 0.84 * ($n > 1 ? $i / ($n - 1) : 0.5));
+        $root = [$cx + cos($a) * $rx * 0.8, $by + sin($a) * $ry * 0.8];
+        $len = (46 + 36 * $g + 14 * sin($i * 1.7)) * $S;
+        $wave = 0.5 * sin($ph * 0.8 + $i * 1.3);
+        $tip = [$root[0] + cos($a + $wave) * $len, $root[1] + sin($a + $wave) * $len];
+        ig_fac_tentacle($im, $root[0], $root[1], $tip[0], $tip[1], 16 * sin($ph + $i) * $S, 8 * $S, $f, $i + 3);
+    }
+    foreach (($o['grabs'] ?? []) as $k => [$tx, $ty]) {
+        $root = [$cx + (0.3 + 0.18 * $k) * $rx, $by - 0.45 * $ry];
+        ig_fac_tentacle($im, $root[0], $root[1], $tx, $ty, (22 + 10 * $k) * $S * sin($ph * 0.5 + $k), 8 * $S, $f, $k + 9);
+        ig_austin_ell($im, $tx, $ty, 11 * $S, 11 * $S, ig_hex($im, '#0A120D'));
+    }
+    return [$mx, $my];
+}
+
+// The hallway: lockers along the back wall, a floor strip, ceiling lights. $lit (0..1) is how
+// bright the lights are, $green (0..1) how far the thing has tinted the place.
+function ig_fac_hall($im, $x1, $y1, $x2, $y2, $floorTop, $lit, $green) {
+    $S = ($y2 - $y1) / 165.0;
+    imagefilledrectangle($im, $x1, $y1, $x2, $y2, ig_hex($im, '#4B5249'));
+    $lw = (int) round(46 * $S) + 2;
+    $lockTop = $y1 + (int) round(14 * $S); $lockBot = $floorTop - (int) round(2 * $S);
+    for ($x = $x1 + 4, $i = 0; $x < $x2 - 6; $x += $lw + 3, $i++) {
+        $tone = ($i % 3 === 1) ? '#74826F' : '#6B7869';
+        imagefilledrectangle($im, $x, $lockTop, $x + $lw, $lockBot, ig_hex($im, $tone));
+        imagefilledrectangle($im, $x, $lockTop, $x + $lw, $lockTop + (int) round(5 * $S), ig_hex($im, '#566352'));
+        for ($v = 0; $v < 3; $v++) imagefilledrectangle($im, $x + (int) round(8 * $S), $lockTop + (int) round((12 + $v * 5) * $S), $x + $lw - (int) round(8 * $S), $lockTop + (int) round((13.5 + $v * 5) * $S), ig_hex($im, '#3E4A3B'));
+        imagefilledrectangle($im, $x + $lw - (int) round(9 * $S), $lockTop + (int) round(42 * $S), $x + $lw - (int) round(6 * $S), $lockTop + (int) round(56 * $S), ig_hex($im, '#B9B8A2'));
+        imageline($im, $x + $lw, $lockTop, $x + $lw, $lockBot, ig_hex($im, '#3A4337'));
+    }
+    imagefilledrectangle($im, $x1, $lockBot, $x2, $floorTop, ig_hex($im, '#2F362C'));              // skirting
+    imagefilledrectangle($im, $x1, $floorTop, $x2, $y2, ig_hex($im, '#857F70'));                   // the floor
+    imagefilledrectangle($im, $x1, $floorTop + (int) round(10 * $S), $x2, $floorTop + (int) round(13 * $S), ig_hex($im, '#938D7D'));
+    for ($x = $x1 + 40; $x < $x2; $x += 180) {                                                        // lights and their pools
+        imagefilledrectangle($im, $x, $y1 + 2, $x + (int) round(70 * $S), $y1 + (int) round(8 * $S), imagecolorallocatealpha($im, 0xFF, 0xFF, 0xE8, (int) round(127 - 112 * $lit)));
+        imagefilledellipse($im, $x + (int) round(35 * $S), $floorTop + (int) round(14 * $S), (int) round(150 * $S), (int) round(16 * $S), imagecolorallocatealpha($im, 0xFF, 0xFF, 0xE8, (int) round(127 - 50 * $lit)));
+    }
+    imagefilledrectangle($im, $x1, $y1, $x2, $y2, imagecolorallocatealpha($im, 0, 0, 0, (int) round(127 - 98 * (1 - $lit))));   // lights down
+    if ($green > 0.01) imagefilledrectangle($im, $x1, $y1, $x2, $y2, imagecolorallocatealpha($im, 0x0C, 0x5A, 0x2C, (int) round(127 - 62 * $green)));
+    imagerectangle($im, $x1, $y1, $x2, $y2, ig_hex($im, '#0B0A09'));
+}
+
+// The whole scene for frame $f (0..335) in the box ($x1, $y1)-($x2, $y2).
+function ig_faculty_scene($im, $x1, $y1, $x2, $y2, $f) {
+    $H = $y2 - $y1; $S = $H / 165.0; $W = $x2 - $x1; $gy = $y2 - 22 * $S;
+    $X = fn($lx) => $x1 + $lx;
+    $ease = fn($u) => $u * $u * (3 - 2 * $u);
+    $prog = fn($a, $b) => max(0.0, min(1.0, ($f - $a) / ($b - $a)));
+    $hash = fn($k) => crc32($k) % 100;
+
+    // the lights: steady, then dying as it starts, sullen while it feeds, and back at the end
+    $lit = 1.0;
+    if ($f >= 100 && $f < 176)      $lit = $hash('fl' . intdiv($f, 2)) < 42 ? 0.45 : 0.92;
+    elseif ($f >= 176 && $f < 300)  $lit = 0.6 + 0.08 * sin($f * 0.35);
+    elseif ($f >= 300 && $f < 326)  $lit = $hash('fm' . intdiv($f, 2)) < 50 ? 0.5 : 0.95;
+    $greenOv = max(0.0, min(1.0, ($f - 132) / 20)) * (1 - max(0.0, min(1.0, ($f - 298) / 20)));
+    imagesetclip($im, $x1, $y1, $x2, $y2);
+    ig_fac_hall($im, $x1, $y1, $x2, $y2, (int) round($gy - 6 * $S), $lit, $greenOv * 0.8);
+    imagesetclip($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1);
+
+    // the three: coach A (front), student B, teacher C (back)
+    $xA = ig_fac_walk_x(-50, $f, 112); $xB = ig_fac_walk_x(-160, $f, 112); $xC = ig_fac_walk_x(-270, $f, 92);
+    $xA += 0.5 * max(0, min($f, 196) - 140);  $xB += 0.5 * max(0, min($f, 194) - 144);
+    $xA -= 60 * $ease($prog(198, 210));
+
+    // the thing: a lunge toward them at 176, a lurch back to feed, and the scuttle out at 292
+    $g = $ease($prog(132, 176));
+    $xM = 283 + 117 * $ease($prog(176, 200));
+    if ($f >= 292) $xM = 400 + ($W + 180 - 400) * pow($prog(292, 324), 1.5);
+    $scut = ($f >= 292 && $f < 326) ? 1.0 : 0.0;
+    $rxM = (10 + 30 * $g) * $S; $byM = $gy - (65 - 13 * $g) * $S; $ryM = (22 + 20 * $g) * $S;
+    $mouthPt = [$X($xM) + 0.42 * $rxM, $byM + 0.28 * $ryM];
+
+    // victims: where B and A are, and whether the thing has hold of them
+    $bLift = $f >= 194 ? 34 * $ease($prog(194, 206)) : 0.0;
+    $aLift = $f >= 220 ? 30 * $ease($prog(220, 232)) : 0.0;
+    $bPull = $ease($prog(226, 250)); $aPull = $ease($prog(246, 268));
+    $bx = $X($xB) + ($mouthPt[0] - $X($xB)) * $bPull; $by0 = $gy; $bLift2 = $bLift * (1 - $bPull) + 6 * $bPull;
+    $ax = $X($xA) + ($mouthPt[0] - $X($xA)) * $aPull; $aLift2 = $aLift * (1 - $aPull) + 6 * $aPull;
+    $bS = $S * (1 - 0.45 * $bPull); $aS = $S * (1 - 0.45 * $aPull);
+    $bDone = $f >= 252; $aDone = $f >= 270;
+
+    // the clipboard: thrown at 214, lies where it lands until the thing drags it off
+    $clipAt = null;
+    if ($f >= 214) {
+        $u = $prog(214, 232); $x0 = $X($xA) + 20; $xl = $X($xA) - 110;
+        $cx = $x0 + ($xl - $x0) * $u; $cy = ($gy - 60 * $S) + (($gy - 4 * $S) - ($gy - 60 * $S)) * $u * $u - 46 * $S * sin(M_PI * $u);
+        if ($f >= 292) $cx = max($xl, $X($xM) - 50 * $S);
+        $clipAt = [$cx, $cy, $u * 9 + ($f >= 232 ? 0 : 0)];
+    }
+    if ($clipAt) {
+        [$cx, $cy, $rot] = $clipAt; $c = cos($rot); $s2 = sin($rot);
+        $pts = array_map(fn($q) => [$cx + ($q[0] * $c - $q[1] * $s2) * $S, $cy + ($q[0] * $s2 + $q[1] * $c) * $S], [[-9, -6], [9, -6], [9, 6], [-9, 6]]);
+        ig_austin_poly($im, $pts, ig_hex($im, '#D8CFA8'));
+    }
+
+    // ── draw the people who are still people
+    if ($f >= 8) {
+        // C, the teacher: stops, shudders, her head jerks, and then she is not C
+        if ($f < 158) {
+            $c = ['pose' => $f < 92 ? 'walk' : 'stand', 'hold' => $f < 126, 'jit' => $f >= 100 ? 0.4 + 3.2 * $prog(100, 134) : 0.0, 'jerk' => $f >= 108 ? sin($f * 1.7) : 0.0];
+            $cxp = $X($xC);
+            if ($f >= 110 && $f < 148) {
+                $hy = $gy - 0.915 * 104 * $S;
+                foreach ([[44, 108], [30, 100], [18, 90]] as [$gr, $ga]) ig_austin_ell($im, $cxp, $hy, $gr * $S * 2 * (0.4 + 0.6 * $prog(110, 130)), $gr * $S * 2 * (0.4 + 0.6 * $prog(110, 130)), imagecolorallocatealpha($im, 0x5A, 0xFF, 0x7A, $ga));
+            }
+            ig_fac_person($im, $cxp, $gy, $S, 'teacher', $f, $c);
+        }
+        // B, the student: notices, backs away, is caught
+        if (!$bDone) {
+            $pose = $f < 112 ? 'walk' : ($f < 144 ? 'stand' : ($f < 194 ? 'scared' : 'flail'));
+            ig_fac_person($im, $f < 226 ? $X($xB) : $bx, $gy, $bS, 'student', $f, ['pose' => $pose, 'dir' => $f < 130 ? 1 : -1, 'lift' => $bLift2, 'jit' => $f >= 194 ? 1.5 : 0.0]);
+        }
+        // A, the coach: walks on a little longer, turns, fights, is caught
+        if (!$aDone) {
+            $pose = $f < 112 ? 'walk' : ($f < 140 ? 'stand' : ($f < 198 ? 'scared' : ($f < 220 ? 'attack' : 'flail')));
+            $sw = $f >= 206 ? $prog(206, 214) : 0.0;
+            ig_fac_person($im, $f < 246 ? $X($xA) : $ax, $gy, $aS, 'coach', $f, ['pose' => $pose, 'dir' => $f < 138 ? 1 : -1, 'lift' => $aLift2, 'swing' => $sw, 'hold' => $f < 214, 'jit' => $f >= 220 ? 1.5 : 0.0]);
+        }
+    }
+
+    // ── the thing
+    if ($g > 0.02 && $xM < $W + 260) {
+        // two tentacles that have hold of B and A, reaching from the thing to their waists
+        $grabs = [];
+        if ($f >= 186 && !$bDone) { $u = $ease($prog(186, 194)); $tx = $X($xM) + 0.5 * $rxM + ($bx - $X($xM) - 0.5 * $rxM) * $u; $ty = ($byM - 0.45 * $ryM) + (($gy - ($bLift2 + 0.46 * 92) * $S) - ($byM - 0.45 * $ryM)) * $u; $grabs[] = [$tx, $ty]; }
+        if ($f >= 216 && !$aDone) { $u = $ease($prog(216, 222)); $tx = $X($xM) + 0.5 * $rxM + ($ax - $X($xM) - 0.5 * $rxM) * $u; $ty = ($byM - 0.45 * $ryM) + (($gy - ($aLift2 + 0.46 * 112) * $S) - ($byM - 0.45 * $ryM)) * $u; $grabs[] = [$tx, $ty]; }
+        $m1 = $f < 232 ? 0.0 : ($f < 247 ? $prog(232, 246) : 0.0);
+        $m2 = $f < 254 ? 0.0 : ($f < 267 ? $prog(254, 264) : 0.0);
+        $swell = $f < 250 ? 0.0 : ($f < 268 ? 0.45 : 0.9 + 0.1 * sin($f * 0.5));
+        if ($f >= 296) $swell = 0.9;
+        $free = $f < 134 ? 0 : (int) round(1 + 7 * $prog(134, 176));
+        $mon = ig_fac_monster($im, $X($xM), $gy, $S, $f, ['g' => $g, 'mouth' => max($m1, $m2), 'swell' => $swell, 'scuttle' => $scut, 'free' => $free, 'grabs' => $grabs]);
+        // a bump travelling down the body after each gulp
+        foreach ([[247, 270], [267, 290]] as [$a, $b]) {
+            if ($f >= $a && $f < $b) {
+                $u = ($f - $a) / ($b - $a);
+                ig_austin_ell($im, $mon[0] - 4 * $S - 26 * $S * $u, $mon[1] + 2 * $S + 12 * $S * $u, (16 - 4 * $u) * $S, (13 - 3 * $u) * $S, imagecolorallocatealpha($im, 0x7A, 0xFF, 0x8A, 70 + (int) (40 * $u)));
+            }
+        }
+        // green blood where the clipboard hit a tentacle
+        if ($f >= 212 && $f < 226) {
+            $u = ($f - 212) / 14; $hx = $X($xA) - 46 * $S; $hy = $gy - 64 * $S;
+            for ($i = 0; $i < 9; $i++) {
+                $a = $i * 0.7 + 0.3; $v = 8 + $hash("gs$i") / 4;
+                ig_austin_ell($im, $hx + cos($a) * $v * $u * 3 * $S, $hy + sin($a) * $v * $u * 3 * $S + 12 * $u * $u * $S, (5 - 3 * $u) * $S, (5 - 3 * $u) * $S, imagecolorallocatealpha($im, 0x7A, 0xFF, 0x7A, (int) (20 + 80 * $u)));
+            }
+        }
+    }
 }
 
 // A photocopied zine flyer: cream stock, near-black ink, one loud spot
