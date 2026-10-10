@@ -43,6 +43,7 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 // pictures, one per 8s cycle (The Scream, Son of Man, Psycho, American Gothic):
 // 4 x 8s = 32s. Marquee's breeze has room for two gusts, and for leaves to fall the whole height of the card: 4 x 8s = 32s.
 function ig_anim_frames($theme) {
+    if ($theme === 'paper') return 3 * IG_ANIM_FRAMES;         // the widow's long drop and climb: 24s
     if ($theme === 'marquee') return 4 * IG_ANIM_FRAMES;       // a breeze with two gusts, and the time for its leaves to fall right across the page: 32s
     if ($theme === 'newsprint') return 3 * 82;
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
@@ -81,7 +82,10 @@ function ig_anim_key(array $item, $date) {
     imagepng($im);
     $png = ob_get_clean();
     imagedestroy($im);
-    return md5($png) . ':v' . IG_ANIM_VERSION;
+    // A theme whose animation changed without its still changing carries a revision number here, so
+    // a video cached from before the change is not mistaken for current.
+    static $rev = ['paper' => 2];
+    return md5($png) . ':v' . IG_ANIM_VERSION . (isset($rev[$item['theme']]) ? ':r' . $rev[$item['theme']] : '');
 }
 
 function ig_anim_fresh(array $item, $date, $i) {

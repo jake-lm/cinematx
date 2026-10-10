@@ -2654,6 +2654,10 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
     // unaffected. Every moving part is a whole number of cycles per loop so
     // the last frame leads straight back into the first.
     $t = $anim !== null ? $anim['frame'] / $anim['frames'] : 0.0;
+    // The October loop may run several 8-second cycles (see ig_anim_frames()). The webs, glints, small
+    // spider and patrol keep their own 8-second cycle, $tt; $t is the position in the whole loop, which
+    // the big widow's long drop is timed against.
+    $tt = $anim !== null ? fmod($t * $anim['frames'] / IG_ANIM_FRAMES, 1.0) : 0.0;
 
     // In October the paper warms to a parchment and the brand red turns a
     // burnt pumpkin orange (the fall half of the seasonal look; the
@@ -2694,20 +2698,24 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
         $small = ['x' => 800.0, 'len' => 54.0, 'phase' => null];
         if ($anim !== null) {
             $tau = 2 * M_PI;
-            $wobTop = 0.30 * sin($tau * 2 * $t);
-            $wobBot = 0.30 * sin($tau * 2 * $t + 1.7);
-            // Once a loop the widow drops: a fast fall that decelerates to
-            // 220px lower (about a third of a second — far enough to hang
-            // below the divider and over the top of the list), a beat's
-            // pause, then a slow, eased climb back up the thread (two
-            // seconds). Zero outside that window, so the loop closes.
-            $dropPx = 220;
-            $drop = 0.0;
-            if ($t >= 0.58 && $t < 0.62)     $drop = $dropPx * (1 - pow(1 - ($t - 0.58) / 0.04, 3));
-            elseif ($t >= 0.62 && $t < 0.67) $drop = (float) $dropPx;
-            elseif ($t >= 0.67 && $t < 0.93) $drop = $dropPx * (1 - ig_ease(($t - 0.67) / 0.26));
-            $big   = ['x' => 925 + 7 * sin($tau * 2 * $t),       'len' => 100 + 8 * sin($tau * $t + 1.0) + $drop, 'phase' => $tau * 8 * $t];
-            $small = ['x' => 800 + 4 * sin($tau * 3 * $t + 0.9), 'len' => 54 + 5 * sin($tau * 2 * $t + 0.6),     'phase' => $tau * 12 * $t + 2.0];
+            $wobTop = 0.30 * sin($tau * 2 * $tt);
+            $wobBot = 0.30 * sin($tau * 2 * $tt + 1.7);
+            // Once a loop the widow makes a long drop (the loop is three 8-second cycles; this is timed
+            // against all of it). She hangs in her usual place for the first third, then falls — faster
+            // and faster — most of the way down the card, over the listings, brought up short and bouncing
+            // on her thread; she hangs there, swaying, a few seconds; then climbs back hand over hand,
+            // slowly, in a rippling, eased climb, and rests again. Zero at both ends, so the loop closes.
+            $dropPx = 700;
+            if     ($t < 0.30)  $p = 0.0;
+            elseif ($t < 0.335) { $u = ($t - 0.30) / 0.035;  $p = $u * $u; }
+            elseif ($t < 0.46)  { $u = ($t - 0.335) / 0.125; $p = 1 + 0.05 * exp(-4 * $u) * sin(6 * M_PI * $u); }
+            elseif ($t < 0.92)  { $u = ($t - 0.46) / 0.46;   $p = max(0.0, 1 - ig_ease($u) + 0.02 * sin(24 * M_PI * $u) * sin(M_PI * $u)); }
+            else                $p = 0.0;
+            $drop = $dropPx * $p;
+            $moving = ($t >= 0.30 && $t < 0.92);
+            $big   = ['x' => 925 + (7 + 9 * min(1.0, $p)) * sin($tau * 2 * $tt), 'len' => 100 + 8 * sin($tau * $tt + 1.0) + $drop,
+                      'phase' => $tau * 8 * $tt + ($moving ? 0.55 * $anim['frame'] : 0.0)];
+            $small = ['x' => 800 + 4 * sin($tau * 3 * $tt + 0.9), 'len' => 54 + 5 * sin($tau * 2 * $tt + 0.6),     'phase' => $tau * 12 * $tt + 2.0];
         }
         ig_cobweb($im, $w - 40, 30, 210, $web, -1, 1, $wobTop);
         if ($anim !== null) {
@@ -2717,14 +2725,15 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
             // brief.
             $accent = imagecolorsforindex($im, $red);
             foreach ([[22.5, 0.46, 0.00], [45, 0.68, 0.43], [67.5, 0.46, 0.71], [45, 0.92, 0.14], [67.5, 0.92, 0.57], [22.5, 0.68, 0.86], [45, 0.26, 0.29]] as [$deg, $f, $ph]) {
-                $i = pow(max(0.0, sin(2 * M_PI * ($t + $ph))), 8);
+                $i = pow(max(0.0, sin(2 * M_PI * ($tt + $ph))), 8);
                 if ($i < 0.08) continue;
                 [$gx, $gy] = ig_web_junction($w - 40, 30, 210, -1, 1, $deg, $f);
                 ig_glint($im, $gx, $gy, 4 + 9 * $i, imagecolorallocatealpha($im, $accent['red'], $accent['green'], $accent['blue'], 127 - (int) round(105 * $i)));
             }
         }
         // Thread tops are fixed at y 20 and y 16; the body hangs $len below.
-        ig_spider($im, $big['x'],   20 + $big['len'],   $big['len'],   26, $dark, $red, 925, $big['phase']);
+        // (animated, the widow is drawn at the end of the page so her drop crosses the listings)
+        if ($anim === null) ig_spider($im, $big['x'], 20 + $big['len'], $big['len'], 26, $dark, $red, 925, $big['phase']);
         ig_spider($im, $small['x'], 16 + $small['len'], $small['len'], 13, $dark, null, 800, $small['phase']);
     }
 
@@ -2823,7 +2832,7 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
             // Glints on this web too, drawn over the list with it.
             $accent = imagecolorsforindex($im, $red);
             foreach ([[22.5, 0.68, 0.07], [45, 0.46, 0.50], [67.5, 0.68, 0.79], [45, 0.92, 0.21], [22.5, 0.92, 0.64], [67.5, 0.46, 0.36]] as [$deg, $f, $ph]) {
-                $i = pow(max(0.0, sin(2 * M_PI * ($t + $ph))), 8);
+                $i = pow(max(0.0, sin(2 * M_PI * ($tt + $ph))), 8);
                 if ($i < 0.08) continue;
                 [$gx, $gy] = ig_web_junction($w - 46, $h - 46, 180, -1, -1, $deg, $f);
                 ig_glint($im, $gx, $gy, 4 + 9 * $i, imagecolorallocatealpha($im, $accent['red'], $accent['green'], $accent['blue'], 127 - (int) round(105 * $i)));
@@ -2837,12 +2846,12 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
             // closes with the spider already standing still.
             $ax = 1012.0; $ay = 1292.0; $bx = 940.0; $by = 1219.0;
             $hAB = atan2($bx - $ax, -($by - $ay));
-            $u = fmod($t + 0.93, 1.0);
+            $u = fmod($tt + 0.93, 1.0);
             if ($u < 0.38)      { $s = ig_ease($u / 0.38);                 $hd = $hAB;                                   $sc = 0.2 + 0.8 * sin(M_PI * $u / 0.38); }
             elseif ($u < 0.48)  { $s = 1.0;                                $hd = $hAB + M_PI * ig_ease(($u - 0.38) / 0.10); $sc = 0.3; }
             elseif ($u < 0.86)  { $s = 1 - ig_ease(($u - 0.48) / 0.38);    $hd = $hAB + M_PI;                            $sc = 0.2 + 0.8 * sin(M_PI * ($u - 0.48) / 0.38); }
             else                { $s = 0.0;                                $hd = $hAB + M_PI + M_PI * ig_ease(($u - 0.86) / 0.14); $sc = 0.3; }
-            ig_spider_crawl($im, $ax + ($bx - $ax) * $s, $ay + ($by - $ay) * $s, 13, $dark, $hd, 2 * M_PI * 20 * $t, $sc);
+            ig_spider_crawl($im, $ax + ($bx - $ax) * $s, $ay + ($by - $ay) * $s, 13, $dark, $hd, 2 * M_PI * 20 * $tt, $sc);
         }
     }
 
@@ -2870,6 +2879,10 @@ function ig_build_list_page_paper(array $films, $date, $moreCount = 0, $anim = n
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
+
+    if ($season && $anim !== null) {
+        ig_spider($im, $big['x'], 20 + $big['len'], $big['len'], 26, $dark, $red, 925, $big['phase']);
+    }
 
     return $im;
 }
