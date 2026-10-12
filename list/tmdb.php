@@ -96,13 +96,14 @@ function tmdb_known_director_hint($title) {
 
 // The same problem as above, but a year — not a director — is what actually
 // disambiguates these, since it narrows the TMDB search itself rather than
-// just re-ranking whatever comes back. All three are Paramount classic
+// just re-ranking whatever comes back. Most are Paramount classic
 // re-releases: their own ticket page states each film's real year (see
 // scraper_paramount.php's year_hint), but that page has sat behind an
-// Incapsula bot wall this server can't get past since ~2026-09, so these
-// are hand-curated the same way a missing signal already is above. Add to
-// this list as they're found; check fetch_tmdb($title, null, ...) first
-// against what the venue actually says is playing, the same way the
+// Incapsula bot wall this server can't get past since ~2026-09. The rest
+// are listings (Alamo's, so far) that never state a year at all. Either
+// way these are hand-curated the same way a missing signal already is
+// above. Add to this list as they're found; check fetch_tmdb($title, null, ...)
+// first against what the venue actually says is playing, the same way the
 // director hints were found.
 const TMDB_KNOWN_YEAR_HINTS = [
     // "Friday the 13th" (1980, Sean S. Cunningham) — the original slasher,
@@ -115,6 +116,10 @@ const TMDB_KNOWN_YEAR_HINTS = [
     // "Frankenstein" (1931, James Whale) — the Boris Karloff classic, same
     // Oct. 14 bill. Popularity picks the 2025 Guillermo del Toro film.
     'frankenstein' => 1931,
+    // "9 to 5" (1980, Colin Higgins) — the Fonda/Tomlin/Parton comedy at
+    // Alamo (the listing carries no year). Popularity picks a 2023
+    // documentary short about a night-shift garbage truck instead.
+    '9 to 5' => 1980,
 ];
 
 function tmdb_known_year_hint($title) {
