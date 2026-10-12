@@ -45,7 +45,7 @@ const IG_VIDEO_POLL_SLEEP    = 5;
 function ig_anim_frames($theme) {
     if ($theme === 'paper') return 3 * IG_ANIM_FRAMES;         // the widow's long drop and climb: 24s
     if ($theme === 'marquee') return 4 * IG_ANIM_FRAMES;       // a breeze with two gusts, and the time for its leaves to fall right across the page: 32s
-    if ($theme === 'newsprint') return 3 * 82;
+    if ($theme === 'newsprint') return 4 * IG_ANIM_FRAMES;  // small groups of bats drifting behind the list: 32s
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
     if ($theme === 'austin') return 11 * IG_ANIM_FRAMES / 2; // the Big Wheel and the twins (16s), then a ghost captured down a full page (28s): 44s

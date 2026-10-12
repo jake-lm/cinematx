@@ -3206,6 +3206,40 @@ function ig_build_list_page_zine(array $films, $date, $moreCount = 0, $anim = nu
     return $im;
 }
 
+// ── Newsprint, Monday: the bats ──────────────────────────────────────────
+
+// The bats of a Monday: a steady, spaced-out flow of small groups — now one, now a pair, now three —
+// crossing the page behind the list, each on its own line, heading left or right, bobbing and
+// beating their wings. Everything is a function of the frame, so the loop closes, and each group
+// starts and ends fully off the card.
+function ig_news_bat_flow($im, $w, $anim, $color) {
+    // [spawn frame, frames to cross, heading (+1 = left to right), height, sway, tilt, [[behind, down, size, phase], ...]]
+    static $groups = [
+        [  0,  92, +1,  330, 26, -110, [[0,  0, 20, 0.0]]],
+        [ 64,  88, -1,  900, 34,   90, [[0,  0, 18, 0.0], [42,  16, 14, 1.9]]],
+        [128,  96, +1,  170, 24,   60, [[0,  0, 20, 0.0]]],
+        [192,  90, -1,  620, 36,  -80, [[0,  0, 20, 0.0], [38, -12, 15, 2.4], [74, 10, 13, 4.1]]],
+        [272,  88, +1, 1080, 28,  -60, [[0,  0, 19, 0.0], [44,  18, 14, 1.3]]],
+        [338,  84, -1,  460, 30,  100, [[0,  0, 18, 0.0]]],
+    ];
+    $T = $anim['frames']; $f = $anim['frame'] % $T;
+    $ft = $f * 12 / $anim['fps'];                              // the frame, in 12-fps frames
+    foreach ($groups as $gi => [$s, $life, $dir, $y0, $amp, $tilt, $bats]) {
+        $n = ($f - (int) round($s * $T / 384) + $T) % $T;
+        $life = (int) round($life * $T / 384);
+        if ($n >= $life) continue;
+        $u = $n / $life;
+        $behind = max(array_column($bats, 0));
+        $lead = -70 + ($w + 140 + $behind) * $u;               // the leader's progress across, in px
+        $gy = $y0 + $tilt * ($u - 0.5) + $amp * sin(2 * M_PI * (1.3 * $u + 0.37 * $gi));
+        foreach ($bats as [$bx, $by, $size, $ph]) {
+            $x = $dir > 0 ? $lead - $bx : ($w - $lead) + $bx;
+            $y = $gy + $by + 7 * sin(2 * M_PI * (5 * $u + $ph / 6.28));
+            ig_bat_silhouette($im, $x, $y, $size, $color, 0.7 * sin($ft * 1.7 + $ph + $gi));
+        }
+    }
+}
+
 // A real newspaper listings page: gray newsprint stock, black ink, red used
 // once and sparingly (showtimes only) rather than as a running accent.
 // Posters run grayscale, no color wash — actual newsprint photo
@@ -3239,13 +3273,13 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
 
     // October: a halftone moon in the header's empty right side with two
     // engraved clouds by it (one across its lower right, a small one at its
-    // upper left), and three bats over it. Animated, the clouds drift slowly
-    // to and fro and the bats fly across.
+    // upper left), and bats. Animated, the clouds drift slowly to and fro and
+    // small groups of bats cross behind the list, in front of the zebra stripes.
     $season = ig_halloween_season($date);
     $moonCx = 905; $moonCy = 201; $moonR = 56;
     if ($season) {
         ig_halftone_moon($im, $moonCx, $moonCy, $moonR, $ink);
-        $ph = $anim !== null ? 2 * M_PI * $anim['frame'] / $anim['frames'] : 0.0;
+        $ph = $anim !== null ? 2 * M_PI * 2 * $anim['frame'] / $anim['frames'] : 0.0;
         ig_news_cloud($im, 948 + 14 * sin($ph), 224 + 2 * sin(2 * $ph), 1.0, $ink, $paper);
         ig_news_cloud($im, 818 - 8 * sin($ph + 1.2), 158 + 2 * sin(2 * $ph + 0.7), 0.6, $ink, $paper);
     }
@@ -3273,11 +3307,37 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
         imagettftext($im, 28, 0, $margin, $y, $muted, IG_FONT_BODY, 'Nothing scraped for today — check back later.');
     }
 
+    // Z-order, back to front: the paper, the zebra stripes, the bats (October), then the posters,
+    // text and rules. So a bat crossing the page is in front of the dark rows and behind everything
+    // written on them.
+    // Zebra banding, same quiet trick as Neon's list page — every other row gets a faintly darker
+    // strip behind it.
+    // (Out of season the stripes are laid inside the row loop below, exactly as they always were.)
+    if ($season) {
+        foreach ($rows as $i => $_) {
+            if ($i % 2 === 1) {
+                $sy = $y + $i * $rowHeight;
+                imagefilledrectangle($im, $margin, $sy - 15, $w - $margin, $sy + $rowHeight - 15, $stripe);
+            }
+        }
+    }
+
+    // October's bats: in front of the stripes, behind the list's posters, text and rules. A soft
+    // ink, so one passing behind a title does not fight it. Still: three small ones by the moon.
+    if ($season) {
+        $batInk = ig_hex($im, '#4A4740');
+        if ($anim !== null) {
+            ig_news_bat_flow($im, $w, $anim, $batInk);
+        } else {
+            foreach ([[$moonCx - 33, $moonCy - 20, 21], [$moonCx + 60, $moonCy - 38, 14], [$moonCx - 72, $moonCy + 24, 15]] as [$bx, $by, $bs]) {
+                ig_bat_silhouette($im, $bx, $by, $bs, $batInk);
+            }
+        }
+    }
+
     $lastIndex = count($rows) - 1;
     foreach ($rows as $i => $film) {
-        // Zebra banding, same quiet trick as Neon's list page — every other
-        // row gets a faintly darker strip behind it.
-        if ($i % 2 === 1) {
+        if (!$season && $i % 2 === 1) {
             imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y + $rowHeight - 15, $stripe);
         }
 
@@ -3314,7 +3374,9 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
         imagettftext($im, $geo['metaSize'], 0, $textX, $y + $geo['timeOffsetY'], $red, IG_FONT_BODY, $time);
 
         $y += $rowHeight;
-        if ($i < $lastIndex) {
+        // The rule under a row. (In October the stripes are laid first, so a rule that the next row's
+        // stripe would have painted over is simply not drawn.)
+        if ($i < $lastIndex && (!$season || ($i + 1) % 2 !== 1)) {
             imagefilledrectangle($im, $margin, $y - 15, $w - $margin, $y - 14, $rule);
         }
     }
@@ -3334,42 +3396,6 @@ function ig_build_list_page_newsprint(array $films, $date, $moreCount = 0, $anim
     }
 
     imagettftext($im, 22, 0, $margin, $footerY, $muted, IG_FONT_BODY, 'Full schedule at cinematx.net');
-
-    if ($season) {
-        ig_news_classifieds($im, 640, 1196, $w - $margin, 1290, $ink, $red, $paper, ig_news_ads(), $anim);
-
-        // The bats: three of them, over the moon in the still. Animated, the
-        // three fly together, once per cycle (three flights a video), drawn last
-        // so they sweep over the screenings. They come up from low on the page —
-        // in from the left edge or the bottom, a different place each flight —
-        // on a curving path across the rows, over the middle of the moon and
-        // away off the right side of the card. Each follows the same path a
-        // little behind the last, at its own size, offset and wing beat. They
-        // are all off the page at the wrap, so the next flight starts with
-        // nothing to explain.
-        $flock = [[$moonCx - 33, $moonCy - 20, 42, 0.0], [$moonCx + 60, $moonCy - 38, 28, 0.45], [$moonCx - 72, $moonCy + 24, 30, -0.35]];
-        if ($anim !== null) {
-            $per = (int) ($anim['frames'] / 3);                      // three flights per video (see ig_anim_frames())
-            $fl  = intdiv($anim['frame'], $per) % 3;
-            $t   = ($anim['frame'] % $per) / $per;
-            [$sx, $sy] = [[-80, 1250], [260, 1430], [-80, 760]][$fl];
-            // Waypoints: the start, a belly out to the lower right, a point
-            // short of the moon at a shallow angle, the middle of the moon, and
-            // out of the right side below the forecast box.
-            $wx = $moonCx - 150; $wy = $moonCy + 125;
-            $dx = $wx - $sx; $dy = $wy - $sy; $L = hypot($dx, $dy);
-            $path = [[$sx, $sy], [($sx + $wx) / 2 - $dy / $L * 110, ($sy + $wy) / 2 + $dx / $L * 110], [$wx, $wy], [$moonCx, $moonCy + 6], [$moonCx + 110, $moonCy - 8], [1240, $moonCy - 28]];
-            $flock = [];
-            foreach ([[0.0, 0, 0, 44, 0.0], [0.06, -34, 26, 38, 1.9], [0.11, 30, 38, 34, 3.7]] as [$dl, $ox, $oy, $sz, $ph]) {
-                $u = ($t - $dl) / 0.84;
-                if ($u <= 0 || $u >= 1) continue;
-                [$bx, $by, $nx, $ny] = ig_path_point($path, $u);
-                $wob = 12 * sin(2 * M_PI * 6 * $u + $ph);
-                $flock[] = [$bx + $nx * $wob + $ox, $by + $ny * $wob + $oy, $sz, 0.7 * sin(2 * M_PI * (22 * $t + $ph))];
-            }
-        }
-        foreach ($flock as [$bx, $by, $bs, $flap]) ig_bat_silhouette($im, $bx, $by, $bs, $ink, $flap);
-    }
 
     return $im;
 }
