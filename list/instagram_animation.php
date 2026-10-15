@@ -48,7 +48,7 @@ function ig_anim_frames($theme) {
     if ($theme === 'newsprint') return 4 * IG_ANIM_FRAMES;  // small groups of bats drifting behind the list: 32s
     if ($theme === 'darkroom') return 4 * IG_ANIM_FRAMES;   // four prints develop: 32s
     if ($theme === 'zine') return 3 * IG_ANIM_FRAMES;       // three posters, a gust between each: 24s
-    if ($theme === 'austin') return 11 * IG_ANIM_FRAMES / 2; // the Big Wheel and the twins (16s), then a ghost captured down a full page (28s): 44s
+    if ($theme === 'austin') return 3 * IG_ANIM_FRAMES;     // bats and a tumbleweed, with the tower's lamps flickering once: 24s
     return ($theme === 'neon' ? 6 : 1) * IG_ANIM_FRAMES;
 }
 
@@ -84,7 +84,7 @@ function ig_anim_key(array $item, $date) {
     imagedestroy($im);
     // A theme whose animation changed without its still changing carries a revision number here, so
     // a video cached from before the change is not mistaken for current.
-    static $rev = ['paper' => 2];
+    static $rev = ['paper' => 2, 'austin' => 3];
     return md5($png) . ':v' . IG_ANIM_VERSION . (isset($rev[$item['theme']]) ? ':r' . $rev[$item['theme']] : '');
 }
 
