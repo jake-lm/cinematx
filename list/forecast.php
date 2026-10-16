@@ -537,22 +537,17 @@ function forecast_week_by_day($conn, $weekOf) {
     $start = strtotime($weekOf);
     $end   = strtotime('+10 day', $start) - 1;
     $films = fetch_all_screenings($conn, $start, $end, false);
-    // IG_VENUES on its own is the *daily Instagram carousel's* venue
-    // list — Alamo and We Luv Video are both deliberately excluded from
-    // it (Alamo gets its own separate carousel flow,
-    // ig_alamo_films()/_admin/instagram_alamo.php, for reasons specific to
-    // that feature: opt-in stacking, one repeat-showing card per day; We
-    // Luv Video was left off the curated arthouse lineup the daily post is
-    // meant to promote). None of that applies to Forecast, which just
-    // wants every film actually playing this week, so both are added on
-    // here rather than into the shared constant — folding them into
-    // IG_VENUES itself would silently pull them into the daily carousel
-    // too. Alamo's five locations collapse under one venue name ('Alamo
-    // Drafthouse') the same way the other three venues would if they had
-    // branches — the title-only dedup below already merges a film across
-    // every location and night it plays into one entry with several
-    // showtimes, exactly like a same-title booking spanning two "real"
-    // venues.
+    // IG_VENUES is the *daily Instagram carousel's* venue list. Alamo is not in it (it gets its own
+    // separate carousel flow, ig_alamo_films()/_admin/instagram_alamo.php, for reasons specific to
+    // that feature: opt-in stacking, one repeat-showing card per day), so it is added on here: Forecast
+    // just wants every film actually playing this week. We Luv Video used to be left off the daily
+    // carousel as outside the curated arthouse lineup and was added here by name; it joined
+    // IG_VENUES on 2026-10-16, so the explicit entry below is now redundant, and is kept only so
+    // Forecast does not depend on what the carousel includes. Alamo's five locations collapse under
+    // one venue name ('Alamo Drafthouse') the same way the other three venues would if they had
+    // branches — the title-only dedup below already merges a film across every location and night
+    // it plays into one entry with several showtimes, exactly like a same-title booking spanning
+    // two "real" venues.
     $films = array_values(array_filter($films, fn($f) => in_array($f['venue'], IG_VENUES, true) || $f['venue'] === IG_ALAMO_VENUE || $f['venue'] === 'We Luv Video'));
     $films = ctx_enrich($films);
 

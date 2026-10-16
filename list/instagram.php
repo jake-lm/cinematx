@@ -56,13 +56,14 @@ define('IG_FONT_DARKROOM_TITLE', dirname(__DIR__) . '/assets/fonts/AllertaStenci
 
 // ── Data ─────────────────────────────────────────────────────────────────
 
-// The arthouse venues this post is meant to promote — not the chains
+// The arthouse venues this post is meant to promote (We Luv Video, the North Loop video
+// store, included) — not the chains
 // (Alamo Drafthouse, Fathom Events) and not real member-submitted `events`
 // (source 'user', kept out until public engagement is actually on). Alamo
 // is still selectable on a per-day basis, though — see ig_alamo_films().
 // An admin-added screening (source 'admin', see _admin/events.php) is let
 // in regardless of venue name — see ig_arthouse_films()'s filter.
-const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club', 'Flick Clique'];
+const IG_VENUES = ['Austin Film Society', 'Paramount Theatre', 'Hyperreal Film Club', 'Flick Clique', 'We Luv Video'];
 const IG_ALAMO_VENUE = 'Alamo Drafthouse';
 
 // The admin page's own "today." Past IG_ADMIN_CUTOVER_HOUR (10pm Central —
@@ -223,6 +224,14 @@ function ig_film_key(array $film) {
     return mb_strtolower(trim($film['title'])) . '|' . $film['venue'] . '|' . ($film['location'] ?? '');
 }
 
+// "A:B", "A : B" and "A:  B" all become "A: B", and runs of spaces collapse to one. Only a colon
+// that is followed by a letter is touched, so a time or a ratio in a title ("9:30", "16:9") is
+// left alone.
+function ig_tidy_title($title) {
+    $title = preg_replace('/(?<=[\p{L}\p{N}\)\]!?\'"])\s*:\s*(?=\p{L})/u', ': ', (string) $title);
+    return trim(preg_replace('/\s{2,}/u', ' ', $title));
+}
+
 /**
  * A film playing twice in one day at the same venue (a scraper row per
  * showing, since the AFS parser fix) is one listing here, not two — one
@@ -239,6 +248,11 @@ function ig_film_key(array $film) {
 function ig_group_showtimes(array $films, $keyFn = 'ig_film_key') {
     $groups = [];
     foreach ($films as $film) {
+        // A venue sometimes types one event's title two ways across its showings — "MIASMA:THE VHS
+        // TOUR" and "MIASMA: THE VHS TOUR" — which would make two rows of one screening. Tidy the
+        // spacing around colons (and runs of spaces) first; a title already written with ": "
+        // comes out unchanged, so every other key and title is as it was.
+        $film['title'] = ig_tidy_title($film['title']);
         $key = $keyFn($film);
         if (isset($groups[$key])) {
             $groups[$key]['timestamps'][] = $film['timestamp'];
