@@ -2011,8 +2011,9 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haun
     // null and is unaffected.
     if ($anim !== null) {
         $n = 4 * max(2, (int) round($n / 4));
-        // One step every six frames (12 fps: two beats a second).
-        $step = intdiv($anim['frame'], 6) % 4;
+        // One step every twelve frames (12 fps: a beat a second) — it was every six, and read as
+        // frantic; the 384-frame loop is a whole number of fours of these, so it still closes.
+        $step = intdiv($anim['frame'], 12) % 4;
     }
 
     // Haunted: a fixed, index-keyed handful of bulbs are burnt out and a
@@ -2097,7 +2098,7 @@ function ig_marquee_bulbs($im, $x1, $y1, $x2, $y2, $spacing, $glow, $bulb, $haun
             // with only the burnt-out ones leaving gaps; the flickerers
             // additionally drop out now and then when it reaches them.
             $lit = ((($i - $step) % 4) + 4) % 4 === 0;
-            if ($lit && $state === 1 && crc32('f' . $i . ':' . intdiv($anim['frame'], 6)) % 3 === 0) {
+            if ($lit && $state === 1 && crc32('f' . $i . ':' . intdiv($anim['frame'], 12)) % 3 === 0) {
                 $lit = false;
             }
             if ($lit) {

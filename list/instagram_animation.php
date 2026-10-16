@@ -84,7 +84,7 @@ function ig_anim_key(array $item, $date) {
     imagedestroy($im);
     // A theme whose animation changed without its still changing carries a revision number here, so
     // a video cached from before the change is not mistaken for current.
-    static $rev = ['paper' => 2, 'austin' => 3];
+    static $rev = ['paper' => 2, 'austin' => 3, 'marquee' => 2];
     return md5($png) . ':v' . IG_ANIM_VERSION . (isset($rev[$item['theme']]) ? ':r' . $rev[$item['theme']] : '');
 }
 
