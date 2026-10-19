@@ -34,7 +34,7 @@ function fetch_afs_films($force = false) {
 //  screening is published.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const AFS_SCREENING_CACHE_V = 5;
+const AFS_SCREENING_CACHE_V = 6;
 
 function fetch_afs_detail($url) {
     $empty = ['series' => null, 'director' => null, 'poster' => null, 'runtime' => null, 'overview' => null, 'format' => null];
@@ -89,7 +89,11 @@ function fetch_afs_detail($url) {
             // captured here at all: the only reason to know this field
             // exists is to call out a real print, so a value only ever
             // lands in $format when there's actually something to say.
-            if (preg_match('/,\s*((?:16|35|70)\s?mm)\s*$/i', $text, $fm)) {
+            // Not necessarily last: a subtitled film's line carries its
+            // language after the format ("…, 35mm, In Italian with English
+            // subtitles."), so this only needs the format as its own
+            // comma-separated beat.
+            if (preg_match('/,\s*((?:16|35|70)\s?mm)\s*(?:,|$)/i', $text, $fm)) {
                 $format = strtolower(str_replace(' ', '', $fm[1]));
             }
             break;
