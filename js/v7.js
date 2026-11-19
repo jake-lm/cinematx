@@ -268,7 +268,9 @@
   function initTheme() {
     var btn = $('#theme');
     if (!btn) return;
-    function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+    // Marquee's dark variant counts too — a stored Marquee family loads as
+    // 'marquee-dark', and this button should read that as dark, not light.
+    function isDark() { return /dark$/.test(document.documentElement.getAttribute('data-theme') || ''); }
     function paint() {
       btn.innerHTML = '<i class="fa-solid fa-' + (isDark() ? 'sun' : 'moon') + '"></i>';
       btn.title = isDark() ? 'Light' : 'Dark';
@@ -277,6 +279,13 @@
     btn.addEventListener('click', function () {
       var next = isDark() ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
+      // The load-time script in _head.php reads the per-family mode key first
+      // and only falls back to 'ctx-theme', so a stale value there — left by
+      // the parked theme switcher — outvoted this button on every reload and
+      // snapped the page back to dark. This button is the paper theme's
+      // light/dark toggle, so it writes exactly what that script reads.
+      store.set('ctx-theme-family', 'paper');
+      store.set('ctx-theme-mode-paper', next);
       store.set('ctx-theme', next);
       paint();
     });
