@@ -6204,3 +6204,310 @@ button, input, select, textarea {
     font-size: var(--t-xs);
   }
 }
+.journal {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--s-4) 0 var(--s-8);
+}
+
+.journal__mast {
+  border-top: 4px solid var(--text);
+  text-align: center;
+}
+
+.journal__name {
+  margin: 0;
+  padding: var(--s-5) 0 var(--s-4);
+  font-family: var(--f-display);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 600;
+  font-variation-settings: "SOFT" 22, "WONK" 1;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.journal__strap {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  padding: var(--s-2) 0;
+  border-top: 1px solid var(--text);
+  border-bottom: 3px double var(--text);
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.journal__strap .c {
+  color: var(--red-hi);
+}
+
+.jlead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--s-6);
+  padding: var(--s-6) 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.jlead--text {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.jlead__art {
+  display: block;
+  aspect-ratio: 4/3;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.jlead__art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.jlead__art:hover img {
+  opacity: 0.92;
+}
+
+.jlead__txt {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+
+.jkicker {
+  display: flex;
+  gap: var(--s-3);
+  margin-bottom: var(--s-3);
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.jkicker__type {
+  color: var(--red-hi);
+}
+
+.jlead__title {
+  margin: 0 0 var(--s-3);
+  font-family: var(--f-display);
+  font-size: clamp(28px, 3.6vw, 46px);
+  font-weight: 600;
+  font-variation-settings: "SOFT" 22, "WONK" 1;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.jlead__title a {
+  color: inherit;
+}
+.jlead__title a:hover {
+  color: var(--red-hi);
+}
+
+.jlead__deck {
+  margin: 0 0 var(--s-4);
+  font-family: var(--f-read);
+  font-size: var(--t-xl);
+  font-style: italic;
+  font-weight: 300;
+  line-height: 1.36;
+  color: var(--text-2);
+}
+
+.jby {
+  margin-bottom: var(--s-4);
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.jby a:hover {
+  color: var(--red-hi);
+}
+
+.jlead__excerpt {
+  margin: 0 0 var(--s-4);
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  line-height: 1.65;
+  color: var(--text-2);
+}
+
+.jmore {
+  align-self: flex-start;
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--red-hi);
+  font-variant-numeric: tabular-nums;
+}
+.jmore:hover {
+  text-decoration: underline;
+}
+
+.jyear {
+  margin-top: var(--s-6);
+}
+
+.jgrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.jitem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--s-5);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+.jitem:nth-child(-n+3) {
+  border-top: none;
+  padding-top: 0;
+}
+.jitem:nth-child(3n+1) {
+  border-left: none;
+  padding-left: 0;
+}
+.jitem:nth-child(3n) {
+  padding-right: 0;
+}
+
+.jitem__art {
+  display: block;
+  aspect-ratio: 3/2;
+  margin-bottom: var(--s-3);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+}
+.jitem__art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.jitem__title {
+  margin: 0 0 var(--s-2);
+  font-family: var(--f-display);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  font-variation-settings: "SOFT" 22, "WONK" 1;
+  line-height: 1.12;
+  letter-spacing: -0.018em;
+  color: var(--text);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.jitem__deck,
+.jitem__excerpt {
+  margin: 0 0 var(--s-3);
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  line-height: 1.45;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.jitem__deck {
+  font-style: italic;
+  font-weight: 300;
+}
+
+.jitem .jby {
+  margin: auto 0 0;
+  padding-top: var(--s-2);
+}
+
+.jitem:hover .jitem__title {
+  color: var(--red-hi);
+}
+.jitem:hover .jitem__art img {
+  opacity: 0.9;
+}
+
+.jpager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--s-7);
+  padding-top: var(--s-5);
+  border-top: 1px solid var(--line-2);
+}
+
+.jpager__n {
+  font-family: var(--f-ui);
+  font-size: var(--t-3xs);
+  font-weight: 600;
+  letter-spacing: var(--track);
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .jgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .jitem:nth-child(n) {
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+    padding: var(--s-5);
+  }
+  .jitem:nth-child(-n+2) {
+    border-top: none;
+    padding-top: 0;
+  }
+  .jitem:nth-child(2n+1) {
+    border-left: none;
+    padding-left: 0;
+  }
+  .jitem:nth-child(2n) {
+    padding-right: 0;
+  }
+}
+@media (max-width: 760px) {
+  .jlead {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-5);
+  }
+}
+@media (max-width: 600px) {
+  .jgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jitem:nth-child(n) {
+    border-left: none;
+    border-top: 1px solid var(--line);
+    padding: var(--s-5) 0;
+  }
+  .jitem:nth-child(1) {
+    border-top: none;
+    padding-top: 0;
+  }
+}

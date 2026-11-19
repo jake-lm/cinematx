@@ -184,7 +184,7 @@ require __DIR__ . '/_chrome.php';
           <div class="card__head">
             <span class="card__n">03</span>
             <span class="card__title">The Journal</span>
-            <a class="card__more" href="/list">Archive &rarr;</a>
+            <a class="card__more" href="/journal">Archive &rarr;</a>
           </div>
           <div class="card__body">
             <?php if ($lead): ?>
