@@ -2,13 +2,14 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  CINEMA, TX — The Journal, the archive
 //
-//  Every published essay and review, built from the same pieces The List is:
-//  the listing header, filter chips, a view toggle and rows. Two views —
-//  columns (a lead story, then compact stories in ruled newspaper columns)
-//  and a plain list — and a filter by type. All of it is ordinary links
-//  (?type=, ?view=, ?page=), so there's no script and every state can be
-//  bookmarked. The toggles deliberately don't use data-view / data-narrow:
-//  the List's script binds those site-wide.
+//  Every published essay and review, laid out the way a modern editorial
+//  front page is: one loud lead with a big cover, a short stack of the next
+//  stories beside it, then image-forward cards in date order, grouped by
+//  year. Underneath it's still The List's own parts — the listing header,
+//  filter chips, a view toggle, rows for the plain list — and all of it is
+//  ordinary links (?type=, ?view=, ?page=), so there's no script and every
+//  state can be bookmarked. The toggles deliberately avoid data-view /
+//  data-narrow: the List's script binds those site-wide.
 //
 //  Same posts the front page's Journal card draws from (type 'essay' or
 //  'review'); that card's "Archive" link lands here.
@@ -16,13 +17,16 @@
 require dirname(__DIR__) . '/v7/_lib.php';
 
 const JOURNAL_TYPES = ['essay' => 'Essays', 'review' => 'Reviews'];
+const JOURNAL_SIDE  = 3;    // stories stacked beside the lead, page 1 only
 
 $type = isset(JOURNAL_TYPES[$_GET['type'] ?? '']) ? $_GET['type'] : null;
-$view = ($_GET['view'] ?? '') === 'list' ? 'list' : 'columns';
+$view = ($_GET['view'] ?? '') === 'list' ? 'list' : 'cards';
 $per  = $view === 'list' ? 30 : 12;
 
 // $type is whitelisted above, so it's safe to inline.
 $where = "p.active = 1 AND p.type IN ('review','essay')" . ($type ? " AND p.type = '$type'" : '');
+$sel   = "SELECT p.*, u.name AS author_name, u.photo AS author_photo
+          FROM posts p LEFT JOIN users u ON p.uid = u.id";
 
 // Chip counts ignore the current filter — they say how much each one holds.
 $counts = $conn->query(
@@ -34,35 +38,33 @@ $n_all = array_sum($counts);
 $total = (int)$conn->query("SELECT COUNT(*) FROM posts p WHERE $where")->fetchColumn();
 
 // The lead is the editor's pick — the latest featured piece, or just the
-// newest when nothing is featured. Columns view only; the list is a plain
-// index. It's excluded from the paged stories on every page so it never
-// shows twice, and only rendered on the first.
+// newest when nothing is featured. Cards view only; the list is a plain
+// index. Everything else is ordered by date.
 $lead = null;
-if ($view === 'columns') {
-    $lead = $conn->query(
-        "SELECT p.*, u.name AS author_name
-         FROM posts p LEFT JOIN users u ON p.uid = u.id
-         WHERE $where
-         ORDER BY p.featured DESC, p.stamp DESC LIMIT 1"
-    )->fetch(PDO::FETCH_ASSOC) ?: null;
+if ($view === 'cards') {
+    $lead = $conn->query("$sel WHERE $where ORDER BY p.featured DESC, p.stamp DESC LIMIT 1")
+                 ->fetch(PDO::FETCH_ASSOC) ?: null;
 }
+$rest_where = $where . ($lead ? " AND p.id != " . (int)$lead['id'] : '');
+$order      = "ORDER BY COALESCE(p.edited, p.stamp) DESC";
 
-$n_rest = $total - ($lead ? 1 : 0);
-$pages  = max(1, (int)ceil($n_rest / $per));
+// The first few after the lead sit beside it on page 1, so the card grid
+// starts after them — and on later pages, still skips them.
+$skip   = $lead ? JOURNAL_SIDE : 0;
+$n_grid = max(0, $total - ($lead ? 1 : 0) - $skip);
+$pages  = max(1, (int)ceil($n_grid / $per));
 $page   = min(max(1, (int)($_GET['page'] ?? 1)), $pages);
 
-$rest = $conn->query(
-    "SELECT p.*, u.name AS author_name
-     FROM posts p LEFT JOIN users u ON p.uid = u.id
-     WHERE $where" . ($lead ? " AND p.id != " . (int)$lead['id'] : "") . "
-     ORDER BY COALESCE(p.edited, p.stamp) DESC
-     LIMIT $per OFFSET " . (($page - 1) * $per)
-)->fetchAll(PDO::FETCH_ASSOC);
+$side = ($lead && $page === 1)
+    ? $conn->query("$sel WHERE $rest_where $order LIMIT " . JOURNAL_SIDE)->fetchAll(PDO::FETCH_ASSOC)
+    : [];
+$grid = $conn->query("$sel WHERE $rest_where $order LIMIT $per OFFSET " . ($skip + ($page - 1) * $per))
+             ->fetchAll(PDO::FETCH_ASSOC);
 
 // By year, newest first — the same label-and-rule heading The List uses for
 // a day, so a long archive reads as sections rather than one long run.
 $by_year = [];
-foreach ($rest as $p) $by_year[date('Y', $p['edited'] ?: $p['stamp'])][] = $p;
+foreach ($grid as $p) $by_year[date('Y', $p['edited'] ?: $p['stamp'])][] = $p;
 
 /** This page's own URL with some parameters changed; defaults are left out. */
 $url = function (array $over = []) use ($type, $view) {
@@ -79,6 +81,29 @@ function journal_excerpt($text, $max) {
     if (!preg_match('/\s/u', mb_substr($text, $max, 1))) $cut = preg_replace('/\s+\S*$/u', '', $cut);
     return rtrim($cut, " ,;:.-—") . '…';
 }
+
+function journal_read_time($content) {
+    $words = preg_match_all('/\S+/u', (string)$content);
+    return max(1, (int)ceil($words / 220)) . ' min read';
+}
+
+/** Byline: avatar (their photo, or an initial), name, reading time. */
+function journal_byline(array $p, $link = false) {
+    $name = trim((string)($p['author_name'] ?? ''));
+    $h = '<span class="jby">';
+    if ($name !== '') {
+        $h .= !empty($p['author_photo'])
+            ? '<img class="jav" src="/uploads/profiles/' . ctx_e($p['author_photo']) . '" alt="" />'
+            : '<span class="jav jav--i">' . ctx_e(mb_strtoupper(mb_substr($name, 0, 1))) . '</span>';
+        $by = $link
+            ? '<a href="/users/profile.php?id=' . (int)$p['uid'] . '">' . ctx_e($name) . '</a>'
+            : ctx_e($name);
+        $h .= '<span>By ' . $by . '</span><span class="jby__dot">&middot;</span>';
+    }
+    return $h . '<span class="jby__read">' . journal_read_time($p['content']) . '</span></span>';
+}
+
+function journal_date($p, $fmt = 'j M Y') { return date($fmt, $p['edited'] ?: $p['stamp']); }
 
 $e = 'ctx_e';
 
@@ -98,12 +123,12 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <div class="listing__head listing__head--paper">
         <div class="listing__title">
           <h1 class="listing__h">The Journal</h1>
-          <span class="listing__sub"><?php echo $total; ?> <?php echo $total === 1 ? 'piece' : 'pieces'; ?></span>
+          <span class="jtag">Essays &amp; reviews from Cinema<span class="c">,</span> TX</span>
         </div>
 
         <div class="listing__controls">
           <div class="seg">
-            <a class="seg__btn<?php echo $view === 'columns' ? ' is-on' : ''; ?>" href="<?php echo $e($url(['view' => null])); ?>" title="Columns" aria-label="Columns"><i class="fa-solid fa-newspaper"></i></a>
+            <a class="seg__btn<?php echo $view === 'cards' ? ' is-on' : ''; ?>" href="<?php echo $e($url(['view' => null])); ?>" title="Cards" aria-label="Cards"><i class="fa-solid fa-table-cells-large"></i></a>
             <a class="seg__btn<?php echo $view === 'list' ? ' is-on' : ''; ?>" href="<?php echo $e($url(['view' => 'list'])); ?>" title="List" aria-label="List"><i class="fa-solid fa-list"></i></a>
           </div>
 
@@ -123,32 +148,47 @@ require dirname(__DIR__) . '/v7/_chrome.php';
       <?php if ($lead && $page === 1):
         $lead_url    = ctx_post_url($lead['id'], $lead['title']);
         $lead_images = ctx_post_images($lead);
-        $lead_text   = journal_excerpt($lead['content'], 300);
+        $lead_dek    = !empty($lead['subtitle']) ? $lead['subtitle'] : journal_excerpt($lead['content'], 220);
       ?>
-      <article class="jlead<?php echo $lead_images ? '' : ' jlead--text'; ?>">
-        <?php if ($lead_images): ?>
-        <a class="jlead__art" href="<?php echo $e($lead_url); ?>">
-          <img src="/uploads/posts/<?php echo $e($lead_images[0]['file']); ?>" alt="" />
-        </a>
-        <?php endif; ?>
-        <div class="jlead__txt">
-          <div class="jkicker">
-            <span class="jkicker__type"><?php echo $e($lead['type'] ?: 'Essay'); ?></span>
-            <span><?php echo date('j F Y', $lead['edited'] ?: $lead['stamp']); ?></span>
-            <?php if (!empty($lead['author_name'])): ?>
-            <span>By <a href="/users/profile.php?id=<?php echo (int)$lead['uid']; ?>"><?php echo $e($lead['author_name']); ?></a></span>
-            <?php endif; ?>
+      <section class="jfront<?php echo $side ? '' : ' jfront--solo'; ?>">
+        <article class="jhero<?php echo $lead_images ? '' : ' jhero--text'; ?>">
+          <?php if ($lead_images): ?>
+          <a class="jhero__art" href="<?php echo $e($lead_url); ?>">
+            <img src="/uploads/posts/<?php echo $e($lead_images[0]['file']); ?>" alt="" />
+          </a>
+          <?php endif; ?>
+          <div class="jhero__txt">
+            <div class="jkicker">
+              <?php if (!empty($lead['featured'])): ?><span class="pill pill--featured">Featured</span><?php endif; ?>
+              <span class="jkicker__type"><?php echo $e($lead['type'] ?: 'Essay'); ?></span>
+              <span><?php echo journal_date($lead, 'j F Y'); ?></span>
+            </div>
+            <h2 class="jhero__title"><a href="<?php echo $e($lead_url); ?>"><?php echo $e($lead['title']); ?></a></h2>
+            <?php if ($lead_dek !== ''): ?><p class="jhero__dek"><?php echo $e($lead_dek); ?></p><?php endif; ?>
+            <?php echo journal_byline($lead, true); ?>
           </div>
-          <h2 class="jlead__title"><a href="<?php echo $e($lead_url); ?>"><?php echo $e($lead['title']); ?></a></h2>
-          <?php if (!empty($lead['subtitle'])): ?>
-          <p class="jlead__deck"><?php echo $e($lead['subtitle']); ?></p>
-          <?php endif; ?>
-          <?php if ($lead_text !== ''): ?>
-          <p class="jlead__excerpt"><?php echo $e($lead_text); ?></p>
-          <?php endif; ?>
-          <a class="jmore" href="<?php echo $e($lead_url); ?>">Read in full &rarr;</a>
-        </div>
-      </article>
+        </article>
+
+        <?php if ($side): ?>
+        <aside class="jside" aria-label="Also in the Journal">
+          <?php foreach ($side as $p): $imgs = ctx_post_images($p); ?>
+          <a class="jside__item<?php echo $imgs ? '' : ' jside__item--text'; ?>" href="<?php echo $e(ctx_post_url($p['id'], $p['title'])); ?>">
+            <span class="jside__txt">
+              <span class="jkicker">
+                <span class="jkicker__type"><?php echo $e($p['type']); ?></span>
+                <span><?php echo journal_date($p); ?></span>
+              </span>
+              <span class="jside__title"><?php echo $e($p['title']); ?></span>
+              <?php echo journal_byline($p); ?>
+            </span>
+            <?php if ($imgs): ?>
+            <span class="jside__art"><img src="/uploads/posts/<?php echo $e($imgs[0]['file']); ?>" alt="" loading="lazy" /></span>
+            <?php endif; ?>
+          </a>
+          <?php endforeach; ?>
+        </aside>
+        <?php endif; ?>
+      </section>
       <?php endif; ?>
 
       <?php foreach ($by_year as $year => $items): ?>
@@ -166,35 +206,29 @@ require dirname(__DIR__) . '/v7/_chrome.php';
             <span class="row__type"><?php echo $e($p['type']); ?></span>
             <span class="row__title"><?php echo $e($p['title']); ?></span>
             <?php if (!empty($p['author_name'])): ?><span class="row__by"><?php echo $e($p['author_name']); ?></span><?php endif; ?>
-            <span class="row__meta"><?php echo date('j M Y', $p['edited'] ?: $p['stamp']); ?></span>
+            <span class="row__meta"><?php echo journal_date($p); ?></span>
           </a>
           <?php endforeach; ?>
         </div>
         <?php else: ?>
-        <div class="jcols">
+        <div class="jgrid">
           <?php foreach ($items as $p):
-            $imgs   = ctx_post_images($p);
-            $teaser = !empty($p['subtitle']) ? null : journal_excerpt($p['content'], 150);
+            $imgs = ctx_post_images($p);
+            $dek  = !empty($p['subtitle']) ? $p['subtitle'] : journal_excerpt($p['content'], 170);
           ?>
-          <a class="jitem<?php echo $imgs ? '' : ' jitem--text'; ?>" href="<?php echo $e(ctx_post_url($p['id'], $p['title'])); ?>">
+          <a class="jcard<?php echo $imgs ? '' : ' jcard--text'; ?>" href="<?php echo $e(ctx_post_url($p['id'], $p['title'])); ?>">
             <?php if ($imgs): ?>
-            <span class="jitem__art"><img src="/uploads/posts/<?php echo $e($imgs[0]['file']); ?>" alt="" loading="lazy" /></span>
+            <span class="jcard__art"><img src="/uploads/posts/<?php echo $e($imgs[0]['file']); ?>" alt="" loading="lazy" /></span>
             <?php endif; ?>
-            <span class="jitem__txt">
-              <span class="jkicker">
-                <span class="jkicker__type"><?php echo $e($p['type']); ?></span>
-                <span><?php echo date('j M Y', $p['edited'] ?: $p['stamp']); ?></span>
-              </span>
-              <span class="jitem__title"><?php echo $e($p['title']); ?></span>
-              <?php if (!empty($p['subtitle'])): ?>
-              <span class="jitem__deck"><?php echo $e($p['subtitle']); ?></span>
-              <?php elseif ($teaser !== null && $teaser !== ''): ?>
-              <span class="jitem__excerpt"><?php echo $e($teaser); ?></span>
-              <?php endif; ?>
-              <?php if (!empty($p['author_name'])): ?>
-              <span class="jby">By <?php echo $e($p['author_name']); ?></span>
-              <?php endif; ?>
+            <span class="jkicker">
+              <span class="jkicker__type"><?php echo $e($p['type']); ?></span>
+              <span><?php echo journal_date($p); ?></span>
             </span>
+            <span class="jcard__title"><?php echo $e($p['title']); ?></span>
+            <?php if ($dek !== ''): ?>
+            <span class="jcard__dek<?php echo !empty($p['subtitle']) ? ' jcard__dek--deck' : ''; ?>"><?php echo $e($dek); ?></span>
+            <?php endif; ?>
+            <?php echo journal_byline($p); ?>
           </a>
           <?php endforeach; ?>
         </div>

@@ -4017,140 +4017,159 @@ button, input, select, textarea { font: inherit; color: inherit; }
 // ═══════════════════════════════════════════════════════════════════════════
 //  JOURNAL — /journal/
 //
-//  Built from The List's own parts — .listing__head with its title, seg and
-//  chips, .day__label for each year, .rows-view and .row for the plain list
-//  — plus a lead and a set of newspaper columns. Left-aligned and tight:
-//  nothing here centres or pads for effect.
+//  An editorial front page in the site's own terms. Hierarchy first: one
+//  loud lead with a big cover, a quiet stack beside it, then image-forward
+//  cards — the same "one loud element, everything else compact and muted"
+//  the rest of the site is built on. The header, chips, seg, year labels
+//  and rows are The List's own parts; fonts and colours are the usual three
+//  faces and tokens, so it follows light/dark with no special cases.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// The listing header, set between a heavy rule and a double rule like a
+// The listing header, set between a heavy rule and a hairline like a
 // masthead, on one row instead of The List's two, and not sticky.
 .listing__head--paper {
   position: static;
   display: flex; align-items: center; flex-wrap: wrap;
   gap: var(--s-3) var(--s-5);
-  margin-bottom: var(--s-5);
+  margin-bottom: var(--s-6);
   padding: var(--s-3) 0;
   border-top: 3px solid var(--text);
-  border-bottom: 3px double var(--text);
+  border-bottom: 1px solid var(--text);
 
+  .listing__title { gap: var(--s-4); }
   .listing__h { font-size: clamp(26px, 2.6vw, 34px); line-height: 1; }
   .listing__controls { margin: 0 0 0 auto; }
+}
+
+.jtag {
+  font-family: var(--f-read);
+  font-size: var(--t-md);
+  font-style: italic; font-weight: 300;
+  color: var(--text-3);
+  .c { color: var(--red-hi); }
 }
 
 // A link standing in for a button in the List's seg control.
 a.seg__btn { text-decoration: none; }
 
-// ── The lead ───────────────────────────────────────────────────────────────
+// ── Shared bits ────────────────────────────────────────────────────────────
 
-.jlead {
+.jkicker {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-1) var(--s-3);
+  margin-bottom: var(--s-2);
+  @include label(var(--t-3xs), var(--text-3));
+}
+.jkicker__type { color: var(--red-hi); }
+
+// Avatar, name, reading time — the line that makes a piece feel written by
+// someone. A photo when they have one, otherwise their initial.
+.jby {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-2);
+  @include label(var(--t-3xs), var(--text-3));
+  a:hover { color: var(--red-hi); }
+}
+.jby__dot { color: var(--text-4); }
+
+// The side stack is too narrow for the whole line without wrapping it
+// awkwardly, so there it's the author alone; the full byline is on the lead
+// and the cards.
+.jside .jby__dot, .jside .jby__read { display: none; }
+
+.jav {
+  width: 20px; height: 20px; flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-3);
+}
+.jav--i {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9px; letter-spacing: 0; color: var(--text-2);
+}
+
+// ── The front: lead and its stack ──────────────────────────────────────────
+
+.jfront {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: var(--s-5);
-  align-items: start;
-  padding-bottom: var(--s-5);
-  margin-bottom: var(--s-5);
+  grid-template-columns: minmax(0, 1.9fr) minmax(260px, 1fr);
+  gap: var(--s-6);
+  padding-bottom: var(--s-6);
+  margin-bottom: var(--s-6);
   border-bottom: 1px solid var(--line-2);
 }
 
-.jlead--text { grid-template-columns: minmax(0, 1fr); }
+.jhero { min-width: 0; }
 
-.jlead__art {
+.jhero__art {
   display: block;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 3 / 2;
+  margin-bottom: var(--s-4);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface-3);
 
   img { display: block; width: 100%; height: 100%; object-fit: cover;
-        transition: opacity var(--t-fast) var(--ease); }
-  &:hover img { opacity: 0.92; }
+        transition: transform 500ms var(--ease); }
+  &:hover img { transform: scale(1.02); }
 }
 
-.jlead__txt { min-width: 0; max-width: 720px; }
-
-.jkicker {
-  display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3);
-  margin-bottom: var(--s-2);
-  @include label(var(--t-3xs), var(--text-3));
-  a:hover { color: var(--red-hi); }
-}
-.jkicker__type { color: var(--red-hi); }
-
-.jlead__title {
-  margin: 0 0 var(--s-2);
+.jhero__title {
+  margin: 0 0 var(--s-3);
   font-family: var(--f-display);
-  font-size: clamp(24px, 2.6vw, 34px);
+  font-size: clamp(28px, 3.4vw, 46px);
   font-weight: 600;
   font-variation-settings: 'SOFT' 22, 'WONK' 1;
-  line-height: 1.06;
-  letter-spacing: -0.025em;
+  line-height: 1.04;
+  letter-spacing: -0.028em;
   a { color: inherit; &:hover { color: var(--red-hi); } }
 }
 
-.jlead__deck {
-  margin: 0 0 var(--s-3);
+.jhero__dek {
+  margin: 0 0 var(--s-4);
+  max-width: 60ch;
   font-family: var(--f-read);
-  font-size: var(--t-lg);
+  font-size: var(--t-xl);
   font-style: italic; font-weight: 300;
   line-height: 1.35;
   color: var(--text-2);
 }
 
-.jlead__excerpt {
-  margin: 0 0 var(--s-3);
-  font-family: var(--f-read);
-  font-size: var(--t-md);
-  line-height: 1.55;
-  color: var(--text-2);
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.jmore {
-  @include label(var(--t-3xs), var(--red-hi));
-  &:hover { text-decoration: underline; }
-}
-
-// ── Columns ────────────────────────────────────────────────────────────────
-
-// Real newspaper columns rather than a grid: as many as fit at this width,
-// stories packed by height with no gaps, and the rule between them drawn by
-// the columns themselves. Reads down each column, then across.
-.jcols { column-width: 340px; column-gap: var(--s-6); column-rule: 1px solid var(--line); }
-
-.jitem {
+// Nothing beside it: the lead goes horizontal rather than stretching a
+// full-width cover across the page.
+.jfront--solo { grid-template-columns: minmax(0, 1fr); }
+.jfront--solo .jhero {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--s-5);
+  align-items: center;
+}
+.jfront--solo .jhero__art { margin-bottom: 0; }
+.jfront--solo .jhero--text { grid-template-columns: minmax(0, 1fr); }
+
+.jside {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding-left: var(--s-5);
+  border-left: 1px solid var(--line-2);
+}
+
+.jside__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
   gap: var(--s-4);
   align-items: start;
-  break-inside: avoid;
-  // Padding below, none above, so every column's first story starts level.
-  margin-bottom: var(--s-4);
-  padding-bottom: var(--s-4);
-  border-bottom: 1px solid var(--line);
+  padding: var(--s-4) 0;
+  border-top: 1px solid var(--line);
 
-  &:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-  &:hover { .jitem__title { color: var(--red-hi); } .jitem__art img { opacity: 0.9; } }
+  &:first-child { border-top: none; padding-top: 0; }
+  &:last-child  { padding-bottom: 0; }
+  &:hover { .jside__title { color: var(--red-hi); } .jside__art img { transform: scale(1.04); } }
 }
+.jside__item--text { grid-template-columns: minmax(0, 1fr); }
 
-.jitem--text { grid-template-columns: minmax(0, 1fr); }
+.jside__txt { display: flex; flex-direction: column; min-width: 0; }
 
-.jitem__art {
-  display: block;
-  aspect-ratio: 4 / 3;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--surface-3);
-
-  img { display: block; width: 100%; height: 100%; object-fit: cover;
-        transition: opacity var(--t-fast) var(--ease); }
-}
-
-.jitem__txt { display: flex; flex-direction: column; min-width: 0; }
-
-.jitem__title {
-  margin-bottom: var(--s-1);
+.jside__title {
+  margin-bottom: var(--s-2);
   font-family: var(--f-display);
   font-size: var(--t-lg);
   font-weight: 600;
@@ -4161,20 +4180,79 @@ a.seg__btn { text-decoration: none; }
   transition: color var(--t-fast) var(--ease);
 }
 
-.jitem__deck,
-.jitem__excerpt {
+.jside__art {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-3);
+  img { display: block; width: 100%; height: 100%; object-fit: cover;
+        transition: transform 400ms var(--ease); }
+}
+
+// ── The cards ──────────────────────────────────────────────────────────────
+
+// Date order, left to right then down — an archive should read in the order
+// it happened. As many columns as fit.
+.jgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--s-6) var(--s-5);
+}
+
+.jcard { display: flex; flex-direction: column; min-width: 0; }
+
+.jcard__art {
+  display: block;
+  aspect-ratio: 3 / 2;
+  margin-bottom: var(--s-3);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-3);
+  img { display: block; width: 100%; height: 100%; object-fit: cover;
+        transition: transform 400ms var(--ease); }
+}
+
+.jcard__title {
   margin-bottom: var(--s-2);
+  font-family: var(--f-display);
+  font-size: var(--t-xl);
+  font-weight: 600;
+  font-variation-settings: 'SOFT' 22, 'WONK' 1;
+  line-height: 1.13;
+  letter-spacing: -0.018em;
+  color: var(--text);
+  transition: color var(--t-fast) var(--ease);
+}
+
+.jcard__dek {
+  margin-bottom: var(--s-3);
   font-family: var(--f-read);
-  font-size: var(--t);
-  line-height: 1.45;
+  font-size: var(--t-md);
+  line-height: 1.5;
   color: var(--text-2);
-  // Cut rather than let one long deck set the height of its whole column.
+  // Cut rather than let one long deck set the height of its whole row.
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.jitem__deck { font-style: italic; font-weight: 300; }
+.jcard__dek--deck { font-style: italic; font-weight: 300; }
 
-.jby { @include label(var(--t-3xs), var(--text-3)); }
+// Pinned to the foot so bylines line up across a row of unequal cards.
+.jcard .jby { margin-top: auto; }
+
+// No cover: a typographic card — a heavy rule on top and a bigger headline —
+// rather than a grey placeholder block pretending to be a picture.
+.jcard--text {
+  padding-top: var(--s-3);
+  border-top: 3px solid var(--text);
+  .jcard__title { font-size: 26px; line-height: 1.1; }
+  .jcard__dek { -webkit-line-clamp: 5; }
+}
+
+.jcard:hover {
+  .jcard__title { color: var(--red-hi); }
+  .jcard__art img { transform: scale(1.03); }
+}
 
 // ── The plain list ─────────────────────────────────────────────────────────
 
@@ -4187,15 +4265,27 @@ a.seg__btn { text-decoration: none; }
 
 .jpager {
   display: flex; align-items: center; justify-content: space-between;
+  margin-top: var(--s-7);
   padding-top: var(--s-4);
   border-top: 1px solid var(--line-2);
 }
 .jpager__n { @include label(var(--t-3xs), var(--text-3)); }
 
+@media (max-width: 900px) {
+  .jfront { grid-template-columns: minmax(0, 1fr); }
+  .jside {
+    padding-left: 0;
+    padding-top: var(--s-4);
+    border-left: none;
+    border-top: 1px solid var(--line-2);
+  }
+}
+
 @media (max-width: 760px) {
-  .jlead { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
-  .jlead__art { aspect-ratio: 16 / 9; }
+  .jfront--solo .jhero { grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .jfront--solo .jhero__art { margin-bottom: 0; }
   .listing__head--paper .listing__controls { margin-left: 0; }
+  .jtag { display: none; }
 }
 
 @media (max-width: 600px) {
